@@ -81,12 +81,20 @@ export class InputManager {
         this.onTouch?.(pos);
     }
     handleMouseMove(e) {
+        // 防止 touch/mouse 双重触发
+        if (Date.now() - this.lastTouchTime < 200) {
+            return;
+        }
         if (e.buttons !== 1)
             return;
         const pos = this.getCanvasPosition(e.clientX, e.clientY);
         this.onTouchMove?.(pos);
     }
     handleMouseUp(e) {
+        // 防止 touch/mouse 双重触发
+        if (Date.now() - this.lastTouchTime < 200) {
+            return;
+        }
         const pos = this.getCanvasPosition(e.clientX, e.clientY);
         this.onTouchEnd?.(pos);
     }
