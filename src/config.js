@@ -112,11 +112,6 @@ export const TARGET_TYPES = [
 ];
 export const CONFIG = {
     GAME_DURATION: 60,
-    CAT: {
-        SPEED: 200,
-        RADIUS: 35,
-        COLOR: '#FF9933'
-    },
     // 运动轨迹参数配置
     MOVEMENT_PARAMS: {
         // 圆周运动
@@ -165,20 +160,6 @@ export const CONFIG = {
             targetRadius: 100,     // 目标点运动半径
             targetSpeed: 1         // 目标点运动速度
         }
-    },
-    YARN_BALL: {
-        SPEED: 80,
-        RADIUS: 20,
-        POINTS: 10,
-        COLOR: '#FF6B6B'
-    },
-    BUTTERFLY: {
-        SPEED: 60,
-        RADIUS: 25,
-        POINTS: 20,
-        AMPLITUDE: 50,
-        FREQUENCY: 2,
-        COLOR: '#9B59B6'
     },
     SPAWN: {
         INTERVAL: 1500,
