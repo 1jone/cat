@@ -1,0 +1,385 @@
+/**
+ * SettingsManager - 游戏设置管理器
+ * 单例模式，负责设置的读取、保存和管理
+ */
+
+export class SettingsManager {
+    static instance = null;
+
+    constructor() {
+        // 默认设置
+        this.defaultSettings = {
+            audio: {
+                bgmVolume: 0.5,
+                sfxVolume: 0.8,
+                muted: false
+            },
+            game: {
+                vibration: true
+            },
+            stats: {
+                highScore: 0,
+                totalGames: 0,
+                totalPlayCount: 0,    // 总游戏次数（用于广告概率计算）
+                targetHighScores: {}, // 按目标类型分别统计（动态结构）
+                endless: {            // 无尽模式统计
+                    highScore: 0,
+                    longestTime: 0
+                }
+            },
+            // 广告相关数据
+            ad: {
+                unlockData: {},      // 目标解锁时间记录 { targetId: timestamp }
+                adWatchCount: 0      // 累计观看广告次数
+            }
+        };
+
+        // 当前设置（初始化为默认值的深拷贝）
+        this.settings = JSON.parse(JSON.stringify(this.defaultSettings));
+    }
+
+    /**
+     * 获取单例实例
+     */
+    static getInstance() {
+        if (!SettingsManager.instance) {
+            SettingsManager.instance = new SettingsManager();
+        }
+        return SettingsManager.instance;
+    }
+
+    /**
+     * 从本地存储加载设置
+     */
+    load() {
+        try {
+            const data = tt.getStorageSync('gameSettings');
+            if (data) {
+                const saved = JSON.parse(data);
+                // 深度合并，确保新增的默认设置项也存在
+                this.settings = this.deepMerge(this.defaultSettings, saved);
+            }
+            console.log('Settings loaded:', this.settings);
+        } catch (e) {
+            console.warn('Settings load failed, using defaults:', e);
+            this.settings = JSON.parse(JSON.stringify(this.defaultSettings));
+        }
+    }
+
+    /**
+     * 保存设置到本地存储
+     */
+    save() {
+        try {
+            tt.setStorageSync('gameSettings', JSON.stringify(this.settings));
+            console.log('Settings saved');
+        } catch (e) {
+            console.warn('Settings save failed:', e);
+        }
+    }
+
+    /**
+     * 深度合并对象
+     */
+    deepMerge(target, source) {
+        const result = { ...target };
+        for (const key in source) {
+            if (source.hasOwnProperty(key)) {
+                if (typeof source[key] === 'object' && source[key] !== null && !Array.isArray(source[key])) {
+                    result[key] = this.deepMerge(target[key] || {}, source[key]);
+                } else {
+                    result[key] = source[key];
+                }
+            }
+        }
+        return result;
+    }
+
+    /**
+     * 获取设置值
+     * @param {string} key - 点分隔的键路径，如 'audio.bgmVolume'
+     * @returns {*} 设置值
+     */
+    get(key) {
+        const keys = key.split('.');
+        let value = this.settings;
+        for (const k of keys) {
+            if (value === undefined || value === null) return undefined;
+            value = value[k];
+        }
+        return value;
+    }
+
+    /**
+     * 设置值并自动保存
+     * @param {string} key - 点分隔的键路径
+     * @param {*} value - 要设置的值
+     */
+    set(key, value) {
+        const keys = key.split('.');
+        let obj = this.settings;
+        for (let i = 0; i < keys.length - 1; i++) {
+            if (obj[keys[i]] === undefined) {
+                obj[keys[i]] = {};
+            }
+            obj = obj[keys[i]];
+        }
+        obj[keys[keys.length - 1]] = value;
+        this.save();
+    }
+
+    /**
+     * 获取 BGM 音量
+     */
+    getBGMVolume() {
+        return this.get('audio.bgmVolume');
+    }
+
+    /**
+     * 设置 BGM 音量
+     */
+    setBGMVolume(volume) {
+        this.set('audio.bgmVolume', Math.max(0, Math.min(1, volume)));
+    }
+
+    /**
+     * 获取音效音量
+     */
+    getSFXVolume() {
+        return this.get('audio.sfxVolume');
+    }
+
+    /**
+     * 设置音效音量
+     */
+    setSFXVolume(volume) {
+        this.set('audio.sfxVolume', Math.max(0, Math.min(1, volume)));
+    }
+
+    /**
+     * 获取静音状态
+     */
+    isMuted() {
+        return this.get('audio.muted');
+    }
+
+    /**
+     * 设置静音状态
+     */
+    setMuted(muted) {
+        this.set('audio.muted', muted);
+    }
+
+    /**
+     * 获取震动设置
+     */
+    isVibrationEnabled() {
+        return this.get('game.vibration');
+    }
+
+    /**
+     * 设置震动
+     */
+    setVibration(enabled) {
+        this.set('game.vibration', enabled);
+    }
+
+    /**
+     * 获取最高分
+     */
+    getHighScore() {
+        return this.get('stats.highScore');
+    }
+
+    /**
+     * 更新最高分（如果新分数更高）
+     * @param {number} score - 新分数
+     * @returns {boolean} 是否更新了最高分
+     */
+    updateHighScore(score) {
+        const current = this.getHighScore();
+        if (score > current) {
+            this.set('stats.highScore', score);
+            return true;
+        }
+        return false;
+    }
+
+    // ==================== 目标得分统计方法 ====================
+
+    /**
+     * 更新特定目标的最高分（动态添加）
+     * @param {string} targetId - 目标ID
+     * @param {number} score - 新分数
+     * @returns {boolean} 是否更新了最高分
+     */
+    updateTargetHighScore(targetId, score) {
+        const targetScores = this.get('stats.targetHighScores') || {};
+        const currentHigh = targetScores[targetId] || 0;
+
+        if (score > currentHigh) {
+            targetScores[targetId] = score;
+            this.set('stats.targetHighScores', targetScores);
+            // 同时更新全局最高分
+            this.updateHighScore(score);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * 获取特定目标的最高分
+     * @param {string} targetId - 目标ID
+     * @returns {number} 最高分
+     */
+    getTargetHighScore(targetId) {
+        const targetScores = this.get('stats.targetHighScores') || {};
+        return targetScores[targetId] || 0;
+    }
+
+    /**
+     * 获取所有目标最高分
+     * @returns {Object} 所有目标的最高分 { targetId: score }
+     */
+    getAllTargetHighScores() {
+        return this.get('stats.targetHighScores') || {};
+    }
+
+    // ==================== 无尽模式统计方法 ====================
+
+    /**
+     * 更新无尽模式记录
+     * @param {number} score - 分数
+     * @param {number} gameTimeMs - 游戏时长（毫秒）
+     * @returns {boolean} 是否更新了任何记录
+     */
+    updateEndlessStats(score, gameTimeMs) {
+        const endless = this.get('stats.endless') || {};
+        let updated = false;
+
+        if (score > (endless.highScore || 0)) {
+            this.set('stats.endless.highScore', score);
+            updated = true;
+        }
+
+        const gameTimeSec = Math.floor(gameTimeMs / 1000);
+        if (gameTimeSec > (endless.longestTime || 0)) {
+            this.set('stats.endless.longestTime', gameTimeSec);
+            updated = true;
+        }
+
+        // 同时更新全局最高分
+        this.updateHighScore(score);
+
+        return updated;
+    }
+
+    /**
+     * 获取无尽模式统计
+     * @returns {Object} { highScore, longestTime }
+     */
+    getEndlessStats() {
+        return this.get('stats.endless') || {
+            highScore: 0,
+            longestTime: 0
+        };
+    }
+
+    /**
+     * 获取总游戏次数
+     */
+    getTotalGames() {
+        return this.get('stats.totalGames');
+    }
+
+    /**
+     * 增加游戏次数
+     */
+    incrementGames() {
+        const current = this.getTotalGames();
+        this.set('stats.totalGames', current + 1);
+    }
+
+    // ==================== 广告相关方法 ====================
+
+    /**
+     * 获取目标解锁数据
+     * @returns {Object} 解锁数据 { targetId: timestamp }
+     */
+    getUnlockData() {
+        return this.get('ad.unlockData') || {};
+    }
+
+    /**
+     * 保存目标解锁数据
+     * @param {Object} unlockData - 解锁数据
+     */
+    saveUnlockData(unlockData) {
+        this.set('ad.unlockData', unlockData);
+    }
+
+    /**
+     * 获取总游戏次数（用于广告概率计算）
+     * @returns {number} 总游戏次数
+     */
+    getTotalPlayCount() {
+        return this.get('stats.totalPlayCount') || 0;
+    }
+
+    /**
+     * 增加总游戏次数
+     */
+    incrementPlayCount() {
+        const current = this.getTotalPlayCount();
+        this.set('stats.totalPlayCount', current + 1);
+    }
+
+    /**
+     * 获取广告观看次数
+     * @returns {number} 广告观看次数
+     */
+    getAdWatchCount() {
+        return this.get('ad.adWatchCount') || 0;
+    }
+
+    /**
+     * 增加广告观看次数
+     */
+    incrementAdWatchCount() {
+        const current = this.getAdWatchCount();
+        this.set('ad.adWatchCount', current + 1);
+    }
+
+    // ==================== 其他方法 ====================
+
+    /**
+     * 重置设置到默认值
+     */
+    resetToDefault() {
+        this.settings = JSON.parse(JSON.stringify(this.defaultSettings));
+        this.save();
+    }
+
+    /**
+     * 触发震动（如果启用）
+     * @param {string} type - 震动类型：'light', 'medium', 'heavy'
+     */
+    vibrate(type = 'light') {
+        if (!this.isVibrationEnabled()) return;
+
+        try {
+            tt.vibrateShort({
+                type: type,
+                success: () => {},
+                fail: () => {}
+            });
+        } catch (e) {
+            // 忽略震动失败
+        }
+    }
+}
+
+// 导出获取实例的便捷函数
+export function getSettingsManager() {
+    return SettingsManager.getInstance();
+}
