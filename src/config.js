@@ -16,7 +16,23 @@ export const TARGET_TYPES = [
         speed: 100,
         radius: 40,
         points: 15,
-        movement: 'bounce'
+        movement: 'bounce',
+        background: {
+            image: '/backgrounds/captain_bg.jpg',
+            showGrass: false
+        },
+        // 广告配置 - 免费目标
+        unlock: {
+            type: 'free',
+            adRequired: false,
+            unlockDuration: 0
+        },
+        adTrigger: {
+            enabled: false,
+            probability: 0,
+            cooldown: 0,
+            maxPerSession: 0
+        }
     },
     {
         id: 'octopus',
@@ -25,7 +41,23 @@ export const TARGET_TYPES = [
         speed: 70,
         radius: 45,
         points: 20,
-        movement: 'wave'
+        movement: 'wave',
+        background: {
+            image: '/backgrounds/octopus_bg.jpg',
+            showGrass: false
+        },
+        // 广告配置 - 需要广告解锁（24小时）
+        unlock: {
+            type: 'ad',
+            adRequired: true,
+            unlockDuration: 24 * 60 * 60 * 1000  // 24小时
+        },
+        adTrigger: {
+            enabled: true,
+            probability: 0.3,
+            cooldown: 90,
+            maxPerSession: 3
+        }
     },
     {
         id: 'bear',
@@ -34,7 +66,23 @@ export const TARGET_TYPES = [
         speed: 50,
         radius: 35,
         points: 25,
-        movement: 'random'
+        movement: 'random',
+        background: {
+            image: '/backgrounds/bear_bg.jpg',
+            showGrass: false
+        },
+        // 广告配置 - 需要广告解锁（24小时）
+        unlock: {
+            type: 'ad',
+            adRequired: true,
+            unlockDuration: 24 * 60 * 60 * 1000  // 24小时
+        },
+        adTrigger: {
+            enabled: true,
+            probability: 0.4,
+            cooldown: 90,
+            maxPerSession: 3
+        }
     },
     {
         id: 'seagull',
@@ -43,7 +91,23 @@ export const TARGET_TYPES = [
         speed: 200,
         radius: 30,
         points: 10,
-        movement: 'random'
+        movement: 'random',
+        background: {
+            image: '/backgrounds/seagull_bg.jpg',
+            showGrass: false
+        },
+        // 广告配置 - 免费但有概率广告
+        unlock: {
+            type: 'free',
+            adRequired: false,
+            unlockDuration: 0
+        },
+        adTrigger: {
+            enabled: true,
+            probability: 0.2,
+            cooldown: 120,
+            maxPerSession: 2
+        }
     }
 ];
 export const CONFIG = {
@@ -52,6 +116,55 @@ export const CONFIG = {
         SPEED: 200,
         RADIUS: 35,
         COLOR: '#FF9933'
+    },
+    // 运动轨迹参数配置
+    MOVEMENT_PARAMS: {
+        // 圆周运动
+        circular: {
+            orbitRadius: 80,       // 轨道半径
+            angularSpeed: 2        // 角速度 (rad/s)
+        },
+        // 螺旋运动
+        spiral: {
+            baseRadius: 40,        // 起始半径
+            maxRadius: 120,        // 最大半径
+            spiralRate: 20,        // 扩展速率 (px/s)
+            angularSpeed: 1.5      // 角速度
+        },
+        // 锯齿运动
+        zigzag: {
+            amplitude: 60,         // 振幅
+            frequency: 1           // 频率 (Hz)
+        },
+        // 8字形运动
+        figure8: {
+            amplitudeX: 100,       // 水平振幅
+            amplitudeY: 80,        // 垂直振幅
+            angularSpeed: 1.5      // 角速度
+        },
+        // 冲刺运动
+        dash: {
+            dashSpeed: 200,        // 冲刺速度
+            dashDuration: 0.4,     // 冲刺时长 (s)
+            pauseDuration: 0.8     // 停顿时长 (s)
+        },
+        // 悬停运动
+        hover: {
+            hoverAmplitude: 30,    // 飘动幅度
+            driftSpeed: 20         // 漂移速度
+        },
+        // 钟摆运动
+        pendulum: {
+            pendulumLength: 150,   // 摆长
+            maxAngle: Math.PI / 3, // 最大摆角 (60度)
+            angularFreq: 2         // 角频率
+        },
+        // 追逐运动
+        chase: {
+            chaseSpeed: 80,        // 追逐速度
+            targetRadius: 100,     // 目标点运动半径
+            targetSpeed: 1         // 目标点运动速度
+        }
     },
     YARN_BALL: {
         SPEED: 80,
@@ -121,5 +234,140 @@ export const AUDIO_CONFIG = {
         SIZE: 40,           // 按钮大小
         PADDING: 15,        // 边距
         ICON_SIZE: 24       // 图标大小
+    },
+    // 音效文件路径
+    SFX_PATHS: {
+        catch: (points) => {
+            const tier = getPointsTier(points);
+            return `assets/sfx/catch_${tier}.mp3`;
+        },
+        unlock: 'assets/sfx/unlock.mp3',
+        countdown: 'assets/sfx/countdown.mp3',
+        gameStart: 'assets/sfx/game_start.mp3',
+        gameOver: 'assets/sfx/game_over.mp3',
+        buttonClick: 'assets/sfx/button_click.mp3',
+        cardScroll: 'assets/sfx/card_scroll.mp3',
+        modeSelect: 'assets/sfx/mode_select.mp3'
     }
 };
+
+/**
+ * 根据分数获取音调档位
+ * 用于参数化得分音效的降级方案
+ */
+export function getPointsTier(points) {
+    if (points <= 10) return 10;
+    if (points <= 15) return 15;
+    if (points <= 20) return 20;
+    if (points <= 25) return 25;
+    return 30;
+}
+
+// 设置页面配置
+export const SETTINGS_CONFIG = {
+    // 面板配置
+    PANEL: {
+        widthRatio: 0.85,       // 相对于 canvas 宽度的比例
+        maxWidth: 340,          // 最大宽度
+        height: 450,            // 面板高度
+        padding: 24,            // 内边距
+        borderRadius: 20        // 圆角半径
+    },
+    // 滑块配置
+    SLIDER: {
+        width: 140,             // 滑块轨道宽度
+        height: 6,              // 滑块轨道高度
+        thumbRadius: 11         // 把手半径
+    },
+    // 开关配置
+    TOGGLE: {
+        width: 52,              // 开关宽度
+        height: 30              // 开关高度
+    },
+    // 按钮配置
+    BUTTON: {
+        height: 44,             // 按钮高度
+        borderRadius: 22        // 按钮圆角（药丸形状）
+    },
+    // 间距配置
+    SPACING: {
+        row: 18,                // 行间距
+        group: 25               // 分组间距
+    },
+    // 颜色配置（毛玻璃风格 - 实化版）
+    COLORS: {
+        // 遮罩和面板
+        overlay: 'rgba(0, 0, 0, 0.6)',           // 全屏遮罩（加深）
+        panelBg: 'rgba(40, 40, 50, 0.92)',       // 面板背景（深色实化）
+        panelBorder: 'rgba(255, 255, 255, 0.4)', // 面板边框
+        innerBg: 'rgba(255, 255, 255, 0.08)',    // 内容区背景
+        // 文字
+        title: '#FFFFFF',                         // 标题颜色
+        text: 'rgba(255, 255, 255, 0.9)',        // 普通文字（更清晰）
+        accent: '#FFD700',                        // 强调色（金色）
+        // 滑块
+        sliderTrack: 'rgba(255, 255, 255, 0.25)', // 滑块轨道
+        sliderFill: '#FFD700',                    // 滑块填充
+        sliderThumb: '#FFFFFF',                   // 滑块把手
+        // 开关
+        toggleOn: '#FFD700',                      // 开关开启
+        toggleOff: 'rgba(255, 255, 255, 0.25)',  // 开关关闭
+        toggleThumb: '#FFFFFF',                   // 开关滑块
+        // 按钮
+        buttonBg: 'rgba(255, 255, 255, 0.15)',   // 按钮背景
+        buttonHover: 'rgba(255, 255, 255, 0.25)' // 按钮悬停
+    },
+    // 设置按钮配置
+    SETTINGS_BUTTON: {
+        SIZE: 40,               // 按钮大小
+        PADDING: 15,            // 边距
+        ICON: '⚙️'              // 图标
+    },
+    // 退出按钮配置（在设置面板内）
+    EXIT_BUTTON: {
+        height: 44,             // 按钮高度
+        marginTop: 15,          // 与返回按钮的间距
+        bgColor: 'rgba(220, 53, 69, 0.9)',      // 红色背景
+        borderColor: 'rgba(255, 100, 100, 0.6)' // 边框颜色
+    }
+};
+
+// 广告配置
+export const AD_CONFIG = {
+    // 全局控制
+    globalEnabled: true,
+    minIntervalSeconds: 60,        // 两次广告最小间隔（秒）
+    maxAdsPerSession: 5,           // 单次会话最大广告数
+
+    // 解锁配置
+    unlock: {
+        duration: 24 * 60 * 60 * 1000  // 24小时有效期（毫秒）
+    },
+
+    // 概率调节因子
+    factors: {
+        newUser: 0.5,                // 新用户降低概率（前5局）
+        consecutivePlays: 0.1        // 连续游戏每局增加概率
+    },
+
+    // 冷却规则
+    cooldown: {
+        afterWatch: 120,             // 观看广告后冷却秒数
+        afterSkip: 60                // 跳过广告后冷却秒数
+    },
+
+    // 无尽模式广告
+    endless: {
+        entryProbability: 0,       // 进入时广告概率
+        unlockProbability: 0.5,      // 解锁目标时广告概率
+        gameOverProbability: 0.3,    // 游戏结束时广告概率
+        gameOverMinScore: 500        // 触发结束广告的最低分数
+    },
+
+    // 广告位ID（需要替换为实际ID）
+    adUnitIds: {
+        rewarded: 'YOUR_REWARDED_AD_UNIT_ID',
+        interstitial: 'YOUR_INTERSTITIAL_AD_UNIT_ID'
+    }
+};
+

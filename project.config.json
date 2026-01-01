@@ -7,12 +7,11 @@
         "newFeature": true,
         "autoCompile": true,
         "compileHotReLoad": true,
-        "nativeCompile": true
+        "nativeCompile": true,
+        "mockLogin": false,
+        "autoPush": true
     },
     "appid": "testAppId",
     "projectname": "catGame",
-    "douyinProjectType": "native",
-    "scripts": {
-        "beforeCompile": ""
-    }
+    "douyinProjectType": "native"
 }
