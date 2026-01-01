@@ -4,9 +4,7 @@ console.log(
   'https://developer.open-douyin.com/docs/resource/zh-CN/mini-game/guide/minigame/introduction',
 );
 
-let systemInfo = tt.getSystemInfoSync();
-let canvas = tt.createCanvas(),
-  ctx = canvas.getContext('2d');
+let canvas = tt.createCanvas()
 
 const game = new Game(canvas)
 game.start()
