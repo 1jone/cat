@@ -1,0 +1,95 @@
+/**
+ * SpawnManager - 目标生成管理器
+ * 负责目标生成逻辑
+ */
+
+import { CONFIG, TARGET_TYPES } from '../config';
+import { Vector2 } from '../utils/Vector2';
+import { ImageTarget } from '../entities/ImageTarget';
+
+export class SpawnManager {
+    constructor() {
+        // 生成计时器
+        this.spawnTimer = 0;
+    }
+
+    /**
+     * 重置计时器
+     */
+    reset() {
+        this.spawnTimer = 0;
+    }
+
+    /**
+     * 更新生成逻辑
+     * @param {number} dt - 时间增量（秒）
+     * @param {object} params - 参数
+     * @param {number} params.canvasWidth - 画布宽度
+     * @param {number} params.canvasHeight - 画布高度
+     * @param {Array} params.targets - 当前目标数组
+     * @param {object} params.selectedTarget - 选中的目标配置
+     * @param {boolean} params.isEndlessMode - 是否无尽模式
+     * @param {number[]} params.unlockedIndices - 已解锁的目标索引
+     * @param {object} params.multipliers - 属性乘数
+     * @returns {ImageTarget|null} 新生成的目标或 null
+     */
+    update(dt, { canvasWidth, canvasHeight, targets, selectedTarget, isEndlessMode, unlockedIndices, multipliers }) {
+        this.spawnTimer += dt * 1000;
+
+        if (this.spawnTimer >= CONFIG.SPAWN.INTERVAL && targets.length < CONFIG.SPAWN.MAX_TARGETS) {
+            this.spawnTimer = 0;
+            return this.spawnTarget({
+                canvasWidth,
+                canvasHeight,
+                selectedTarget,
+                isEndlessMode,
+                unlockedIndices,
+                multipliers
+            });
+        }
+
+        return null;
+    }
+
+    /**
+     * 生成单个目标
+     * @param {object} params - 参数
+     * @returns {ImageTarget} 新生成的目标
+     */
+    spawnTarget({ canvasWidth, canvasHeight, selectedTarget, isEndlessMode, unlockedIndices, multipliers }) {
+        const padding = 100;
+        const x = padding + Math.random() * (canvasWidth - padding * 2);
+        const y = padding + Math.random() * (canvasHeight - padding * 2 - 80);
+        const position = new Vector2(x, y);
+
+        // 无尽模式：从已解锁的目标中随机选择，应用随机属性
+        let targetConfig;
+        if (isEndlessMode && unlockedIndices && unlockedIndices.length > 0) {
+            const randomIndex = unlockedIndices[Math.floor(Math.random() * unlockedIndices.length)];
+            const baseTarget = TARGET_TYPES[randomIndex];
+            targetConfig = {
+                ...baseTarget,
+                speed: baseTarget.speed * (multipliers?.speed || 1),
+                radius: baseTarget.radius * (multipliers?.radius || 1),
+                points: Math.floor(baseTarget.points * (multipliers?.points || 1))
+            };
+        } else {
+            targetConfig = selectedTarget;
+        }
+
+        return new ImageTarget(position, targetConfig);
+    }
+
+    /**
+     * 生成初始目标
+     * @param {object} params - 参数
+     * @returns {ImageTarget[]} 初始目标数组
+     */
+    spawnInitialTargets(params) {
+        const targets = [];
+        for (let i = 0; i < CONFIG.SPAWN.INITIAL_COUNT; i++) {
+            targets.push(this.spawnTarget(params));
+        }
+        return targets;
+    }
+}
