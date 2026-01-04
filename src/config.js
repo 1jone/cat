@@ -363,16 +363,15 @@ export const AD_CONFIG = {
 // 受惊机制配置
 export const STARTLE_CONFIG = {
     TRIGGER_RADIUS: 150,       // 触发距离（像素）
-    SPEED_MULTIPLIER: 2.5,     // 速度倍增
+    SPEED_MULTIPLIER: 2.5,     // 速度峰值倍增
     DURATION: 0.8,             // 受惊持续时间（秒）
     COOLDOWN: 2.0,             // 冷却时间（秒）
     FLEE_ANGLE_VARIANCE: 30,   // 逃离角度随机偏差（度）
 
     // 视觉效果参数
-    SHAKE_INTENSITY: 5,        // 抖动强度（像素）
-    SHAKE_FREQUENCY: 30,       // 抖动频率（Hz）
-    FLASH_INTERVAL: 0.1,       // 闪烁间隔（秒）
-    EXCLAMATION_DURATION: 0.5, // 惊叹号显示时长（秒）
+    SHAKE_INTENSITY: 6,        // 抖动强度（像素，会随时间衰减）
+    SHAKE_FREQUENCY: 25,       // 抖动频率（Hz）
+    EXCLAMATION_DURATION: 0.4, // 惊叹号显示时长（秒）
     EXCLAMATION_OFFSET_Y: -50  // 惊叹号Y偏移（在目标上方）
 };
 

@@ -27,8 +27,8 @@ export class ImageTarget extends Entity {
         this.startleCooldown = 0;
         this.originalSpeed = config.speed;
         this.exclamationTimer = 0;
-        this.flashTimer = 0;
-        this.isFlashVisible = true;
+        this.startleScale = 1;           // 受惊时的缩放（替代闪烁）
+        this.startleSpeedFactor = 1;     // 速度渐变因子
         this.preStartleMovement = null;  // 受惊前的运动模式
         this.preStartleVelocity = null;  // 受惊前的速度
 
@@ -605,8 +605,8 @@ export class ImageTarget extends Entity {
         this.isStartled = true;
         this.startleTimer = STARTLE_CONFIG.DURATION;
         this.exclamationTimer = STARTLE_CONFIG.EXCLAMATION_DURATION;
-        this.flashTimer = 0;
-        this.isFlashVisible = true;
+        this.startleScale = 1.3;         // 初始放大（惊吓反应）
+        this.startleSpeedFactor = 1;     // 速度从1开始渐变到最大
 
         // 保存受惊前的状态
         this.preStartleVelocity = this.velocity ? this.velocity.clone() : null;
@@ -634,9 +634,8 @@ export class ImageTarget extends Entity {
         const rotatedX = fleeX * cos - fleeY * sin;
         const rotatedY = fleeX * sin + fleeY * cos;
 
-        // 设置高速逃离
-        const startleSpeed = this.originalSpeed * STARTLE_CONFIG.SPEED_MULTIPLIER;
-        this.velocity = new Vector2(rotatedX * startleSpeed, rotatedY * startleSpeed);
+        // 保存逃离方向（用于渐变加速）
+        this.fleeDirection = new Vector2(rotatedX, rotatedY);
     }
 
     /**
@@ -646,19 +645,37 @@ export class ImageTarget extends Entity {
         if (this.isStartled) {
             this.startleTimer -= dt;
             this.exclamationTimer -= dt;
-            this.flashTimer += dt;
 
-            // 闪烁逻辑
-            if (this.flashTimer >= STARTLE_CONFIG.FLASH_INTERVAL) {
-                this.flashTimer = 0;
-                this.isFlashVisible = !this.isFlashVisible;
+            // 计算受惊进度 (0 = 刚开始, 1 = 结束)
+            const progress = 1 - (this.startleTimer / STARTLE_CONFIG.DURATION);
+
+            // 缩放渐变：1.3 -> 1.0（从放大恢复正常）
+            this.startleScale = 1 + 0.3 * (1 - progress);
+
+            // 速度渐变：快速加速到峰值，然后缓慢减速
+            // 使用缓动函数：先快后慢
+            if (progress < 0.2) {
+                // 前20%：快速加速到峰值
+                this.startleSpeedFactor = 1 + (STARTLE_CONFIG.SPEED_MULTIPLIER - 1) * (progress / 0.2);
+            } else {
+                // 后80%：缓慢减速回正常
+                const decayProgress = (progress - 0.2) / 0.8;
+                this.startleSpeedFactor = STARTLE_CONFIG.SPEED_MULTIPLIER - (STARTLE_CONFIG.SPEED_MULTIPLIER - 1) * decayProgress;
             }
+
+            // 更新速度向量
+            const currentSpeed = this.originalSpeed * this.startleSpeedFactor;
+            this.velocity = new Vector2(
+                this.fleeDirection.x * currentSpeed,
+                this.fleeDirection.y * currentSpeed
+            );
 
             // 受惊结束
             if (this.startleTimer <= 0) {
                 this.isStartled = false;
                 this.startleCooldown = STARTLE_CONFIG.COOLDOWN;
-                this.isFlashVisible = true;
+                this.startleScale = 1;
+                this.startleSpeedFactor = 1;
 
                 // 恢复之前的速度（如果有）
                 if (this.preStartleVelocity) {
@@ -736,25 +753,21 @@ export class ImageTarget extends Entity {
     // ==================== 渲染 ====================
 
     render(ctx) {
-        // 闪烁：受惊时交替显示/隐藏
-        if (this.isStartled && !this.isFlashVisible) {
-            // 不绘制目标，但仍绘制惊叹号
-            this.renderExclamation(ctx);
-            return;
-        }
-
         ctx.save();
 
         // 计算并平滑旋转角度
         const targetRotation = this.getTargetRotation();
         this.currentRotation = this.lerpAngle(this.currentRotation, targetRotation, 0.15);
 
-        // 抖动偏移（受惊时）
+        // 抖动偏移（受惊时，强度随时间衰减）
         let shakeX = 0, shakeY = 0;
         if (this.isStartled) {
+            // 抖动强度随受惊进度衰减
+            const shakeProgress = this.startleTimer / STARTLE_CONFIG.DURATION;
+            const currentShakeIntensity = STARTLE_CONFIG.SHAKE_INTENSITY * shakeProgress;
             const shakePhase = this.time * STARTLE_CONFIG.SHAKE_FREQUENCY * Math.PI * 2;
-            shakeX = Math.sin(shakePhase) * STARTLE_CONFIG.SHAKE_INTENSITY;
-            shakeY = Math.cos(shakePhase * 1.3) * STARTLE_CONFIG.SHAKE_INTENSITY * 0.7;
+            shakeX = Math.sin(shakePhase) * currentShakeIntensity;
+            shakeY = Math.cos(shakePhase * 1.3) * currentShakeIntensity * 0.7;
         }
 
         // 移动到目标中心点（含抖动偏移）
@@ -763,11 +776,13 @@ export class ImageTarget extends Entity {
         // 旋转画布
         ctx.rotate(this.currentRotation);
 
+        // 基础晃动 + 受惊缩放
         const wobble = Math.sin(this.time * 3) * 0.1;
-        const scale = 1 + wobble * 0.1;
+        const baseScale = 1 + wobble * 0.1;
+        const finalScale = baseScale * this.startleScale;
 
         if (this.imageLoaded) {
-            const size = this.radius * 2 * scale;
+            const size = this.radius * 2 * finalScale;
             ctx.drawImage(
                 this.image,
                 -size / 2,
@@ -778,7 +793,7 @@ export class ImageTarget extends Entity {
         } else {
             ctx.fillStyle = '#CCCCCC';
             ctx.beginPath();
-            ctx.arc(0, 0, this.radius * scale, 0, Math.PI * 2);
+            ctx.arc(0, 0, this.radius * finalScale, 0, Math.PI * 2);
             ctx.fill();
 
             ctx.fillStyle = '#666666';
