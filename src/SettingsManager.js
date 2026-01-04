@@ -3,6 +3,8 @@
  * 单例模式，负责设置的读取、保存和管理
  */
 
+import { CONFIG } from './config';
+
 export class SettingsManager {
     static instance = null;
 
@@ -15,7 +17,16 @@ export class SettingsManager {
                 muted: false
             },
             game: {
-                vibration: true
+                vibration: true,
+                // 按关卡独立存储游戏参数
+                // 结构: { targetId: { spawnInterval: ms, maxTargets: count, speedMultiplier: number } }
+                targetGameSettings: {},
+                // 无尽模式独立设置
+                endlessGameSettings: {
+                    spawnInterval: CONFIG.SPAWN.INTERVAL,
+                    maxTargets: CONFIG.SPAWN.MAX_TARGETS,
+                    speedMultiplier: CONFIG.SPAWN.SPEED_MULTIPLIER
+                }
             },
             stats: {
                 highScore: 0,
@@ -375,6 +386,104 @@ export class SettingsManager {
             });
         } catch (e) {
             // 忽略震动失败
+        }
+    }
+
+    // ==================== 游戏参数设置方法（按关卡独立） ====================
+
+    /**
+     * 获取指定关卡的生成间隔
+     * @param {string} targetId - 目标ID
+     * @param {boolean} isEndlessMode - 是否无尽模式
+     * @returns {number} 生成间隔（毫秒）
+     */
+    getSpawnInterval(targetId, isEndlessMode = false) {
+        if (isEndlessMode) {
+            return this.get('game.endlessGameSettings.spawnInterval') ?? CONFIG.SPAWN.INTERVAL;
+        }
+        const settings = this.get('game.targetGameSettings') || {};
+        return settings[targetId]?.spawnInterval ?? CONFIG.SPAWN.INTERVAL;
+    }
+
+    /**
+     * 设置指定关卡的生成间隔
+     * @param {string} targetId - 目标ID
+     * @param {number} ms - 生成间隔（毫秒）
+     * @param {boolean} isEndlessMode - 是否无尽模式
+     */
+    setSpawnInterval(targetId, ms, isEndlessMode = false) {
+        const clampedMs = Math.max(CONFIG.SPAWN.INTERVAL_MIN, Math.min(CONFIG.SPAWN.INTERVAL_MAX, ms));
+        if (isEndlessMode) {
+            this.set('game.endlessGameSettings.spawnInterval', clampedMs);
+        } else {
+            const settings = this.get('game.targetGameSettings') || {};
+            if (!settings[targetId]) settings[targetId] = {};
+            settings[targetId].spawnInterval = clampedMs;
+            this.set('game.targetGameSettings', settings);
+        }
+    }
+
+    /**
+     * 获取指定关卡的最大实体数量
+     * @param {string} targetId - 目标ID
+     * @param {boolean} isEndlessMode - 是否无尽模式
+     * @returns {number} 最大实体数量
+     */
+    getMaxTargets(targetId, isEndlessMode = false) {
+        if (isEndlessMode) {
+            return this.get('game.endlessGameSettings.maxTargets') ?? CONFIG.SPAWN.MAX_TARGETS;
+        }
+        const settings = this.get('game.targetGameSettings') || {};
+        return settings[targetId]?.maxTargets ?? CONFIG.SPAWN.MAX_TARGETS;
+    }
+
+    /**
+     * 设置指定关卡的最大实体数量
+     * @param {string} targetId - 目标ID
+     * @param {number} count - 最大实体数量
+     * @param {boolean} isEndlessMode - 是否无尽模式
+     */
+    setMaxTargets(targetId, count, isEndlessMode = false) {
+        const clampedCount = Math.max(CONFIG.SPAWN.MAX_TARGETS_MIN, Math.min(CONFIG.SPAWN.MAX_TARGETS_MAX, count));
+        if (isEndlessMode) {
+            this.set('game.endlessGameSettings.maxTargets', clampedCount);
+        } else {
+            const settings = this.get('game.targetGameSettings') || {};
+            if (!settings[targetId]) settings[targetId] = {};
+            settings[targetId].maxTargets = clampedCount;
+            this.set('game.targetGameSettings', settings);
+        }
+    }
+
+    /**
+     * 获取指定关卡的速度乘数
+     * @param {string} targetId - 目标ID
+     * @param {boolean} isEndlessMode - 是否无尽模式
+     * @returns {number} 速度乘数
+     */
+    getSpeedMultiplier(targetId, isEndlessMode = false) {
+        if (isEndlessMode) {
+            return this.get('game.endlessGameSettings.speedMultiplier') ?? CONFIG.SPAWN.SPEED_MULTIPLIER;
+        }
+        const settings = this.get('game.targetGameSettings') || {};
+        return settings[targetId]?.speedMultiplier ?? CONFIG.SPAWN.SPEED_MULTIPLIER;
+    }
+
+    /**
+     * 设置指定关卡的速度乘数
+     * @param {string} targetId - 目标ID
+     * @param {number} multiplier - 速度乘数
+     * @param {boolean} isEndlessMode - 是否无尽模式
+     */
+    setSpeedMultiplier(targetId, multiplier, isEndlessMode = false) {
+        const clampedMultiplier = Math.max(CONFIG.SPAWN.SPEED_MULTIPLIER_MIN, Math.min(CONFIG.SPAWN.SPEED_MULTIPLIER_MAX, multiplier));
+        if (isEndlessMode) {
+            this.set('game.endlessGameSettings.speedMultiplier', clampedMultiplier);
+        } else {
+            const settings = this.get('game.targetGameSettings') || {};
+            if (!settings[targetId]) settings[targetId] = {};
+            settings[targetId].speedMultiplier = clampedMultiplier;
+            this.set('game.targetGameSettings', settings);
         }
     }
 }

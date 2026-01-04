@@ -1,0 +1,13 @@
+{
+  "name": "emoji-tool",
+  "version": "1.0.0",
+  "description": "Download Twemoji and generate sprite sheet for catGame",
+  "main": "index.js",
+  "scripts": {
+    "generate": "node index.js"
+  },
+  "dependencies": {
+    "sharp": "^0.33.0"
+  },
+  "license": "MIT"
+}

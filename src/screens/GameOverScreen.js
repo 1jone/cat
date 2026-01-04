@@ -4,9 +4,10 @@
  */
 
 export class GameOverScreen {
-    constructor(canvas, ctx) {
+    constructor(canvas, ctx, emojiManager) {
         this.canvas = canvas;
         this.ctx = ctx;
+        this.emojiManager = emojiManager;
     }
 
     /**
@@ -28,14 +29,17 @@ export class GameOverScreen {
         let yOffset = this.canvas.height / 2 - 100;
 
         // 标题（破纪录时显示特殊标题）
-        ctx.fillStyle = '#FFFFFF';
         ctx.font = 'bold 48px Arial';
         ctx.textAlign = 'center';
         if (isNewRecord) {
+            // 使用 emoji 图片渲染庆祝图标
+            this.emojiManager.draw(ctx, 'party', this.canvas.width / 2 - 120, yOffset - 10, 40);
             ctx.fillStyle = '#FFD700';
-            ctx.fillText('🎉 新纪录！', this.canvas.width / 2, yOffset);
+            ctx.fillText(' 新纪录！', this.canvas.width / 2 + 10, yOffset);
         } else {
-            ctx.fillText('🎉 游戏结束！', this.canvas.width / 2, yOffset);
+            this.emojiManager.draw(ctx, 'party', this.canvas.width / 2 - 130, yOffset - 10, 40);
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillText(' 游戏结束！', this.canvas.width / 2 + 10, yOffset);
         }
         yOffset += 60;
 
@@ -61,10 +65,11 @@ export class GameOverScreen {
             yOffset += 40;
         }
 
-        // 继续提示
+        // 继续提示 - 使用 emoji 图片渲染手指
         yOffset = Math.max(yOffset + 20, this.canvas.height / 2 + 80);
+        this.emojiManager.draw(ctx, 'finger', this.canvas.width / 2 - 130, yOffset - 5, 26);
         ctx.font = 'bold 28px Arial';
         ctx.fillStyle = '#FFFFFF';
-        ctx.fillText('👆 点击选择新目标', this.canvas.width / 2, yOffset);
+        ctx.fillText(' 点击选择新目标', this.canvas.width / 2 + 10, yOffset);
     }
 }

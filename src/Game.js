@@ -14,6 +14,7 @@ import { GameStateManager, GameState } from './managers/GameStateManager';
 import { ResourceManager } from './managers/ResourceManager';
 import { SpawnManager } from './managers/SpawnManager';
 import { AdManager } from './managers/AdManager';
+import { EmojiManager } from './managers/EmojiManager';
 
 // 屏幕
 import { SelectionScreen } from './screens/SelectionScreen';
@@ -38,16 +39,26 @@ export class Game {
         // 初始化管理器
         this.stateManager = new GameStateManager();
         this.resourceManager = new ResourceManager();
-        this.spawnManager = new SpawnManager();
+        this.emojiManager = new EmojiManager();
+
+        // 初始化设置管理器（需要在 SpawnManager 之前）
+        this.settingsManager = getSettingsManager();
+        this.settingsManager.load();
+
+        // 初始化 SpawnManager（传入设置管理器）
+        this.spawnManager = new SpawnManager(this.settingsManager);
+
+        // 预加载 emoji 精灵图
+        this.emojiManager.preload();
 
         // 初始化屏幕
-        this.startScreen = new StartScreen(canvas, ctx);
-        this.gameOverScreen = new GameOverScreen(canvas, ctx);
+        this.startScreen = new StartScreen(canvas, ctx, this.emojiManager);
+        this.gameOverScreen = new GameOverScreen(canvas, ctx, this.emojiManager);
 
         // 初始化渲染器
         this.bgRenderer = new BackgroundRenderer(canvas, ctx);
-        this.hudRenderer = new HUDRenderer(canvas, ctx);
-        this.effectsRenderer = new EffectsRenderer(canvas, ctx);
+        this.hudRenderer = new HUDRenderer(canvas, ctx, this.emojiManager);
+        this.effectsRenderer = new EffectsRenderer(canvas, ctx, this.emojiManager);
 
         // 初始化输入管理器
         this.inputManager = new InputManager(canvas);
@@ -60,21 +71,17 @@ export class Game {
         this.audioManager = getAudioManager();
         this.audioInitialized = false;
 
-        // 初始化设置管理器
-        this.settingsManager = getSettingsManager();
-        this.settingsManager.load();
-
         // 初始化广告管理器
         this.adManager = new AdManager(this.settingsManager);
 
         // 初始化设置界面
-        this.settingsUI = new SettingsUI(canvas, ctx, this.settingsManager, this.audioManager);
+        this.settingsUI = new SettingsUI(canvas, ctx, this.settingsManager, this.audioManager, this.emojiManager);
 
         // 预加载资源
         this.resourceManager.preloadImages();
 
         // 初始化选择界面（需要在资源管理器之后，传入广告管理器和设置管理器）
-        this.selectionScreen = new SelectionScreen(canvas, ctx, this.resourceManager, this.adManager, this.settingsManager);
+        this.selectionScreen = new SelectionScreen(canvas, ctx, this.resourceManager, this.adManager, this.settingsManager, this.emojiManager);
 
         // 防止点击穿透
         this.skipNextTouchEnd = false;

@@ -7,9 +7,10 @@ import { AUDIO_CONFIG, SETTINGS_CONFIG } from '../config';
 import { drawRoundRect } from '../utils/CanvasUtils';
 
 export class HUDRenderer {
-    constructor(canvas, ctx) {
+    constructor(canvas, ctx, emojiManager) {
         this.canvas = canvas;
         this.ctx = ctx;
+        this.emojiManager = emojiManager;
 
         // 按钮位置
         this.muteButton = null;
@@ -72,7 +73,9 @@ export class HUDRenderer {
             ctx.fillStyle = '#FFFFFF';
             ctx.font = 'bold 16px Arial';
             ctx.textAlign = 'left';
-            ctx.fillText('♾️ 无尽', 25, 35);
+            // 使用 emoji 图片渲染无尽模式图标
+            this.emojiManager.draw(ctx, 'infinite', 32, 30, 18);
+            ctx.fillText(' 无尽', 42, 35);
             ctx.font = 'bold 20px Arial';
             ctx.fillStyle = '#FFD700';
             ctx.fillText(`${Math.floor(gameTimer / 1000)}s`, 25, 58);
@@ -81,12 +84,16 @@ export class HUDRenderer {
             ctx.fillStyle = '#FFFFFF';
             ctx.font = 'bold 26px Arial';
             ctx.textAlign = 'left';
-            ctx.fillText(`⏱️ ${timeLeft}s`, 25, 45);
+            // 使用 emoji 图片渲染计时器图标
+            this.emojiManager.draw(ctx, 'timer', 38, 38, 24);
+            ctx.fillText(` ${timeLeft}s`, 50, 45);
         }
 
         ctx.fillStyle = '#FFD700';
         ctx.font = 'bold 22px Arial';
-        ctx.fillText(`⭐ ${score}`, 25, 78);
+        // 使用 emoji 图片渲染星星图标
+        this.emojiManager.draw(ctx, 'star', 36, 72, 20);
+        ctx.fillText(` ${score}`, 48, 78);
 
         // 渲染按钮
         this.renderMuteButton(false);
@@ -114,13 +121,9 @@ export class HUDRenderer {
         ctx.lineWidth = 2;
         ctx.stroke();
 
-        // 图标
-        ctx.fillStyle = '#FFFFFF';
-        ctx.font = `${AUDIO_CONFIG.MUTE_BUTTON.ICON_SIZE}px Arial`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(isMuted ? '🔇' : '🔊', btn.x, btn.y);
-        ctx.textBaseline = 'alphabetic';
+        // 使用 emoji 图片渲染图标
+        const iconKey = isMuted ? 'sound-off' : 'sound-on';
+        this.emojiManager.draw(ctx, iconKey, btn.x, btn.y, AUDIO_CONFIG.MUTE_BUTTON.ICON_SIZE);
     }
 
     /**
@@ -143,13 +146,8 @@ export class HUDRenderer {
         ctx.lineWidth = 2;
         ctx.stroke();
 
-        // 齿轮图标
-        ctx.fillStyle = '#FFFFFF';
-        ctx.font = `${SETTINGS_CONFIG.SETTINGS_BUTTON.SIZE * 0.5}px Arial`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(SETTINGS_CONFIG.SETTINGS_BUTTON.ICON, btn.x, btn.y);
-        ctx.textBaseline = 'alphabetic';
+        // 使用 emoji 图片渲染齿轮图标
+        this.emojiManager.draw(ctx, 'settings', btn.x, btn.y, SETTINGS_CONFIG.SETTINGS_BUTTON.SIZE * 0.5);
     }
 
     /**

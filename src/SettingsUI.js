@@ -3,14 +3,15 @@
  * 半透明毛玻璃效果设计
  */
 
-import { SETTINGS_CONFIG } from './config';
+import { SETTINGS_CONFIG, CONFIG } from './config';
 
 export class SettingsUI {
-    constructor(canvas, ctx, settingsManager, audioManager) {
+    constructor(canvas, ctx, settingsManager, audioManager, emojiManager = null) {
         this.canvas = canvas;
         this.ctx = ctx;
         this.settingsManager = settingsManager;
         this.audioManager = audioManager;
+        this.emojiManager = emojiManager;
 
         // 面板尺寸（延迟计算）
         this.panel = null;
@@ -46,9 +47,9 @@ export class SettingsUI {
         const canvasW = this.canvas.width;
         const canvasH = this.canvas.height;
 
-        // 计算面板尺寸
+        // 计算面板尺寸（游戏中时使用更高的面板以容纳额外滑块）
         const panelWidth = Math.min(canvasW * cfg.PANEL.widthRatio, cfg.PANEL.maxWidth);
-        const panelHeight = cfg.PANEL.height;
+        const panelHeight = this.isInGame ? cfg.PANEL.heightInGame : cfg.PANEL.height;
         const panelX = (canvasW - panelWidth) / 2;
         const panelY = (canvasH - panelHeight) / 2;
 
@@ -139,7 +140,91 @@ export class SettingsUI {
             getValue: () => this.settingsManager.isVibrationEnabled(),
             setValue: (v) => this.settingsManager.setVibration(v)
         });
-        currentY += cfg.SPACING.group + 20;
+        currentY += cfg.SPACING.row + 30;
+
+        // 游戏参数滑块（仅在游戏中显示）
+        // 标记游戏参数滑块的起始位置
+        this.gameParamSlidersStartIndex = this.sliders.length;
+
+        if (this.isInGame && this.currentGameInfo) {
+            const { targetId, isEndlessMode } = this.currentGameInfo;
+
+            // 生成间隔滑块（反向：滑块向右 = 间隔更短 = 生成更快）
+            this.sliders.push({
+                id: 'spawnInterval',
+                label: '生成间隔',
+                x: contentX,
+                y: currentY,
+                width: contentWidth,
+                trackX: contentX + contentWidth - cfg.SLIDER.width,
+                trackWidth: cfg.SLIDER.width,
+                getValue: () => {
+                    const ms = this.settingsManager.getSpawnInterval(targetId, isEndlessMode);
+                    // 反向映射：值越大，间隔越短
+                    return 1 - (ms - CONFIG.SPAWN.INTERVAL_MIN) / (CONFIG.SPAWN.INTERVAL_MAX - CONFIG.SPAWN.INTERVAL_MIN);
+                },
+                setValue: (v) => {
+                    // 反向映射：滑块值越大，间隔越短
+                    const ms = Math.round(CONFIG.SPAWN.INTERVAL_MAX - v * (CONFIG.SPAWN.INTERVAL_MAX - CONFIG.SPAWN.INTERVAL_MIN));
+                    this.settingsManager.setSpawnInterval(targetId, ms, isEndlessMode);
+                },
+                formatValue: (v) => {
+                    const ms = Math.round(CONFIG.SPAWN.INTERVAL_MAX - v * (CONFIG.SPAWN.INTERVAL_MAX - CONFIG.SPAWN.INTERVAL_MIN));
+                    return (ms / 1000).toFixed(1) + 's';
+                }
+            });
+            currentY += cfg.SPACING.row + 30;
+
+            // 移动速度滑块
+            this.sliders.push({
+                id: 'speedMultiplier',
+                label: '移动速度',
+                x: contentX,
+                y: currentY,
+                width: contentWidth,
+                trackX: contentX + contentWidth - cfg.SLIDER.width,
+                trackWidth: cfg.SLIDER.width,
+                getValue: () => {
+                    const multiplier = this.settingsManager.getSpeedMultiplier(targetId, isEndlessMode);
+                    // 0.5-2 映射到 0-1
+                    return (multiplier - CONFIG.SPAWN.SPEED_MULTIPLIER_MIN) / (CONFIG.SPAWN.SPEED_MULTIPLIER_MAX - CONFIG.SPAWN.SPEED_MULTIPLIER_MIN);
+                },
+                setValue: (v) => {
+                    const multiplier = CONFIG.SPAWN.SPEED_MULTIPLIER_MIN + v * (CONFIG.SPAWN.SPEED_MULTIPLIER_MAX - CONFIG.SPAWN.SPEED_MULTIPLIER_MIN);
+                    this.settingsManager.setSpeedMultiplier(targetId, multiplier, isEndlessMode);
+                },
+                formatValue: (v) => {
+                    const multiplier = CONFIG.SPAWN.SPEED_MULTIPLIER_MIN + v * (CONFIG.SPAWN.SPEED_MULTIPLIER_MAX - CONFIG.SPAWN.SPEED_MULTIPLIER_MIN);
+                    return multiplier.toFixed(1) + 'x';
+                }
+            });
+            currentY += cfg.SPACING.row + 30;
+
+            // 最大实体数量滑块
+            this.sliders.push({
+                id: 'maxTargets',
+                label: '实体数量',
+                x: contentX,
+                y: currentY,
+                width: contentWidth,
+                trackX: contentX + contentWidth - cfg.SLIDER.width,
+                trackWidth: cfg.SLIDER.width,
+                getValue: () => {
+                    const count = this.settingsManager.getMaxTargets(targetId, isEndlessMode);
+                    return (count - CONFIG.SPAWN.MAX_TARGETS_MIN) / (CONFIG.SPAWN.MAX_TARGETS_MAX - CONFIG.SPAWN.MAX_TARGETS_MIN);
+                },
+                setValue: (v) => {
+                    const count = Math.round(CONFIG.SPAWN.MAX_TARGETS_MIN + v * (CONFIG.SPAWN.MAX_TARGETS_MAX - CONFIG.SPAWN.MAX_TARGETS_MIN));
+                    this.settingsManager.setMaxTargets(targetId, count, isEndlessMode);
+                },
+                formatValue: (v) => {
+                    return Math.round(CONFIG.SPAWN.MAX_TARGETS_MIN + v * (CONFIG.SPAWN.MAX_TARGETS_MAX - CONFIG.SPAWN.MAX_TARGETS_MIN)).toString();
+                }
+            });
+            currentY += cfg.SPACING.row + 10;
+        }
+
+        currentY += cfg.SPACING.group;
 
         // 统计区域 Y 位置
         this.statsY = currentY + 30;
@@ -274,12 +359,24 @@ export class SettingsUI {
     renderTitle() {
         const ctx = this.ctx;
         const cfg = SETTINGS_CONFIG;
+        const titleX = this.panel.x + this.panel.width / 2;
+        const titleY = this.panel.y + cfg.PANEL.padding + 20;
 
-        ctx.fillStyle = cfg.COLORS.title;
-        ctx.font = 'bold 22px Arial';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('⚙️ 设置', this.panel.x + this.panel.width / 2, this.panel.y + cfg.PANEL.padding + 20);
+        // 使用 emoji 图片渲染设置图标
+        if (this.emojiManager) {
+            this.emojiManager.draw(ctx, 'settings', titleX - 50, titleY, 22);
+            ctx.fillStyle = cfg.COLORS.title;
+            ctx.font = 'bold 22px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(' 设置', titleX + 5, titleY);
+        } else {
+            ctx.fillStyle = cfg.COLORS.title;
+            ctx.font = 'bold 22px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('⚙️ 设置', titleX, titleY);
+        }
     }
 
     /**
@@ -311,10 +408,11 @@ export class SettingsUI {
         ctx.textBaseline = 'middle';
         ctx.fillText(slider.label, slider.x, slider.y);
 
-        // 百分比值
+        // 值显示（支持自定义格式化）
         ctx.fillStyle = cfg.COLORS.accent;
         ctx.textAlign = 'right';
-        ctx.fillText(Math.round(value * 100) + '%', slider.trackX - 10, slider.y);
+        const displayValue = slider.formatValue ? slider.formatValue(value) : Math.round(value * 100) + '%';
+        ctx.fillText(displayValue, slider.trackX - 10, slider.y);
 
         // 滑块轨道
         const trackY = slider.y - cfg.SLIDER.height / 2;

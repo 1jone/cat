@@ -8,9 +8,14 @@ import { Vector2 } from '../utils/Vector2';
 import { ImageTarget } from '../entities/ImageTarget';
 
 export class SpawnManager {
-    constructor() {
+    /**
+     * @param {import('../SettingsManager').SettingsManager} settingsManager - 设置管理器
+     */
+    constructor(settingsManager = null) {
         // 生成计时器
         this.spawnTimer = 0;
+        // 设置管理器
+        this.settingsManager = settingsManager;
     }
 
     /**
@@ -36,7 +41,15 @@ export class SpawnManager {
     update(dt, { canvasWidth, canvasHeight, targets, selectedTarget, isEndlessMode, unlockedIndices, multipliers }) {
         this.spawnTimer += dt * 1000;
 
-        if (this.spawnTimer >= CONFIG.SPAWN.INTERVAL && targets.length < CONFIG.SPAWN.MAX_TARGETS) {
+        const targetId = selectedTarget?.id;
+
+        // 从设置读取生成间隔和最大实体数，否则使用默认值
+        const interval = this.settingsManager?.getSpawnInterval(targetId, isEndlessMode)
+            ?? CONFIG.SPAWN.INTERVAL;
+        const maxTargets = this.settingsManager?.getMaxTargets(targetId, isEndlessMode)
+            ?? CONFIG.SPAWN.MAX_TARGETS;
+
+        if (this.spawnTimer >= interval && targets.length < maxTargets) {
             this.spawnTimer = 0;
             return this.spawnTarget({
                 canvasWidth,
@@ -62,6 +75,11 @@ export class SpawnManager {
         const y = padding + Math.random() * (canvasHeight - padding * 2 - 80);
         const position = new Vector2(x, y);
 
+        const targetId = selectedTarget?.id;
+
+        // 获取用户设置的速度乘数
+        const userSpeedMultiplier = this.settingsManager?.getSpeedMultiplier(targetId, isEndlessMode) ?? 1;
+
         // 无尽模式：从已解锁的目标中随机选择，应用随机属性
         let targetConfig;
         if (isEndlessMode && unlockedIndices && unlockedIndices.length > 0) {
@@ -69,12 +87,17 @@ export class SpawnManager {
             const baseTarget = TARGET_TYPES[randomIndex];
             targetConfig = {
                 ...baseTarget,
-                speed: baseTarget.speed * (multipliers?.speed || 1),
+                // 应用游戏内随机乘数和用户设置的速度乘数
+                speed: baseTarget.speed * (multipliers?.speed || 1) * userSpeedMultiplier,
                 radius: baseTarget.radius * (multipliers?.radius || 1),
                 points: Math.floor(baseTarget.points * (multipliers?.points || 1))
             };
         } else {
-            targetConfig = selectedTarget;
+            // 计时模式：应用用户设置的速度乘数
+            targetConfig = {
+                ...selectedTarget,
+                speed: selectedTarget.speed * userSpeedMultiplier
+            };
         }
 
         return new ImageTarget(position, targetConfig);

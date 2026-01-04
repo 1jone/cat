@@ -7,12 +7,13 @@ import { SELECTION_CONFIG, TARGET_TYPES, ENDLESS_MODE_CARD } from '../config';
 import { drawRoundRect } from '../utils/CanvasUtils';
 
 export class SelectionScreen {
-    constructor(canvas, ctx, resourceManager, adManager = null, settingsManager = null) {
+    constructor(canvas, ctx, resourceManager, adManager = null, settingsManager = null, emojiManager = null) {
         this.canvas = canvas;
         this.ctx = ctx;
         this.resourceManager = resourceManager;
         this.adManager = adManager;  // 广告管理器
         this.settingsManager = settingsManager;  // 设置管理器（用于获取最高分）
+        this.emojiManager = emojiManager;  // Emoji 管理器
 
         // 滚动选择相关属性
         this.scrollOffset = 0;
@@ -492,12 +493,16 @@ export class SelectionScreen {
         );
         ctx.fill();
 
-        // 锁图标
-        ctx.font = `bold ${40 * scale}px Arial`;
-        ctx.fillStyle = '#FFFFFF';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('🔒', x, y - 10 * scale);
+        // 锁图标 - 使用 emoji 图片渲染
+        if (this.emojiManager) {
+            this.emojiManager.draw(ctx, 'lock', x, y - 10 * scale, 40 * scale);
+        } else {
+            ctx.font = `bold ${40 * scale}px Arial`;
+            ctx.fillStyle = '#FFFFFF';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('🔒', x, y - 10 * scale);
+        }
 
         // 解锁提示文字
         ctx.font = `bold ${14 * scale}px Arial`;
@@ -565,12 +570,16 @@ export class SelectionScreen {
         ctx.stroke();
         ctx.shadowBlur = 0;
 
-        // ∞ 图标
-        ctx.font = `bold ${60 * scale}px Arial`;
-        ctx.fillStyle = '#FFFFFF';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('∞', center.x, center.y - 20 * scale);
+        // ∞ 图标 - 使用 emoji 图片渲染 (♾️)
+        if (this.emojiManager) {
+            this.emojiManager.draw(ctx, 'infinite', center.x, center.y - 20 * scale, 60 * scale);
+        } else {
+            ctx.font = `bold ${60 * scale}px Arial`;
+            ctx.fillStyle = '#FFFFFF';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('∞', center.x, center.y - 20 * scale);
+        }
 
         // 标题文字
         ctx.font = `bold ${20 * scale}px Arial`;

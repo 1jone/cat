@@ -162,8 +162,15 @@ export const CONFIG = {
         }
     },
     SPAWN: {
-        INTERVAL: 1500,
-        MAX_TARGETS: 6,
+        INTERVAL: 1500,           // 默认生成间隔（毫秒）
+        INTERVAL_MIN: 500,        // 最小生成间隔
+        INTERVAL_MAX: 3000,       // 最大生成间隔
+        MAX_TARGETS: 6,           // 默认最大实体数
+        MAX_TARGETS_MIN: 3,       // 最小实体数
+        MAX_TARGETS_MAX: 15,      // 最大实体数
+        SPEED_MULTIPLIER: 1,      // 默认速度乘数
+        SPEED_MULTIPLIER_MIN: 0.5,// 最小速度乘数
+        SPEED_MULTIPLIER_MAX: 2,  // 最大速度乘数
         INITIAL_COUNT: 3
     },
     COLORS: {
@@ -250,7 +257,8 @@ export const SETTINGS_CONFIG = {
     PANEL: {
         widthRatio: 0.85,       // 相对于 canvas 宽度的比例
         maxWidth: 340,          // 最大宽度
-        height: 450,            // 面板高度
+        height: 480,            // 面板高度（非游戏中）
+        heightInGame: 620,      // 面板高度（游戏中，多3个滑块）
         padding: 24,            // 内边距
         borderRadius: 20        // 圆角半径
     },

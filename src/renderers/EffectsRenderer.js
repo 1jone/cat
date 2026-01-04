@@ -6,9 +6,10 @@
 import { drawRoundRect } from '../utils/CanvasUtils';
 
 export class EffectsRenderer {
-    constructor(canvas, ctx) {
+    constructor(canvas, ctx, emojiManager) {
         this.canvas = canvas;
         this.ctx = ctx;
+        this.emojiManager = emojiManager;
     }
 
     /**
@@ -24,16 +25,15 @@ export class EffectsRenderer {
         const offsetY = (1 - alpha) * 40;
 
         ctx.save();
-        ctx.globalAlpha = alpha;
 
-        // 爪印
-        ctx.font = `${40 * scale}px Arial`;
-        ctx.textAlign = 'center';
-        ctx.fillText('🐾', effect.x, effect.y - offsetY);
+        // 使用 emoji 图片渲染爪印（带缩放和透明度动画）
+        this.emojiManager.drawScaled(ctx, 'paw', effect.x, effect.y - offsetY, 40, scale, alpha);
 
         // 分数
+        ctx.globalAlpha = alpha;
         ctx.font = `bold ${24 * scale}px Arial`;
         ctx.fillStyle = '#FFD700';
+        ctx.textAlign = 'center';
         ctx.fillText(`+${effect.points}`, effect.x, effect.y - offsetY - 40);
 
         ctx.restore();
