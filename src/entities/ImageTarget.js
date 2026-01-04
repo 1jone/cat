@@ -1,6 +1,6 @@
 import { Entity } from './Entity';
 import { Vector2 } from '../utils/Vector2';
-import { CONFIG } from '../config';
+import { CONFIG, STARTLE_CONFIG } from '../config';
 
 export class ImageTarget extends Entity {
     constructor(position, config) {
@@ -16,6 +16,28 @@ export class ImageTarget extends Entity {
         this.baseY = position.y;
         this.baseX = position.x;
         this.direction = Math.random() < 0.5 ? -1 : 1;
+
+        // 头部朝向相关属性
+        this.currentRotation = 0;  // 当前旋转角度
+        this.previousPosition = position.clone();  // 前一帧位置（用于计算无速度模式的方向）
+
+        // 受惊机制相关属性
+        this.isStartled = false;
+        this.startleTimer = 0;
+        this.startleCooldown = 0;
+        this.originalSpeed = config.speed;
+        this.exclamationTimer = 0;
+        this.flashTimer = 0;
+        this.isFlashVisible = true;
+        this.preStartleMovement = null;  // 受惊前的运动模式
+        this.preStartleVelocity = null;  // 受惊前的速度
+
+        // 动画系统预留属性
+        this.animationType = 'static';  // 'static' | 'gif' | 'spritesheet'
+        this.spriteFrames = [];
+        this.currentFrame = 0;
+        this.frameInterval = 100;
+        this.lastFrameTime = 0;
 
         // 获取运动参数（合并默认配置和自定义配置）
         const movementType = config.movement || 'bounce';
@@ -116,6 +138,18 @@ export class ImageTarget extends Entity {
 
     update(dt, canvasWidth, canvasHeight) {
         this.time += dt * 2;
+
+        // 保存当前位置用于计算移动方向
+        this.previousPosition = this.position.clone();
+
+        // 更新受惊状态
+        this.updateStartle(dt);
+
+        // 如果处于受惊状态，使用受惊运动
+        if (this.isStartled) {
+            this.updateStartleMovement(dt, canvasWidth, canvasHeight);
+            return;
+        }
 
         switch (this.config.movement) {
             case 'bounce':
@@ -550,10 +584,184 @@ export class ImageTarget extends Entity {
         }
     }
 
+    // ==================== 受惊机制 ====================
+
+    /**
+     * 检查是否应该触发受惊（由外部调用）
+     */
+    checkStartle(touchPosition) {
+        if (!touchPosition || this.startleCooldown > 0 || this.isStartled) return;
+
+        const distance = this.position.distanceTo(touchPosition);
+        if (distance < STARTLE_CONFIG.TRIGGER_RADIUS) {
+            this.triggerStartle(touchPosition);
+        }
+    }
+
+    /**
+     * 触发受惊状态
+     */
+    triggerStartle(touchPosition) {
+        this.isStartled = true;
+        this.startleTimer = STARTLE_CONFIG.DURATION;
+        this.exclamationTimer = STARTLE_CONFIG.EXCLAMATION_DURATION;
+        this.flashTimer = 0;
+        this.isFlashVisible = true;
+
+        // 保存受惊前的状态
+        this.preStartleVelocity = this.velocity ? this.velocity.clone() : null;
+
+        // 计算逃离方向（远离触摸点）
+        const dx = this.position.x - touchPosition.x;
+        const dy = this.position.y - touchPosition.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        let fleeX, fleeY;
+        if (distance > 0) {
+            fleeX = dx / distance;
+            fleeY = dy / distance;
+        } else {
+            // 触摸点和目标重合，随机选择方向
+            const angle = Math.random() * Math.PI * 2;
+            fleeX = Math.cos(angle);
+            fleeY = Math.sin(angle);
+        }
+
+        // 添加随机偏差
+        const angleVariance = (Math.random() - 0.5) * 2 * STARTLE_CONFIG.FLEE_ANGLE_VARIANCE * Math.PI / 180;
+        const cos = Math.cos(angleVariance);
+        const sin = Math.sin(angleVariance);
+        const rotatedX = fleeX * cos - fleeY * sin;
+        const rotatedY = fleeX * sin + fleeY * cos;
+
+        // 设置高速逃离
+        const startleSpeed = this.originalSpeed * STARTLE_CONFIG.SPEED_MULTIPLIER;
+        this.velocity = new Vector2(rotatedX * startleSpeed, rotatedY * startleSpeed);
+    }
+
+    /**
+     * 更新受惊状态计时器
+     */
+    updateStartle(dt) {
+        if (this.isStartled) {
+            this.startleTimer -= dt;
+            this.exclamationTimer -= dt;
+            this.flashTimer += dt;
+
+            // 闪烁逻辑
+            if (this.flashTimer >= STARTLE_CONFIG.FLASH_INTERVAL) {
+                this.flashTimer = 0;
+                this.isFlashVisible = !this.isFlashVisible;
+            }
+
+            // 受惊结束
+            if (this.startleTimer <= 0) {
+                this.isStartled = false;
+                this.startleCooldown = STARTLE_CONFIG.COOLDOWN;
+                this.isFlashVisible = true;
+
+                // 恢复之前的速度（如果有）
+                if (this.preStartleVelocity) {
+                    this.velocity = this.preStartleVelocity;
+                    this.preStartleVelocity = null;
+                }
+            }
+        }
+
+        if (this.startleCooldown > 0) {
+            this.startleCooldown -= dt;
+        }
+    }
+
+    /**
+     * 受惊时的移动更新（高速弹跳）
+     */
+    updateStartleMovement(dt, canvasWidth, canvasHeight) {
+        // 高速移动
+        this.position.x += this.velocity.x * dt;
+        this.position.y += this.velocity.y * dt;
+
+        // 边界碰撞反弹
+        if (this.position.x - this.radius < 0) {
+            this.position.x = this.radius;
+            this.velocity.x *= -1;
+        } else if (this.position.x + this.radius > canvasWidth) {
+            this.position.x = canvasWidth - this.radius;
+            this.velocity.x *= -1;
+        }
+
+        if (this.position.y - this.radius < 0) {
+            this.position.y = this.radius;
+            this.velocity.y *= -1;
+        } else if (this.position.y + this.radius > canvasHeight - 80) {
+            this.position.y = canvasHeight - 80 - this.radius;
+            this.velocity.y *= -1;
+        }
+    }
+
+    // ==================== 头部朝向 ====================
+
+    /**
+     * 角度插值（处理角度环绕问题）
+     */
+    lerpAngle(current, target, t) {
+        let diff = target - current;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        return current + diff * t;
+    }
+
+    /**
+     * 计算目标旋转角度
+     */
+    getTargetRotation() {
+        // 图片默认头部朝上，需要+90度（π/2）补偿
+        let targetRotation = 0;  // 默认不旋转（朝上）
+
+        // 优先使用速度向量
+        if (this.velocity && (Math.abs(this.velocity.x) > 0.1 || Math.abs(this.velocity.y) > 0.1)) {
+            targetRotation = Math.atan2(this.velocity.y, this.velocity.x) + Math.PI / 2;
+        } else {
+            // 对于无速度的运动模式，使用位置差分计算方向
+            const dx = this.position.x - this.previousPosition.x;
+            const dy = this.position.y - this.previousPosition.y;
+            if (Math.abs(dx) > 0.1 || Math.abs(dy) > 0.1) {
+                targetRotation = Math.atan2(dy, dx) + Math.PI / 2;
+            }
+        }
+
+        return targetRotation;
+    }
+
     // ==================== 渲染 ====================
 
     render(ctx) {
+        // 闪烁：受惊时交替显示/隐藏
+        if (this.isStartled && !this.isFlashVisible) {
+            // 不绘制目标，但仍绘制惊叹号
+            this.renderExclamation(ctx);
+            return;
+        }
+
         ctx.save();
+
+        // 计算并平滑旋转角度
+        const targetRotation = this.getTargetRotation();
+        this.currentRotation = this.lerpAngle(this.currentRotation, targetRotation, 0.15);
+
+        // 抖动偏移（受惊时）
+        let shakeX = 0, shakeY = 0;
+        if (this.isStartled) {
+            const shakePhase = this.time * STARTLE_CONFIG.SHAKE_FREQUENCY * Math.PI * 2;
+            shakeX = Math.sin(shakePhase) * STARTLE_CONFIG.SHAKE_INTENSITY;
+            shakeY = Math.cos(shakePhase * 1.3) * STARTLE_CONFIG.SHAKE_INTENSITY * 0.7;
+        }
+
+        // 移动到目标中心点（含抖动偏移）
+        ctx.translate(this.position.x + shakeX, this.position.y + shakeY);
+
+        // 旋转画布
+        ctx.rotate(this.currentRotation);
 
         const wobble = Math.sin(this.time * 3) * 0.1;
         const scale = 1 + wobble * 0.1;
@@ -562,22 +770,58 @@ export class ImageTarget extends Entity {
             const size = this.radius * 2 * scale;
             ctx.drawImage(
                 this.image,
-                this.position.x - size / 2,
-                this.position.y - size / 2,
+                -size / 2,
+                -size / 2,
                 size,
                 size
             );
         } else {
             ctx.fillStyle = '#CCCCCC';
             ctx.beginPath();
-            ctx.arc(this.position.x, this.position.y, this.radius * scale, 0, Math.PI * 2);
+            ctx.arc(0, 0, this.radius * scale, 0, Math.PI * 2);
             ctx.fill();
 
             ctx.fillStyle = '#666666';
             ctx.font = '14px Arial';
             ctx.textAlign = 'center';
-            ctx.fillText('加载中...', this.position.x, this.position.y + 5);
+            ctx.fillText('加载中...', 0, 5);
         }
+
+        ctx.restore();
+
+        // 绘制惊叹号（在目标上方，不受旋转影响）
+        if (this.exclamationTimer > 0) {
+            this.renderExclamation(ctx);
+        }
+    }
+
+    /**
+     * 渲染惊叹号特效
+     */
+    renderExclamation(ctx) {
+        const alpha = Math.min(1, this.exclamationTimer / 0.2);  // 淡出效果
+
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.font = 'bold 32px Arial';
+        ctx.fillStyle = '#FF4444';
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.lineWidth = 3;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        const x = this.position.x;
+        const y = this.position.y + STARTLE_CONFIG.EXCLAMATION_OFFSET_Y;
+
+        // 缩放动画（出现时放大然后收缩）
+        const scaleProgress = 1 - alpha;
+        const scale = 1 + scaleProgress * 0.5;
+
+        ctx.translate(x, y);
+        ctx.scale(scale, scale);
+
+        ctx.strokeText('!', 0, 0);
+        ctx.fillText('!', 0, 0);
 
         ctx.restore();
     }

@@ -39,6 +39,13 @@ export class InputManager {
             writable: true,
             value: 0
         });
+        // 当前触摸/鼠标位置（用于受惊机制检测）
+        Object.defineProperty(this, "currentTouchPosition", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: null
+        });
         this.canvas = canvas;
         this.setupEventListeners();
     }
@@ -56,12 +63,14 @@ export class InputManager {
         this.lastTouchTime = Date.now();
         const touch = e.touches[0];
         const pos = this.getCanvasPosition(touch.clientX, touch.clientY);
+        this.currentTouchPosition = pos;
         this.onTouchStart?.(pos);
     }
     handleTouchMove(e) {
         e.preventDefault();
         const touch = e.touches[0];
         const pos = this.getCanvasPosition(touch.clientX, touch.clientY);
+        this.currentTouchPosition = pos;
         this.onTouchMove?.(pos);
     }
     handleTouchEnd(e) {
@@ -69,6 +78,7 @@ export class InputManager {
         // touchend 事件中 touches 为空，使用 changedTouches
         const touch = e.changedTouches[0];
         const pos = this.getCanvasPosition(touch.clientX, touch.clientY);
+        this.currentTouchPosition = null;
         this.onTouchEnd?.(pos);
     }
     handleMouseDown(e) {
@@ -77,6 +87,7 @@ export class InputManager {
             return;
         }
         const pos = this.getCanvasPosition(e.clientX, e.clientY);
+        this.currentTouchPosition = pos;
         this.onTouchStart?.(pos);
         this.onTouch?.(pos);
     }
@@ -85,10 +96,12 @@ export class InputManager {
         if (Date.now() - this.lastTouchTime < 200) {
             return;
         }
-        if (e.buttons !== 1)
-            return;
         const pos = this.getCanvasPosition(e.clientX, e.clientY);
-        this.onTouchMove?.(pos);
+        // 只有按住鼠标时才更新位置（用于受惊检测）
+        if (e.buttons === 1) {
+            this.currentTouchPosition = pos;
+            this.onTouchMove?.(pos);
+        }
     }
     handleMouseUp(e) {
         // 防止 touch/mouse 双重触发
@@ -96,6 +109,7 @@ export class InputManager {
             return;
         }
         const pos = this.getCanvasPosition(e.clientX, e.clientY);
+        this.currentTouchPosition = null;
         this.onTouchEnd?.(pos);
     }
     getCanvasPosition(clientX, clientY) {

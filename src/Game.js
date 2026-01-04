@@ -187,7 +187,10 @@ export class Game {
         }
 
         // 更新目标
+        const touchPos = this.inputManager.currentTouchPosition;
         for (const target of this.targets) {
+            // 检查受惊（在更新前检测触摸位置）
+            target.checkStartle(touchPos);
             target.update(dt, this.canvas.width, this.canvas.height);
         }
         this.targets = this.targets.filter(t => t.isActive);
