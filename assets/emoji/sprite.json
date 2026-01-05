@@ -1,7 +1,7 @@
 {
   "image": "sprite.png",
   "size": 72,
-  "width": 792,
+  "width": 864,
   "height": 72,
   "frames": {
     "sound-on": {
@@ -46,6 +46,10 @@
     },
     "party": {
       "x": 720,
+      "y": 0
+    },
+    "phone": {
+      "x": 792,
       "y": 0
     }
   }

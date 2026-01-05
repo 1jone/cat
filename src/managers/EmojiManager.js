@@ -22,6 +22,7 @@ const SPRITE_DATA = {
     'lock': { x: 576, y: 0 },
     'finger': { x: 648, y: 0 },
     'party': { x: 720, y: 0 },
+    'phone': { x: 792, y: 0 },
   },
 };
 
@@ -188,6 +189,7 @@ export class EmojiManager {
       'lock': '🔒',
       'finger': '👆',
       'party': '🎉',
+      'phone': '📲',
     };
 
     const emoji = emojiMap[key];

@@ -15,6 +15,7 @@ const EMOJIS = [
   { key: 'lock', emoji: '🔒', codepoint: '1f512' },
   { key: 'finger', emoji: '👆', codepoint: '1f446' },
   { key: 'party', emoji: '🎉', codepoint: '1f389' },
+  { key: 'phone', emoji: '📲', codepoint: '1f4f2' },
 ];
 
 const CONFIG = {
