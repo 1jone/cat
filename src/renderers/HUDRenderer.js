@@ -11,6 +11,7 @@ export class HUDRenderer {
         this.canvas = canvas;
         this.ctx = ctx;
         this.emojiManager = emojiManager;
+        this.dpr = 1;  // 设备像素比
 
         // 按钮位置
         this.muteButton = null;
@@ -22,22 +23,25 @@ export class HUDRenderer {
 
     /**
      * 更新按钮位置（窗口大小变化时调用）
+     * 按钮位置：左下角，设置按钮在左，静音按钮在右
      */
     updateButtonPositions() {
-        // 静音按钮
         const muteConfig = AUDIO_CONFIG.MUTE_BUTTON;
-        this.muteButton = {
-            x: this.canvas.width - muteConfig.SIZE / 2 - muteConfig.PADDING,
-            y: muteConfig.SIZE / 2 + muteConfig.PADDING,
-            size: muteConfig.SIZE
+        const settingsConfig = SETTINGS_CONFIG.SETTINGS_BUTTON;
+        const logicalHeight = this.canvas.height / this.dpr;
+
+        // 设置按钮: 左下角最左侧
+        this.settingsButton = {
+            x: settingsConfig.SIZE / 2 + settingsConfig.PADDING,
+            y: logicalHeight - settingsConfig.SIZE / 2 - settingsConfig.PADDING,
+            size: settingsConfig.SIZE
         };
 
-        // 设置按钮（在静音按钮左侧）
-        const settingsConfig = SETTINGS_CONFIG.SETTINGS_BUTTON;
-        this.settingsButton = {
-            x: this.canvas.width - muteConfig.SIZE - muteConfig.PADDING - settingsConfig.SIZE / 2 - 10,
-            y: settingsConfig.SIZE / 2 + settingsConfig.PADDING,
-            size: settingsConfig.SIZE
+        // 静音按钮: 设置按钮右侧
+        this.muteButton = {
+            x: settingsConfig.PADDING + settingsConfig.SIZE + 10 + muteConfig.SIZE / 2,
+            y: logicalHeight - muteConfig.SIZE / 2 - muteConfig.PADDING,
+            size: muteConfig.SIZE
         };
     }
 
@@ -52,21 +56,10 @@ export class HUDRenderer {
     renderHUD({ score, timeLeft, isEndlessMode, gameTimer }) {
         const ctx = this.ctx;
 
-        // 无尽模式和计时模式使用一致的深灰色背景
-        if (isEndlessMode) {
-            ctx.fillStyle = 'rgba(51, 51, 51, 0.7)';
-        } else {
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-        }
-        drawRoundRect(ctx, 10, 10, 150, 95, 10);
-        ctx.fill();
-
-        // 无尽模式金色边框效果
-        if (isEndlessMode) {
-            ctx.strokeStyle = 'rgba(255, 215, 0, 0.5)';
-            ctx.lineWidth = 2;
-            ctx.stroke();
-        }
+        // 设置文字描边样式（确保在各种背景下可见）
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.6)';
+        ctx.lineWidth = 3;
+        ctx.lineJoin = 'round';
 
         if (isEndlessMode) {
             // 无尽模式显示
@@ -75,9 +68,11 @@ export class HUDRenderer {
             ctx.textAlign = 'left';
             // 使用 emoji 图片渲染无尽模式图标
             this.emojiManager.draw(ctx, 'infinite', 32, 30, 18);
+            ctx.strokeText(' 无尽', 42, 35);
             ctx.fillText(' 无尽', 42, 35);
             ctx.font = 'bold 20px Arial';
             ctx.fillStyle = '#FFD700';
+            ctx.strokeText(`${Math.floor(gameTimer / 1000)}s`, 25, 58);
             ctx.fillText(`${Math.floor(gameTimer / 1000)}s`, 25, 58);
         } else {
             // 计时模式
@@ -86,6 +81,7 @@ export class HUDRenderer {
             ctx.textAlign = 'left';
             // 使用 emoji 图片渲染计时器图标
             this.emojiManager.draw(ctx, 'timer', 38, 38, 24);
+            ctx.strokeText(` ${timeLeft}s`, 50, 45);
             ctx.fillText(` ${timeLeft}s`, 50, 45);
         }
 
@@ -93,6 +89,7 @@ export class HUDRenderer {
         ctx.font = 'bold 22px Arial';
         // 使用 emoji 图片渲染星星图标
         this.emojiManager.draw(ctx, 'star', 36, 72, 20);
+        ctx.strokeText(` ${score}`, 48, 78);
         ctx.fillText(` ${score}`, 48, 78);
 
         // 渲染按钮
@@ -186,8 +183,10 @@ export class HUDRenderer {
 
     /**
      * 窗口大小变化时调用
+     * @param {number} dpr - 设备像素比
      */
-    resize() {
+    resize(dpr = 1) {
+        this.dpr = dpr;
         this.updateButtonPositions();
     }
 }

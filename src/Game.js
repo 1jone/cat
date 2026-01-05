@@ -129,18 +129,40 @@ export class Game {
     }
 
     /**
-     * 调整画布大小
+     * 调整画布大小（支持高 DPI 设备）
      */
     resize() {
-        this.canvas.width = tt.getSystemInfoSync().windowWidth;
-        this.canvas.height = tt.getSystemInfoSync().windowHeight;
+        const systemInfo = tt.getSystemInfoSync();
+        const dpr = systemInfo.pixelRatio || 1;
+        const width = systemInfo.windowWidth;
+        const height = systemInfo.windowHeight;
 
-        // 更新各组件
-        this.bgRenderer.resize();
-        this.hudRenderer.resize();
+        // 设置 Canvas 物理尺寸（高分辨率）
+        this.canvas.width = Math.floor(width * dpr);
+        this.canvas.height = Math.floor(height * dpr);
+
+        // 缩放上下文以匹配逻辑坐标（使用 setTransform 避免累积）
+        this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+        // 高质量图像渲染
+        this.ctx.imageSmoothingEnabled = true;
+        this.ctx.imageSmoothingQuality = 'high';
+
+        // 存储逻辑尺寸供其他组件使用
+        this.logicalWidth = width;
+        this.logicalHeight = height;
+        this.dpr = dpr;
+
+        // 更新各组件（传递 dpr）
+        this.bgRenderer.resize(dpr);
+        this.hudRenderer.resize(dpr);
+        this.effectsRenderer.setDpr(dpr);
+        this.startScreen.setDpr(dpr);
+        this.gameOverScreen.setDpr(dpr);
+        this.selectionScreen.setDpr(dpr);
 
         if (this.settingsUI) {
-            this.settingsUI.updateLayout();
+            this.settingsUI.updateLayout(dpr);
         }
     }
 
@@ -191,14 +213,14 @@ export class Game {
         for (const target of this.targets) {
             // 检查受惊（在更新前检测触摸位置）
             target.checkStartle(touchPos);
-            target.update(dt, this.canvas.width, this.canvas.height);
+            target.update(dt, this.logicalWidth, this.logicalHeight);
         }
         this.targets = this.targets.filter(t => t.isActive);
 
         // 生成新目标
         const newTarget = this.spawnManager.update(dt, {
-            canvasWidth: this.canvas.width,
-            canvasHeight: this.canvas.height,
+            canvasWidth: this.logicalWidth,
+            canvasHeight: this.logicalHeight,
             targets: this.targets,
             selectedTarget: this.stateManager.selectedTarget,
             isEndlessMode: this.stateManager.isEndlessMode,
@@ -498,8 +520,8 @@ export class Game {
 
         // 生成初始目标
         this.targets = this.spawnManager.spawnInitialTargets({
-            canvasWidth: this.canvas.width,
-            canvasHeight: this.canvas.height,
+            canvasWidth: this.logicalWidth,
+            canvasHeight: this.logicalHeight,
             selectedTarget: targetConfig,
             isEndlessMode: false,
             unlockedIndices: [],
@@ -538,8 +560,8 @@ export class Game {
 
         // 生成初始目标
         this.targets = this.spawnManager.spawnInitialTargets({
-            canvasWidth: this.canvas.width,
-            canvasHeight: this.canvas.height,
+            canvasWidth: this.logicalWidth,
+            canvasHeight: this.logicalHeight,
             selectedTarget: this.stateManager.selectedTarget,
             isEndlessMode: true,
             unlockedIndices: this.stateManager.unlockedTargetIndices,
@@ -623,7 +645,7 @@ export class Game {
                 this.settingsUI.currentGameInfo = null;
             }
 
-            this.settingsUI.updateLayout();
+            this.settingsUI.updateLayout(this.dpr);
         }
     }
 

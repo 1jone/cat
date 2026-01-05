@@ -14,6 +14,7 @@ export class SelectionScreen {
         this.adManager = adManager;  // 广告管理器
         this.settingsManager = settingsManager;  // 设置管理器（用于获取最高分）
         this.emojiManager = emojiManager;  // Emoji 管理器
+        this.dpr = 1;  // 设备像素比
 
         // 滚动选择相关属性
         this.scrollOffset = 0;
@@ -30,6 +31,24 @@ export class SelectionScreen {
         // 解锁确认弹窗状态
         this.showUnlockDialog = false;
         this.unlockDialogTarget = null;
+    }
+
+    /**
+     * 更新设备像素比
+     * @param {number} dpr - 设备像素比
+     */
+    setDpr(dpr) {
+        this.dpr = dpr;
+    }
+
+    /**
+     * 获取逻辑尺寸
+     */
+    getLogicalSize() {
+        return {
+            width: this.canvas.width / this.dpr,
+            height: this.canvas.height / this.dpr
+        };
     }
 
     /**
@@ -140,9 +159,10 @@ export class SelectionScreen {
         const targetIndex = Math.round(this.scrollOffset / cardStep);
         const clampedIndex = Math.max(0, Math.min(this.resourceManager.selectionItems.length - 1, targetIndex));
 
-        // 计算中间卡片的位置
-        const centerX = this.canvas.width / 2;
-        const centerY = this.canvas.height / 2 + 30;
+        // 计算中间卡片的位置（使用逻辑尺寸）
+        const { width: logicalWidth, height: logicalHeight } = this.getLogicalSize();
+        const centerX = logicalWidth / 2;
+        const centerY = logicalHeight / 2 + 30;
         const cardWidth = SELECTION_CONFIG.CARD_WIDTH;
         const cardHeight = SELECTION_CONFIG.CARD_HEIGHT;
 
@@ -177,8 +197,9 @@ export class SelectionScreen {
      * @returns {object|null} 解锁成功后返回目标配置
      */
     handleUnlockDialogClick(pos) {
-        const centerX = this.canvas.width / 2;
-        const centerY = this.canvas.height / 2;
+        const { width: logicalWidth, height: logicalHeight } = this.getLogicalSize();
+        const centerX = logicalWidth / 2;
+        const centerY = logicalHeight / 2;
         const dialogWidth = 280;
         const dialogHeight = 180;
         const buttonWidth = 100;
@@ -313,20 +334,21 @@ export class SelectionScreen {
      */
     render() {
         const ctx = this.ctx;
+        const { width: logicalWidth, height: logicalHeight } = this.getLogicalSize();
 
         // 半透明背景
         ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
-        ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        ctx.fillRect(0, 0, logicalWidth, logicalHeight);
 
         // 标题
         ctx.fillStyle = '#FFFFFF';
         ctx.font = 'bold 36px Arial';
         ctx.textAlign = 'center';
-        ctx.fillText('选择的目标', this.canvas.width / 2, this.canvas.height / 2 - 160);
+        ctx.fillText('选择的目标', logicalWidth / 2, logicalHeight / 2 - 160);
 
         // 渲染滚动卡片列表
-        const centerX = this.canvas.width / 2;
-        const centerY = this.canvas.height / 2 + 30;
+        const centerX = logicalWidth / 2;
+        const centerY = logicalHeight / 2 + 30;
         const cardStep = SELECTION_CONFIG.CARD_WIDTH + SELECTION_CONFIG.CARD_SPACING;
 
         // 按从远到近的顺序渲染（先渲染两侧，再渲染中间）
@@ -365,6 +387,7 @@ export class SelectionScreen {
         const cardWidth = SELECTION_CONFIG.CARD_WIDTH;
         const cardHeight = SELECTION_CONFIG.CARD_HEIGHT;
         const cardStep = SELECTION_CONFIG.CARD_WIDTH + SELECTION_CONFIG.CARD_SPACING;
+        const { width: logicalWidth } = this.getLogicalSize();
 
         // 计算缩放和透明度
         const distanceRatio = Math.min(Math.abs(offset) / cardStep, 1);
@@ -376,7 +399,7 @@ export class SelectionScreen {
         const y = centerY;
 
         // 如果卡片完全超出屏幕，不渲染
-        if (x < -cardWidth || x > this.canvas.width + cardWidth) {
+        if (x < -cardWidth || x > logicalWidth + cardWidth) {
             return;
         }
 
@@ -622,10 +645,11 @@ export class SelectionScreen {
      */
     renderIndicators(centerY) {
         const ctx = this.ctx;
+        const { width: logicalWidth } = this.getLogicalSize();
         const dotSize = 8;
         const dotSpacing = 16;
         const totalWidth = (this.resourceManager.selectionItems.length - 1) * dotSpacing;
-        const startX = (this.canvas.width - totalWidth) / 2;
+        const startX = (logicalWidth - totalWidth) / 2;
         const y = centerY + SELECTION_CONFIG.CARD_HEIGHT / 2 + 80;
 
         const cardStep = SELECTION_CONFIG.CARD_WIDTH + SELECTION_CONFIG.CARD_SPACING;
@@ -647,14 +671,15 @@ export class SelectionScreen {
      */
     renderUnlockDialog() {
         const ctx = this.ctx;
-        const centerX = this.canvas.width / 2;
-        const centerY = this.canvas.height / 2;
+        const { width: logicalWidth, height: logicalHeight } = this.getLogicalSize();
+        const centerX = logicalWidth / 2;
+        const centerY = logicalHeight / 2;
         const dialogWidth = 280;
         const dialogHeight = 180;
 
         // 全屏遮罩
         ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-        ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        ctx.fillRect(0, 0, logicalWidth, logicalHeight);
 
         // 弹窗背景
         const gradient = ctx.createLinearGradient(

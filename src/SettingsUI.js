@@ -12,6 +12,7 @@ export class SettingsUI {
         this.settingsManager = settingsManager;
         this.audioManager = audioManager;
         this.emojiManager = emojiManager;
+        this.dpr = 1;  // 设备像素比
 
         // 面板尺寸（延迟计算）
         this.panel = null;
@@ -41,11 +42,14 @@ export class SettingsUI {
 
     /**
      * 更新布局（窗口大小变化时调用）
+     * @param {number} dpr - 设备像素比
      */
-    updateLayout() {
+    updateLayout(dpr = 1) {
+        this.dpr = dpr;
         const cfg = SETTINGS_CONFIG;
-        const canvasW = this.canvas.width;
-        const canvasH = this.canvas.height;
+        // 使用逻辑尺寸
+        const canvasW = this.canvas.width / this.dpr;
+        const canvasH = this.canvas.height / this.dpr;
 
         // 计算面板尺寸（游戏中时使用更高的面板以容纳额外滑块）
         const panelWidth = Math.min(canvasW * cfg.PANEL.widthRatio, cfg.PANEL.maxWidth);
@@ -267,13 +271,16 @@ export class SettingsUI {
     render() {
         const ctx = this.ctx;
         const cfg = SETTINGS_CONFIG;
+        // 使用逻辑尺寸
+        const logicalWidth = this.canvas.width / this.dpr;
+        const logicalHeight = this.canvas.height / this.dpr;
 
         // 保存状态
         ctx.save();
 
         // 1. 全屏遮罩
         ctx.fillStyle = cfg.COLORS.overlay;
-        ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        ctx.fillRect(0, 0, logicalWidth, logicalHeight);
 
         // 2. 毛玻璃面板
         this.renderGlassPanel();

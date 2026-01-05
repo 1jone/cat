@@ -113,11 +113,8 @@ export class InputManager {
         this.onTouchEnd?.(pos);
     }
     getCanvasPosition(clientX, clientY) {
-        let systemInfo = tt.getSystemInfoSync();
-        const width = systemInfo.windowWidth;
-        const height = systemInfo.windowHeight;
-        const scaleX = this.canvas.width / width;
-        const scaleY = this.canvas.height / height;
-        return new Vector2((clientX) * scaleX, (clientY) * scaleY);
+        // 触摸坐标直接对应逻辑坐标
+        // Canvas 已通过 ctx.setTransform(dpr) 缩放，绘制使用逻辑坐标
+        return new Vector2(clientX, clientY);
     }
 }

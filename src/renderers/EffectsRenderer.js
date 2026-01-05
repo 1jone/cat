@@ -10,6 +10,25 @@ export class EffectsRenderer {
         this.canvas = canvas;
         this.ctx = ctx;
         this.emojiManager = emojiManager;
+        this.dpr = 1;  // 设备像素比
+    }
+
+    /**
+     * 更新设备像素比
+     * @param {number} dpr - 设备像素比
+     */
+    setDpr(dpr) {
+        this.dpr = dpr;
+    }
+
+    /**
+     * 获取逻辑尺寸
+     */
+    getLogicalSize() {
+        return {
+            width: this.canvas.width / this.dpr,
+            height: this.canvas.height / this.dpr
+        };
     }
 
     /**
@@ -48,20 +67,21 @@ export class EffectsRenderer {
 
         const ctx = this.ctx;
         const alpha = Math.min(notification.time / 2, 1);
+        const { width: logicalWidth, height: logicalHeight } = this.getLogicalSize();
 
         ctx.save();
         ctx.globalAlpha = alpha;
 
-        // 金色背景框
+        // 金色背景框（使用逻辑坐标）
         ctx.fillStyle = 'rgba(255, 215, 0, 0.9)';
-        drawRoundRect(ctx, this.canvas.width / 2 - 150, this.canvas.height / 2 - 30, 300, 60, 15);
+        drawRoundRect(ctx, logicalWidth / 2 - 150, logicalHeight / 2 - 30, 300, 60, 15);
         ctx.fill();
 
         // 白色文字
         ctx.fillStyle = '#FFFFFF';
         ctx.font = 'bold 24px Arial';
         ctx.textAlign = 'center';
-        ctx.fillText(notification.message, this.canvas.width / 2, this.canvas.height / 2 + 8);
+        ctx.fillText(notification.message, logicalWidth / 2, logicalHeight / 2 + 8);
 
         ctx.restore();
     }
