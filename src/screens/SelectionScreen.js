@@ -31,6 +31,65 @@ export class SelectionScreen {
         // 解锁确认弹窗状态
         this.showUnlockDialog = false;
         this.unlockDialogTarget = null;
+
+        // 粒子动画时间
+        this.particleTime = 0;
+
+        // 初始化粒子状态
+        this.initParticleStates();
+    }
+
+    /**
+     * 初始化粒子状态（用于粒子预览）
+     */
+    initParticleStates() {
+        this.particleStates = new Map();
+
+        // 为每个粒子类型目标初始化状态
+        for (const item of this.resourceManager.selectionItems) {
+            if (item.config.renderType === 'particle') {
+                const particleCount = item.config.id === 'laser' ? 4 : 6;
+                const particles = [];
+
+                for (let i = 0; i < particleCount; i++) {
+                    const angle = (i / particleCount) * Math.PI * 2;
+                    particles.push({
+                        angle: angle,
+                        phase: Math.random() * Math.PI * 2,
+                        radiusOffset: Math.random() * 0.3 - 0.15,
+                        size: 0.8 + Math.random() * 0.4,
+                    });
+                }
+
+                this.particleStates.set(item.config.id, {
+                    particles: particles,
+                    randomPhase: Math.random() * Math.PI * 2
+                });
+            }
+        }
+    }
+
+    /**
+     * 获取粒子配置（适配卡片尺寸）
+     */
+    getParticleConfig(config, cardSize) {
+        const baseRadius = cardSize * 0.35;  // 基于卡片尺寸
+
+        return {
+            coreRadius: baseRadius * 0.4,
+            coreColor: config.id === 'laser' ? '#FF0000' : '#FFD700',
+            glowRadius: baseRadius * 1.5,
+            glowColor: config.id === 'laser' ? 'rgba(255, 0, 0, 0.3)' : 'rgba(255, 215, 0, 0.3)',
+            particleCount: config.id === 'laser' ? 4 : 6,
+            particleRadius: baseRadius * 0.15,
+            orbitRadius: baseRadius * 0.8,
+            orbitSpeed: config.id === 'laser' ? 4 : 2,
+            pulseSpeed: config.id === 'laser' ? 6 : 3,
+            pulseAmplitude: 0.3,
+            twinkleSpeed: config.id === 'laser' ? 10 : 5,
+            twinkleMin: 0.6,
+            twinkleMax: 1.0,
+        };
     }
 
     /**
@@ -289,6 +348,9 @@ export class SelectionScreen {
      * @param {number} dt - 时间增量（秒）
      */
     update(dt) {
+        // 更新粒子动画时间
+        this.particleTime += dt;
+
         const cardStep = SELECTION_CONFIG.CARD_WIDTH + SELECTION_CONFIG.CARD_SPACING;
         const maxOffset = (this.resourceManager.selectionItems.length - 1) * cardStep;
 
@@ -457,8 +519,14 @@ export class SelectionScreen {
         }
         ctx.stroke();
 
-        // 图片
-        if (item.loaded) {
+        // 图片或粒子效果
+        if (item.config.renderType === 'particle') {
+            // 渲染粒子特效
+            const imgSize = scaledWidth * 0.85;
+            const imgCenterY = y - scaledHeight / 2 + 10 + imgSize / 2;
+            this.renderParticlePreview(x, imgCenterY, scaledWidth, item.config, scale);
+        } else if (item.loaded) {
+            // 渲染普通图片
             const imgSize = scaledWidth * 0.85;
             ctx.drawImage(
                 item.image,
@@ -468,6 +536,7 @@ export class SelectionScreen {
                 imgSize
             );
         } else {
+            // 图片未加载的占位符
             ctx.fillStyle = '#CCCCCC';
             const imgSize = scaledWidth * 0.85;
             ctx.fillRect(x - imgSize / 2, y - scaledHeight / 2 + 10, imgSize, imgSize);
@@ -773,5 +842,163 @@ export class SelectionScreen {
         ctx.stroke();
         ctx.fillStyle = '#FFFFFF';
         ctx.fillText('取消', cancelX, buttonY);
+    }
+
+    /**
+     * 渲染粒子预览效果
+     * @param {number} x - 中心 X 坐标
+     * @param {number} y - 中心 Y 坐标
+     * @param {number} scaledWidth - 缩放后的卡片宽度
+     * @param {object} config - 目标配置
+     * @param {number} scale - 缩放比例
+     */
+    renderParticlePreview(x, y, scaledWidth, config, scale) {
+        const ctx = this.ctx;
+        const pConfig = this.getParticleConfig(config, scaledWidth);
+        const state = this.particleStates.get(config.id);
+        const time = this.particleTime + (state && state.randomPhase || 0);
+
+        ctx.save();
+
+        // 计算脉冲缩放
+        const pulse = 1 + Math.sin(time * pConfig.pulseSpeed) * pConfig.pulseAmplitude;
+
+        // 计算闪烁亮度
+        const twinkle = pConfig.twinkleMin + (pConfig.twinkleMax - pConfig.twinkleMin) *
+            (0.5 + 0.5 * Math.sin(time * pConfig.twinkleSpeed));
+
+        // 1. 绘制外层光晕
+        this.drawParticleGlow(ctx, x, y, pConfig.glowRadius * pulse, pConfig.glowColor, twinkle);
+
+        // 2. 绘制中层光晕
+        this.drawParticleGlow(ctx, x, y, pConfig.glowRadius * 0.6 * pulse, pConfig.glowColor, twinkle * 0.8);
+
+        // 3. 绘制环绕粒子
+        if (state) {
+            this.drawParticleOrbits(ctx, x, y, time, pConfig, state.particles);
+        }
+
+        // 4. 绘制核心光点
+        this.drawParticleCore(ctx, x, y, pConfig.coreRadius * pulse, pConfig.coreColor, twinkle);
+
+        // 5. 绘制核心高光
+        this.drawParticleHighlight(ctx, x, y, pConfig.coreRadius * pulse * 0.5, twinkle);
+
+        ctx.restore();
+    }
+
+    /**
+     * 绘制粒子光晕
+     */
+    drawParticleGlow(ctx, x, y, radius, color, alpha) {
+        const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
+
+        const baseColor = color.replace(/[\d.]+\)$/, '');
+        gradient.addColorStop(0, baseColor + (0.6 * alpha) + ')');
+        gradient.addColorStop(0.5, baseColor + (0.3 * alpha) + ')');
+        gradient.addColorStop(1, baseColor + '0)');
+
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    /**
+     * 绘制粒子核心
+     */
+    drawParticleCore(ctx, x, y, radius, color, alpha) {
+        ctx.globalAlpha = alpha;
+
+        // 核心实心圆
+        const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
+        gradient.addColorStop(0, '#FFFFFF');
+        gradient.addColorStop(0.3, color);
+        gradient.addColorStop(1, this.darkenColor(color, 0.3));
+
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 外发光边缘
+        ctx.shadowColor = color;
+        ctx.shadowBlur = radius * 2;
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(x, y, radius * 0.8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        ctx.globalAlpha = 1;
+    }
+
+    /**
+     * 绘制粒子高光
+     */
+    drawParticleHighlight(ctx, x, y, radius, alpha) {
+        ctx.globalAlpha = alpha * 0.9;
+        ctx.fillStyle = '#FFFFFF';
+        ctx.beginPath();
+        ctx.arc(x - radius * 0.3, y - radius * 0.3, radius * 0.4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+    }
+
+    /**
+     * 绘制环绕粒子
+     */
+    drawParticleOrbits(ctx, centerX, centerY, time, pConfig, particles) {
+        particles.forEach((particle) => {
+            // 计算当前角度
+            const currentAngle = particle.angle + time * pConfig.orbitSpeed + particle.phase;
+
+            // 计算轨道半径
+            const radius = pConfig.orbitRadius * (1 + particle.radiusOffset);
+
+            // 计算位置
+            const px = centerX + Math.cos(currentAngle) * radius;
+            const py = centerY + Math.sin(currentAngle) * radius;
+
+            // 计算粒子大小（带脉动）
+            const sizePulse = 0.8 + 0.4 * Math.sin(time * 4 + particle.phase);
+            const size = pConfig.particleRadius * particle.size * sizePulse;
+
+            // 计算粒子透明度
+            const distanceAlpha = 0.5 + 0.5 * Math.cos(currentAngle - time * pConfig.orbitSpeed);
+
+            // 绘制粒子
+            ctx.globalAlpha = distanceAlpha * 0.8;
+
+            const gradient = ctx.createRadialGradient(px, py, 0, px, py, size);
+            gradient.addColorStop(0, '#FFFFFF');
+            gradient.addColorStop(0.5, pConfig.coreColor);
+            gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(px, py, size, 0, Math.PI * 2);
+            ctx.fill();
+        });
+
+        ctx.globalAlpha = 1;
+    }
+
+    /**
+     * 辅助方法：加深颜色
+     */
+    darkenColor(color, factor) {
+        if (color.startsWith('#')) {
+            const r = parseInt(color.slice(1, 3), 16);
+            const g = parseInt(color.slice(3, 5), 16);
+            const b = parseInt(color.slice(5, 7), 16);
+
+            const dr = Math.floor(r * (1 - factor));
+            const dg = Math.floor(g * (1 - factor));
+            const db = Math.floor(b * (1 - factor));
+
+            return `rgb(${dr}, ${dg}, ${db})`;
+        }
+        return color;
     }
 }

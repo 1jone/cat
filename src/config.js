@@ -383,8 +383,8 @@ export const TARGET_TYPES = [
             showGrass: true
         },
         unlock: {
-            type: 'ad',
-            adRequired: true,
+            type: 'free',
+            adRequired: false,
             unlockDuration: -1  // -1 表示永久解锁
         },
         adTrigger: {
