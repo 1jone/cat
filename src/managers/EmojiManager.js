@@ -23,6 +23,7 @@ const SPRITE_DATA = {
     'finger': { x: 648, y: 0 },
     'party': { x: 720, y: 0 },
     'phone': { x: 792, y: 0 },
+    'gift': { x: 864, y: 0 },
   },
 };
 
@@ -190,6 +191,7 @@ export class EmojiManager {
       'finger': '👆',
       'party': '🎉',
       'phone': '📲',
+      'gift': '🎁',
     };
 
     const emoji = emojiMap[key];

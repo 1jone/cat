@@ -74,6 +74,25 @@ export class SelectionScreen {
     }
 
     /**
+     * 根据目标ID选中对应卡片
+     * @param {string} targetId - 目标ID
+     */
+    selectTargetById(targetId) {
+        const items = this.resourceManager.selectionItems;
+        const targetIndex = items.findIndex(item => item.config.id === targetId);
+
+        if (targetIndex !== -1) {
+            const cardStep = SELECTION_CONFIG.CARD_WIDTH + SELECTION_CONFIG.CARD_SPACING;
+            this.currentIndex = targetIndex;
+            this.scrollOffset = targetIndex * cardStep;
+            this.autoScrollTimer = 0;
+            console.log(`[SelectionScreen] 选中目标: ${targetId}, 索引: ${targetIndex}`);
+        } else {
+            console.warn(`[SelectionScreen] 未找到目标: ${targetId}`);
+        }
+    }
+
+    /**
      * 处理触摸开始
      * @param {object} pos - 触摸位置 { x, y }
      */
@@ -536,7 +555,13 @@ export class SelectionScreen {
         // 有效期提示
         ctx.font = `${12 * scale}px Arial`;
         ctx.fillStyle = '#AAAAAA';
-        ctx.fillText('解锁后有效24小时', x, y + 50 * scale);
+        let timeLeft= config.unlock.unlockDuration
+        if(timeLeft>0){
+            timeLeft= timeLeft/1000/60/60
+            ctx.fillText(`解锁后有效${timeLeft}小时`, x, y + 50 * scale);
+        }else if(timeLeft == -1 || timeLeft == 0){
+            ctx.fillText(`解锁后永久有效`, x, y + 50 * scale);
+        }
     }
 
     /**

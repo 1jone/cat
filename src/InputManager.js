@@ -64,14 +64,14 @@ export class InputManager {
         const touch = e.touches[0];
         const pos = this.getCanvasPosition(touch.clientX, touch.clientY);
         this.currentTouchPosition = pos;
-        this.onTouchStart?.(pos);
+        this.onTouchStart && this.onTouchStart(pos);
     }
     handleTouchMove(e) {
         e.preventDefault();
         const touch = e.touches[0];
         const pos = this.getCanvasPosition(touch.clientX, touch.clientY);
         this.currentTouchPosition = pos;
-        this.onTouchMove?.(pos);
+        this.onTouchMove && this.onTouchMove(pos);
     }
     handleTouchEnd(e) {
         e.preventDefault();
@@ -79,7 +79,7 @@ export class InputManager {
         const touch = e.changedTouches[0];
         const pos = this.getCanvasPosition(touch.clientX, touch.clientY);
         this.currentTouchPosition = null;
-        this.onTouchEnd?.(pos);
+        this.onTouchEnd && this.onTouchEnd(pos);
     }
     handleMouseDown(e) {
         // 防止 touch/mouse 双重触发：触摸事件后 100ms 内的鼠标事件将被忽略
@@ -88,8 +88,8 @@ export class InputManager {
         }
         const pos = this.getCanvasPosition(e.clientX, e.clientY);
         this.currentTouchPosition = pos;
-        this.onTouchStart?.(pos);
-        this.onTouch?.(pos);
+        this.onTouchStart && this.onTouchStart(pos);
+        this.onTouch && this.onTouch(pos);
     }
     handleMouseMove(e) {
         // 防止 touch/mouse 双重触发
@@ -100,7 +100,7 @@ export class InputManager {
         // 只有按住鼠标时才更新位置（用于受惊检测）
         if (e.buttons === 1) {
             this.currentTouchPosition = pos;
-            this.onTouchMove?.(pos);
+            this.onTouchMove && this.onTouchMove(pos);
         }
     }
     handleMouseUp(e) {
@@ -110,7 +110,7 @@ export class InputManager {
         }
         const pos = this.getCanvasPosition(e.clientX, e.clientY);
         this.currentTouchPosition = null;
-        this.onTouchEnd?.(pos);
+        this.onTouchEnd && this.onTouchEnd(pos);
     }
     getCanvasPosition(clientX, clientY) {
         // 触摸坐标直接对应逻辑坐标

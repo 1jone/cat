@@ -6,6 +6,7 @@
 import { CONFIG, TARGET_TYPES } from '../config';
 import { Vector2 } from '../utils/Vector2';
 import { ImageTarget } from '../entities/ImageTarget';
+import { ParticleTarget } from '../entities/ParticleTarget';
 
 export class SpawnManager {
     /**
@@ -41,13 +42,13 @@ export class SpawnManager {
     update(dt, { canvasWidth, canvasHeight, targets, selectedTarget, isEndlessMode, unlockedIndices, multipliers }) {
         this.spawnTimer += dt * 1000;
 
-        const targetId = selectedTarget?.id;
+        const targetId = selectedTarget ? selectedTarget.id : undefined;
 
         // 从设置读取生成间隔和最大实体数，否则使用默认值
-        const interval = this.settingsManager?.getSpawnInterval(targetId, isEndlessMode)
-            ?? CONFIG.SPAWN.INTERVAL;
-        const maxTargets = this.settingsManager?.getMaxTargets(targetId, isEndlessMode)
-            ?? CONFIG.SPAWN.MAX_TARGETS;
+        const interval = (this.settingsManager && this.settingsManager.getSpawnInterval(targetId, isEndlessMode))
+            || CONFIG.SPAWN.INTERVAL;
+        const maxTargets = (this.settingsManager && this.settingsManager.getMaxTargets(targetId, isEndlessMode))
+            || CONFIG.SPAWN.MAX_TARGETS;
 
         if (this.spawnTimer >= interval && targets.length < maxTargets) {
             this.spawnTimer = 0;
@@ -75,10 +76,10 @@ export class SpawnManager {
         const y = padding + Math.random() * (canvasHeight - padding * 2 - 80);
         const position = new Vector2(x, y);
 
-        const targetId = selectedTarget?.id;
+        const targetId = selectedTarget ? selectedTarget.id : undefined;
 
         // 获取用户设置的速度乘数
-        const userSpeedMultiplier = this.settingsManager?.getSpeedMultiplier(targetId, isEndlessMode) ?? 1;
+        const userSpeedMultiplier = (this.settingsManager && this.settingsManager.getSpeedMultiplier(targetId, isEndlessMode)) || 1;
 
         // 无尽模式：从已解锁的目标中随机选择，应用随机属性
         let targetConfig;
@@ -88,9 +89,9 @@ export class SpawnManager {
             targetConfig = {
                 ...baseTarget,
                 // 应用游戏内随机乘数和用户设置的速度乘数
-                speed: baseTarget.speed * (multipliers?.speed || 1) * userSpeedMultiplier,
-                radius: baseTarget.radius * (multipliers?.radius || 1),
-                points: Math.floor(baseTarget.points * (multipliers?.points || 1))
+                speed: baseTarget.speed * (multipliers && multipliers.speed || 1) * userSpeedMultiplier,
+                radius: baseTarget.radius * (multipliers && multipliers.radius || 1),
+                points: Math.floor(baseTarget.points * (multipliers && multipliers.points || 1))
             };
         } else {
             // 计时模式：应用用户设置的速度乘数
@@ -100,6 +101,10 @@ export class SpawnManager {
             };
         }
 
+        // 根据 renderType 选择目标类
+        if (targetConfig.renderType === 'particle') {
+            return new ParticleTarget(position, targetConfig);
+        }
         return new ImageTarget(position, targetConfig);
     }
 

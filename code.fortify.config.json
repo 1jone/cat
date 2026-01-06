@@ -30,6 +30,7 @@
           "src/SettingsManager.js",
           "src/SettingsUI.js",
           "src/SoundGenerator.js",
+          "src/SidebarRewardUI.js",
           "src/utils/CanvasUtils.js",
           "src/utils/Vector2.js",
           "src/screens/GameOverScreen.js",
@@ -43,8 +44,10 @@
           "src/managers/GameStateManager.js",
           "src/managers/ResourceManager.js",
           "src/managers/SpawnManager.js",
+          "src/managers/SidebarManager.js",
           "src/entities/Entity.js",
-          "src/entities/ImageTarget.js"
+          "src/entities/ImageTarget.js",
+          "src/entities/ParticleTarget.js"
         ]
       }
     ]

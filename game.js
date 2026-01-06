@@ -8,6 +8,7 @@ let canvas = tt.createCanvas()
 
 const game = new Game(canvas)
 game.start()
+
 // canvas.width = systemInfo.windowWidth;
 // canvas.height = systemInfo.windowHeight;
 

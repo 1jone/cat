@@ -73,10 +73,13 @@ export class AdManager {
         const unlockTime = this.unlockData[targetId];
         if (!unlockTime) return false;
 
+        // 永久解锁（unlockDuration <= 0 或 -1）
+        const duration = target.unlock.unlockDuration;
+        if (duration <= 0) return true;
+
         // 检查是否过期
         const now = Date.now();
-        const duration = target.unlock.unlockDuration;
-        if (duration > 0 && (now - unlockTime) > duration) {
+        if ((now - unlockTime) > duration) {
             // 已过期，清除记录
             delete this.unlockData[targetId];
             this.settings.saveUnlockData(this.unlockData);
@@ -98,8 +101,11 @@ export class AdManager {
         const unlockTime = this.unlockData[targetId];
         if (!unlockTime) return 0;
 
-        const now = Date.now();
+        // 永久解锁
         const duration = target.unlock.unlockDuration;
+        if (duration <= 0) return -1;
+
+        const now = Date.now();
         const remaining = (unlockTime + duration) - now;
 
         return Math.max(0, remaining);
@@ -111,7 +117,8 @@ export class AdManager {
      * @returns {string} 格式化的时间字符串
      */
     formatRemainingTime(remainingMs) {
-        if (remainingMs <= 0) return '';
+        if (remainingMs < 0) return '永久';  // 永久解锁
+        if (remainingMs === 0) return '';
 
         const hours = Math.floor(remainingMs / (1000 * 60 * 60));
         const minutes = Math.floor((remainingMs % (1000 * 60 * 60)) / (1000 * 60));
@@ -136,7 +143,15 @@ export class AdManager {
             this.unlockData[targetId] = Date.now();
             this.settings.saveUnlockData(this.unlockData);
             this.recordAdShown();
-            console.log(`[AdManager] 目标 ${targetId} 解锁成功，有效期24小时`);
+
+            // 计算有效期描述
+            const duration = target.unlock.unlockDuration;
+            const durationText = duration <= 0 ? '永久' :
+                duration >= 48 * 60 * 60 * 1000 ? '48小时' :
+                duration >= 24 * 60 * 60 * 1000 ? '24小时' :
+                `${Math.floor(duration / (60 * 60 * 1000))}小时`;
+
+            console.log(`[AdManager] 目标 ${targetId} 解锁成功，有效期${durationText}`);
             return true;
         }
         return false;

@@ -8,6 +8,7 @@ import { InputManager } from './InputManager';
 import { getAudioManager } from './AudioManager';
 import { getSettingsManager } from './SettingsManager';
 import { SettingsUI } from './SettingsUI';
+import { SidebarRewardUI } from './SidebarRewardUI';
 
 // 管理器
 import { GameStateManager, GameState } from './managers/GameStateManager';
@@ -15,6 +16,7 @@ import { ResourceManager } from './managers/ResourceManager';
 import { SpawnManager } from './managers/SpawnManager';
 import { AdManager } from './managers/AdManager';
 import { EmojiManager } from './managers/EmojiManager';
+import { SidebarManager } from './managers/SidebarManager';
 
 // 屏幕
 import { SelectionScreen } from './screens/SelectionScreen';
@@ -76,6 +78,12 @@ export class Game {
 
         // 初始化设置界面
         this.settingsUI = new SettingsUI(canvas, ctx, this.settingsManager, this.audioManager, this.emojiManager);
+
+        // 初始化侧边栏管理器
+        this.sidebarManager = new SidebarManager(this);
+
+        // 初始化侧边栏奖励UI
+        this.sidebarRewardUI = new SidebarRewardUI(canvas, ctx, this.sidebarManager, this.emojiManager);
 
         // 预加载资源
         this.resourceManager.preloadImages();
@@ -164,6 +172,10 @@ export class Game {
         if (this.settingsUI) {
             this.settingsUI.updateLayout(dpr);
         }
+
+        if (this.sidebarRewardUI) {
+            this.sidebarRewardUI.updateLayout(dpr);
+        }
     }
 
     /**
@@ -183,6 +195,16 @@ export class Game {
 
         // 设置界面状态：跳过游戏逻辑更新
         if (state === GameState.SETTINGS) {
+            return;
+        }
+
+        // 开始界面：更新侧边栏奖励UI动画
+        if (state === GameState.START) {
+            if (this.sidebarRewardUI) {
+                this.sidebarRewardUI.update(dt);
+            }
+            // 检查并显示待处理的奖励
+            this.checkPendingSidebarReward();
             return;
         }
 
@@ -241,11 +263,11 @@ export class Game {
 
         // 渲染背景
         const currentConfig = this.stateManager.selectedTarget;
-        const hasBackgroundImage = currentConfig?.background?.image;
+        const hasBackgroundImage = currentConfig && currentConfig.background && currentConfig.background.image;
         const backgroundImage = hasBackgroundImage
             ? this.resourceManager.getBackground(currentConfig.id)
             : null;
-        const showGrass = currentConfig?.background?.showGrass !== false;
+        const showGrass = currentConfig && currentConfig.background && currentConfig.background.showGrass !== false;
 
         this.bgRenderer.render(backgroundImage, showGrass);
 
@@ -253,11 +275,18 @@ export class Game {
         switch (state) {
             case GameState.START:
                 this.startScreen.render();
+                // 渲染侧边栏入口按钮（在"点击开始"下方）
+                if (this.sidebarRewardUI) {
+                    const buttonY = this.logicalHeight / 2 + 160;
+                    this.sidebarRewardUI.renderEntryButton(this.logicalWidth / 2, buttonY);
+                    // 如果有弹窗，渲染弹窗
+                    this.sidebarRewardUI.render();
+                }
                 break;
 
             case GameState.SELECT:
                 this.selectionScreen.render();
-                this.hudRenderer.renderMuteButton(this.audioManager?.isMuted);
+                this.hudRenderer.renderMuteButton(this.audioManager && this.audioManager.isMuted);
                 this.hudRenderer.renderSettingsButton();
                 break;
 
@@ -276,7 +305,7 @@ export class Game {
                     isEndlessMode: this.stateManager.isEndlessMode,
                     gameTimer: this.stateManager.gameTimer
                 });
-                this.hudRenderer.renderMuteButton(this.audioManager?.isMuted);
+                this.hudRenderer.renderMuteButton(this.audioManager && this.audioManager.isMuted);
                 this.hudRenderer.renderSettingsButton();
                 break;
 
@@ -288,10 +317,10 @@ export class Game {
                 // 渲染结束界面（传递额外的统计信息）
                 this.gameOverScreen.render({
                     score: this.stateManager.score,
-                    isEndlessMode: this._lastGameResult?.wasEndlessMode || false,
+                    isEndlessMode: this._lastGameResult && this._lastGameResult.wasEndlessMode || false,
                     gameTimer: this.stateManager.gameTimer,
-                    highScore: this._lastGameResult?.highScore || 0,
-                    isNewRecord: this._lastGameResult?.isNewRecord || false
+                    highScore: this._lastGameResult && this._lastGameResult.highScore || 0,
+                    isNewRecord: this._lastGameResult && this._lastGameResult.isNewRecord || false
                 });
                 break;
 
@@ -372,6 +401,16 @@ export class Game {
         }
 
         if (state === GameState.START) {
+            // 检查侧边栏奖励UI点击（弹窗优先）
+            if (this.sidebarRewardUI) {
+                const clickResult = this.sidebarRewardUI.handleClick(pos.x, pos.y);
+                if (clickResult) {
+                    this.handleSidebarRewardClick(clickResult);
+                    return;
+                }
+            }
+
+            // 如果没有点击弹窗或按钮，则进入选择界面
             this.stateManager.setState(GameState.SELECT);
             this.selectionScreen.reset();
             this.skipNextTouchEnd = true;
@@ -639,7 +678,7 @@ export class Game {
                 this.settingsUI.currentGameInfo = {
                     isEndlessMode: this.stateManager.isEndlessMode,
                     targetId: this.stateManager.getCurrentTargetId(),
-                    targetName: this.stateManager.selectedTarget?.name || null
+                    targetName: this.stateManager.selectedTarget && this.stateManager.selectedTarget.name || null
                 };
             } else {
                 this.settingsUI.currentGameInfo = null;
@@ -694,6 +733,85 @@ export class Game {
             // 计时模式：保存到对应目标的最高分
             this.settingsManager.updateTargetHighScore(targetId, score);
             console.log(`[Game] 计时模式退出，保存分数: ${score}, 目标: ${targetId}`);
+        }
+    }
+
+    /**
+     * 处理侧边栏奖励UI点击
+     * @param {string} clickResult - 点击结果
+     */
+    handleSidebarRewardClick(clickResult) {
+        this.audioManager.playButtonClick();
+
+        switch (clickResult) {
+            case 'entry':
+                // 如果当前会话是从侧边栏进入的
+                if (this.sidebarManager.isCurrentSessionFromSidebar()) {
+                    // 检查是否有待处理奖励（应该已经自动检测并设置）
+                    this.checkPendingSidebarReward();
+                    // 不再进行跳转操作，避免无限循环
+                    return;
+                }
+
+                // 非侧边栏进入的情况，执行正常引导/跳转流程
+                if (this.sidebarManager.shouldShowGuide()) {
+                    // 首次显示引导弹窗
+                    this.sidebarRewardUI.showGuide();
+                } else {
+                    // 直接跳转到侧边栏
+                    this.sidebarManager.navigateToSidebar();
+                }
+                break;
+
+            case 'guide-confirm':
+                // 确认引导，跳转到侧边栏
+                this.sidebarRewardUI.hideGuide();
+                this.sidebarManager.markGuideShown();
+                this.sidebarManager.navigateToSidebar();
+                break;
+
+            case 'close':
+                // 关闭引导弹窗
+                this.sidebarRewardUI.hideGuide();
+                this.sidebarManager.markGuideShown();
+                break;
+
+            case 'reward-confirm':
+                // 确认奖励，进入游戏体验
+                const reward = this.sidebarRewardUI.currentReward;
+                this.sidebarRewardUI.hideReward();
+                if (reward) {
+                    // 跳转到选择界面并选中奖励关卡
+                    this.stateManager.setState(GameState.SELECT);
+                    this.selectionScreen.reset();
+                    this.selectionScreen.selectTargetById(reward.targetId);
+                    this.audioManager.playBGM('menu', { volume: AUDIO_CONFIG.BGM_VOLUME.select });
+                }
+                break;
+
+            case 'popup-background':
+                // 点击弹窗背景，不做任何操作
+                break;
+        }
+    }
+
+    /**
+     * 检查并显示待处理的侧边栏奖励
+     */
+    checkPendingSidebarReward() {
+        if (!this.sidebarManager || !this.sidebarRewardUI) return;
+
+        // 如果已经在显示弹窗，跳过
+        if (this.sidebarRewardUI.isShowingPopup()) return;
+
+        // 检查是否有待处理的奖励
+        if (this.sidebarManager.hasPendingReward()) {
+            const reward = this.sidebarManager.consumePendingReward();
+            if (reward) {
+                console.log('[Game] 显示侧边栏奖励弹窗:', reward);
+                this.sidebarRewardUI.showReward(reward);
+                this.audioManager.playUnlock();
+            }
         }
     }
 }

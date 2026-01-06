@@ -23,15 +23,19 @@ export const TARGET_TYPES = [
         },
         // 广告配置 - 免费目标
         unlock: {
-            type: 'free',
-            adRequired: false,
-            unlockDuration: 0
+            type: 'ad',
+            adRequired: true,
+            unlockDuration: 10 * 60 * 60 * 1000
         },
         adTrigger: {
             enabled: false,
             probability: 0,
             cooldown: 0,
             maxPerSession: 0
+        },
+        // 侧边栏奖励配置 - 免费关卡不参与奖励
+        sidebarReward: {
+            canBeRewarded: false
         }
     },
     {
@@ -57,6 +61,10 @@ export const TARGET_TYPES = [
             probability: 0.3,
             cooldown: 90,
             maxPerSession: 3
+        },
+        // 侧边栏奖励配置 - 可作为奖励
+        sidebarReward: {
+            canBeRewarded: true
         }
     },
     {
@@ -82,6 +90,10 @@ export const TARGET_TYPES = [
             probability: 0.4,
             cooldown: 90,
             maxPerSession: 3
+        },
+        // 侧边栏奖励配置 - 可作为奖励
+        sidebarReward: {
+            canBeRewarded: true
         }
     },
     {
@@ -107,7 +119,285 @@ export const TARGET_TYPES = [
             probability: 0.2,
             cooldown: 120,
             maxPerSession: 2
+        },
+        // 侧边栏奖励配置 - 免费关卡不参与奖励
+        sidebarReward: {
+            canBeRewarded: false
         }
+    },
+    // ========== 新增免费目标 ==========
+    {
+        id: 'sparkle',
+        name: '光点',
+        image: '/target/sparkle_re.png',
+        speed: 60,
+        radius: 25,
+        points: 8,
+        movement: 'hover',
+        movementConfig: {
+            hoverAmplitude: 20,
+            driftSpeed: 15
+        },
+        background: {
+            image: null,
+            showGrass: true
+        },
+        unlock: {
+            type: 'free',
+            adRequired: false,
+            unlockDuration: 0
+        },
+        adTrigger: {
+            enabled: false,
+            probability: 0,
+            cooldown: 0,
+            maxPerSession: 0
+        },
+        sidebarReward: {
+            canBeRewarded: false
+        },
+        // 特殊渲染标记
+        renderType: 'particle'
+    },
+    {
+        id: 'butterfly',
+        name: '蝴蝶',
+        image: '/target/butterfly_re.png',
+        speed: 90,
+        radius: 30,
+        points: 12,
+        movement: 'wave',
+        background: {
+            image: null,
+            showGrass: true
+        },
+        unlock: {
+            type: 'free',
+            adRequired: false,
+            unlockDuration: 0
+        },
+        adTrigger: {
+            enabled: false,
+            probability: 0,
+            cooldown: 0,
+            maxPerSession: 0
+        },
+        sidebarReward: {
+            canBeRewarded: false
+        }
+    },
+    {
+        id: 'mouse',
+        name: '老鼠',
+        image: '/target/mouse_re.png',
+        speed: 150,
+        radius: 28,
+        points: 18,
+        movement: 'dash',
+        movementConfig: {
+            dashSpeed: 250,
+            dashDuration: 0.3,
+            pauseDuration: 0.6
+        },
+        background: {
+            image: null,
+            showGrass: true
+        },
+        unlock: {
+            type: 'free',
+            adRequired: false,
+            unlockDuration: 0
+        },
+        adTrigger: {
+            enabled: false,
+            probability: 0,
+            cooldown: 0,
+            maxPerSession: 0
+        },
+        sidebarReward: {
+            canBeRewarded: false
+        }
+    },
+    // ========== 新增广告目标 (24h) ==========
+    {
+        id: 'fish',
+        name: '小鱼',
+        image: '/target/fish_re.png',
+        speed: 100,
+        radius: 32,
+        points: 12,
+        movement: 'wave',
+        background: {
+            image: null,
+            showGrass: true
+        },
+        unlock: {
+            type: 'ad',
+            adRequired: true,
+            unlockDuration: 24 * 60 * 60 * 1000  // 24小时
+        },
+        adTrigger: {
+            enabled: true,
+            probability: 0.25,
+            cooldown: 120,
+            maxPerSession: 2
+        },
+        sidebarReward: {
+            canBeRewarded: true
+        }
+    },
+    {
+        id: 'bird',
+        name: '小鸟',
+        image: '/target/bird_re.png',
+        speed: 130,
+        radius: 30,
+        points: 15,
+        movement: 'zigzag',
+        movementConfig: {
+            amplitude: 80,
+            frequency: 1.2
+        },
+        background: {
+            image: null,
+            showGrass: true
+        },
+        unlock: {
+            type: 'ad',
+            adRequired: true,
+            unlockDuration: 24 * 60 * 60 * 1000  // 24小时
+        },
+        adTrigger: {
+            enabled: true,
+            probability: 0.25,
+            cooldown: 120,
+            maxPerSession: 2
+        },
+        sidebarReward: {
+            canBeRewarded: true
+        }
+    },
+    {
+        id: 'yarn',
+        name: '毛线球',
+        image: '/target/yarn_re.png',
+        speed: 80,
+        radius: 35,
+        points: 10,
+        movement: 'bounce',
+        background: {
+            image: null,
+            showGrass: true
+        },
+        unlock: {
+            type: 'ad',
+            adRequired: true,
+            unlockDuration: 24 * 60 * 60 * 1000  // 24小时
+        },
+        adTrigger: {
+            enabled: true,
+            probability: 0.2,
+            cooldown: 120,
+            maxPerSession: 2
+        },
+        sidebarReward: {
+            canBeRewarded: true
+        }
+    },
+    // ========== 新增广告目标 (48h) ==========
+    {
+        id: 'ladybug',
+        name: '瓢虫',
+        image: '/target/ladybug_re.png',
+        speed: 60,
+        radius: 22,  // 小体积，难点击
+        points: 20,
+        movement: 'random',
+        background: {
+            image: null,
+            showGrass: true
+        },
+        unlock: {
+            type: 'ad',
+            adRequired: true,
+            unlockDuration: 48 * 60 * 60 * 1000  // 48小时
+        },
+        adTrigger: {
+            enabled: true,
+            probability: 0.3,
+            cooldown: 150,
+            maxPerSession: 2
+        },
+        sidebarReward: {
+            canBeRewarded: true
+        }
+    },
+    {
+        id: 'feather',
+        name: '羽毛',
+        image: '/target/feather_re.png',
+        speed: 70,
+        radius: 28,
+        points: 22,
+        movement: 'pendulum',
+        movementConfig: {
+            pendulumLength: 120,
+            maxAngle: Math.PI / 4,
+            angularFreq: 1.5
+        },
+        background: {
+            image: null,
+            showGrass: true
+        },
+        unlock: {
+            type: 'ad',
+            adRequired: true,
+            unlockDuration: 48 * 60 * 60 * 1000  // 48小时
+        },
+        adTrigger: {
+            enabled: true,
+            probability: 0.3,
+            cooldown: 150,
+            maxPerSession: 2
+        },
+        sidebarReward: {
+            canBeRewarded: true
+        }
+    },
+    // ========== 新增广告目标 (永久) ==========
+    {
+        id: 'laser',
+        name: '激光点',
+        image: '/target/laser_re.png',
+        speed: 180,
+        radius: 20,  // 最小体积
+        points: 25,
+        movement: 'chase',
+        movementConfig: {
+            chaseSpeed: 120,
+            targetRadius: 80,
+            targetSpeed: 1.5
+        },
+        background: {
+            image: null,
+            showGrass: true
+        },
+        unlock: {
+            type: 'ad',
+            adRequired: true,
+            unlockDuration: -1  // -1 表示永久解锁
+        },
+        adTrigger: {
+            enabled: true,
+            probability: 0.35,
+            cooldown: 180,
+            maxPerSession: 2
+        },
+        sidebarReward: {
+            canBeRewarded: true
+        },
+        // 特殊渲染标记
+        renderType: 'particle'
     }
 ];
 export const CONFIG = {
@@ -373,5 +663,27 @@ export const STARTLE_CONFIG = {
     SHAKE_FREQUENCY: 25,       // 抖动频率（Hz）
     EXCLAMATION_DURATION: 0.4, // 惊叹号显示时长（秒）
     EXCLAMATION_OFFSET_Y: -50  // 惊叹号Y偏移（在目标上方）
+};
+
+// 侧边栏奖励配置
+export const SIDEBAR_REWARD_CONFIG = {
+    enabled: true,                    // 是否启用侧边栏奖励
+    cooldownDays: 15,                 // 奖励冷却时间（天）
+    showGuideOnFirstVisit: true,      // 首次是否显示引导
+
+    // UI 配置
+    ui: {
+        buttonText: '入口有奖',        // 按钮文字
+        showRedDot: true,             // 是否显示红点提示
+    },
+
+    // 弹窗文案
+    text: {
+        guideTitle: '入口有奖',
+        guideDesc: '添加到侧边栏，下次从侧边栏进入即可获得【随机关卡体验】奖励！',
+        guideButton: '立即添加',
+        rewardTitle: '恭喜获得',
+        rewardButton: '立即体验',
+    }
 };
 

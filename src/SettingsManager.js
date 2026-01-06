@@ -42,6 +42,13 @@ export class SettingsManager {
             ad: {
                 unlockData: {},      // 目标解锁时间记录 { targetId: timestamp }
                 adWatchCount: 0      // 累计观看广告次数
+            },
+            // 侧边栏奖励相关数据
+            sidebar: {
+                hasAddedToSidebar: false,  // 是否已添加到侧边栏
+                lastRewardTime: 0,         // 上次领取奖励时间戳
+                totalRewardsReceived: 0,   // 累计领取奖励次数
+                guideShown: false          // 是否已显示过引导
             }
         };
 
@@ -361,6 +368,72 @@ export class SettingsManager {
         this.set('ad.adWatchCount', current + 1);
     }
 
+    // ==================== 侧边栏奖励相关方法 ====================
+
+    /**
+     * 检查是否已添加到侧边栏
+     * @returns {boolean}
+     */
+    hasAddedToSidebar() {
+        return this.get('sidebar.hasAddedToSidebar') || false;
+    }
+
+    /**
+     * 设置已添加到侧边栏
+     * @param {boolean} added
+     */
+    setAddedToSidebar(added) {
+        this.set('sidebar.hasAddedToSidebar', added);
+    }
+
+    /**
+     * 获取上次领取奖励时间
+     * @returns {number} 时间戳
+     */
+    getLastSidebarRewardTime() {
+        return this.get('sidebar.lastRewardTime') || 0;
+    }
+
+    /**
+     * 设置上次领取奖励时间
+     * @param {number} timestamp
+     */
+    setLastSidebarRewardTime(timestamp) {
+        this.set('sidebar.lastRewardTime', timestamp);
+    }
+
+    /**
+     * 获取累计领取奖励次数
+     * @returns {number}
+     */
+    getTotalSidebarRewards() {
+        return this.get('sidebar.totalRewardsReceived') || 0;
+    }
+
+    /**
+     * 增加累计领取奖励次数
+     */
+    incrementSidebarRewards() {
+        const current = this.getTotalSidebarRewards();
+        this.set('sidebar.totalRewardsReceived', current + 1);
+    }
+
+    /**
+     * 检查是否已显示过引导
+     * @returns {boolean}
+     */
+    hasSidebarGuideShown() {
+        return this.get('sidebar.guideShown') || false;
+    }
+
+    /**
+     * 设置已显示过引导
+     * @param {boolean} shown
+     */
+    setSidebarGuideShown(shown) {
+        this.set('sidebar.guideShown', shown);
+    }
+
     // ==================== 其他方法 ====================
 
     /**
@@ -399,10 +472,11 @@ export class SettingsManager {
      */
     getSpawnInterval(targetId, isEndlessMode = false) {
         if (isEndlessMode) {
-            return this.get('game.endlessGameSettings.spawnInterval') ?? CONFIG.SPAWN.INTERVAL;
+            var val = this.get('game.endlessGameSettings.spawnInterval');
+            return val != null ? val : CONFIG.SPAWN.INTERVAL;
         }
         const settings = this.get('game.targetGameSettings') || {};
-        return settings[targetId]?.spawnInterval ?? CONFIG.SPAWN.INTERVAL;
+        return (settings[targetId] && settings[targetId].spawnInterval) || CONFIG.SPAWN.INTERVAL;
     }
 
     /**
@@ -431,10 +505,11 @@ export class SettingsManager {
      */
     getMaxTargets(targetId, isEndlessMode = false) {
         if (isEndlessMode) {
-            return this.get('game.endlessGameSettings.maxTargets') ?? CONFIG.SPAWN.MAX_TARGETS;
+            var val = this.get('game.endlessGameSettings.maxTargets');
+            return val != null ? val : CONFIG.SPAWN.MAX_TARGETS;
         }
         const settings = this.get('game.targetGameSettings') || {};
-        return settings[targetId]?.maxTargets ?? CONFIG.SPAWN.MAX_TARGETS;
+        return (settings[targetId] && settings[targetId].maxTargets) || CONFIG.SPAWN.MAX_TARGETS;
     }
 
     /**
@@ -463,10 +538,11 @@ export class SettingsManager {
      */
     getSpeedMultiplier(targetId, isEndlessMode = false) {
         if (isEndlessMode) {
-            return this.get('game.endlessGameSettings.speedMultiplier') ?? CONFIG.SPAWN.SPEED_MULTIPLIER;
+            var val = this.get('game.endlessGameSettings.speedMultiplier');
+            return val != null ? val : CONFIG.SPAWN.SPEED_MULTIPLIER;
         }
         const settings = this.get('game.targetGameSettings') || {};
-        return settings[targetId]?.speedMultiplier ?? CONFIG.SPAWN.SPEED_MULTIPLIER;
+        return (settings[targetId] && settings[targetId].speedMultiplier) || CONFIG.SPAWN.SPEED_MULTIPLIER;
     }
 
     /**
