@@ -23,8 +23,8 @@ export const TARGET_TYPES = [
         },
         // 广告配置 - 免费目标
         unlock: {
-            type: 'ad',
-            adRequired: true,
+            type: 'free',
+            adRequired: false,
             unlockDuration: 10 * 60 * 60 * 1000
         },
         adTrigger: {
@@ -52,8 +52,8 @@ export const TARGET_TYPES = [
         },
         // 广告配置 - 需要广告解锁（24小时）
         unlock: {
-            type: 'ad',
-            adRequired: true,
+            type: 'free',
+            adRequired: false,
             unlockDuration: 24 * 60 * 60 * 1000  // 24小时
         },
         adTrigger: {
@@ -81,8 +81,8 @@ export const TARGET_TYPES = [
         },
         // 广告配置 - 需要广告解锁（24小时）
         unlock: {
-            type: 'ad',
-            adRequired: true,
+            type: 'free',
+            adRequired: false,
             unlockDuration: 24 * 60 * 60 * 1000  // 24小时
         },
         adTrigger: {
@@ -232,8 +232,8 @@ export const TARGET_TYPES = [
             showGrass: true
         },
         unlock: {
-            type: 'ad',
-            adRequired: true,
+            type: 'free',
+            adRequired: false,
             unlockDuration: 24 * 60 * 60 * 1000  // 24小时
         },
         adTrigger: {
@@ -263,8 +263,8 @@ export const TARGET_TYPES = [
             showGrass: true
         },
         unlock: {
-            type: 'ad',
-            adRequired: true,
+            type: 'free',
+            adRequired: false,
             unlockDuration: 24 * 60 * 60 * 1000  // 24小时
         },
         adTrigger: {
@@ -290,8 +290,8 @@ export const TARGET_TYPES = [
             showGrass: true
         },
         unlock: {
-            type: 'ad',
-            adRequired: true,
+            type: 'free',
+            adRequired: false,
             unlockDuration: 24 * 60 * 60 * 1000  // 24小时
         },
         adTrigger: {
@@ -318,8 +318,8 @@ export const TARGET_TYPES = [
             showGrass: true
         },
         unlock: {
-            type: 'ad',
-            adRequired: true,
+            type: 'free',
+            adRequired: false,
             unlockDuration: 48 * 60 * 60 * 1000  // 48小时
         },
         adTrigger: {
@@ -350,8 +350,8 @@ export const TARGET_TYPES = [
             showGrass: true
         },
         unlock: {
-            type: 'ad',
-            adRequired: true,
+            type: 'free',
+            adRequired: false,
             unlockDuration: 48 * 60 * 60 * 1000  // 48小时
         },
         adTrigger: {
@@ -478,7 +478,8 @@ export const ENDLESS_CONFIG = {
     RADIUS_MULTIPLIER_RANGE: [0.8, 1.3],
     POINTS_MULTIPLIER_RANGE: [0.8, 1.5],
     UNLOCK_SCORE_INTERVAL: 500, // 每500分解锁一个新目标
-    UNLOCK_NOTIFICATION_DURATION: 2000 // 解锁提示显示时长(ms)
+    UNLOCK_NOTIFICATION_DURATION: 2000, // 解锁提示显示时长(ms)
+    USE_ALL_TARGETS: false // true: 使用所有目标, false: 只使用选择界面已解锁的目标
 };
 export const SELECTION_CONFIG = {
     CARD_WIDTH: 140,              // 卡片宽度

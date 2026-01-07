@@ -585,9 +585,10 @@ export class Game {
             }
         }
 
-        this.stateManager.startEndlessMode();
-        // 传递 AdManager 给 GameStateManager 用于解锁时的广告触发
+        // 先传递 AdManager，让 startEndlessMode 能获取解锁状态
         this.stateManager.setAdManager(this.adManager);
+
+        this.stateManager.startEndlessMode();
 
         this.targets = [];
         this.spawnManager.reset();

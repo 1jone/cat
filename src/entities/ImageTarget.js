@@ -682,11 +682,92 @@ export class ImageTarget extends Entity {
                     this.velocity = this.preStartleVelocity;
                     this.preStartleVelocity = null;
                 }
+
+                // 同步参数化运动模式的基准点，避免位置漂移回位
+                this.syncMovementBasePoint();
             }
         }
 
         if (this.startleCooldown > 0) {
             this.startleCooldown -= dt;
+        }
+    }
+
+    /**
+     * 同步参数化运动模式的基准点
+     * 受惊结束后调用，根据当前位置和时间反推正确的基准点，
+     * 避免下一帧位置被强制"拉回"到旧基准点
+     */
+    syncMovementBasePoint() {
+        const movement = this.config.movement;
+        const params = this.movementParams || {};
+
+        switch (movement) {
+            case 'wave':
+                // wave: position.y = baseY + sin(time) * 50
+                // 反推: baseY = position.y - sin(time) * 50
+                this.baseY = this.position.y - Math.sin(this.time) * 50;
+                break;
+
+            case 'hover': {
+                // hover: position = base + hoverOffset
+                const amp = params.hoverAmplitude || 30;
+                const hoverX = amp * Math.sin(this.time * 1.5) + amp * 0.5 * Math.sin(this.time * 2.7);
+                const hoverY = amp * Math.sin(this.time * 1.8) + amp * 0.5 * Math.sin(this.time * 3.1);
+                this.baseX = this.position.x - hoverX;
+                this.baseY = this.position.y - hoverY;
+                break;
+            }
+
+            case 'pendulum': {
+                // pendulum: position = pivot + length * sin/cos(angle)
+                const pendulumLength = params.pendulumLength || 150;
+                const maxAngle = params.maxAngle || Math.PI / 3;
+                const angularFreq = params.angularFreq || 2;
+                const angle = maxAngle * Math.sin(this.time * angularFreq);
+                this.pivotX = this.position.x - pendulumLength * Math.sin(angle);
+                this.pivotY = this.position.y - pendulumLength * Math.cos(angle);
+                break;
+            }
+
+            case 'circular': {
+                // circular: position = orbitCenter + radius * cos/sin(phase)
+                const angularSpeed = params.angularSpeed || 2;
+                const orbitRadius = params.orbitRadius || 80;
+                this.orbitCenterX = this.position.x - orbitRadius * Math.cos(this.time * angularSpeed + this.phase);
+                this.orbitCenterY = this.position.y - orbitRadius * Math.sin(this.time * angularSpeed + this.phase);
+                break;
+            }
+
+            case 'spiral': {
+                // spiral: position = spiralCenter + spiralRadius * cos/sin(phase)
+                const angularSpeed = params.angularSpeed || 1.5;
+                this.spiralCenterX = this.position.x - this.spiralRadius * Math.cos(this.time * angularSpeed + this.phase);
+                this.spiralCenterY = this.position.y - this.spiralRadius * Math.sin(this.time * angularSpeed + this.phase);
+                break;
+            }
+
+            case 'zigzag': {
+                // zigzag: position.y = baseY + amplitude * triangleValue
+                const amplitude = params.amplitude || 60;
+                const frequency = params.frequency || 1;
+                const t = (this.time * frequency) % 1;
+                const triangleValue = t < 0.5 ? 4 * t - 1 : 3 - 4 * t;
+                this.baseY = this.position.y - amplitude * triangleValue;
+                break;
+            }
+
+            case 'figure8': {
+                // figure8: position = center + amplitude * sin(...)
+                const amplitudeX = params.amplitudeX || 100;
+                const amplitudeY = params.amplitudeY || 80;
+                const angularSpeed = params.angularSpeed || 1.5;
+                this.figure8CenterX = this.position.x - amplitudeX * Math.sin(2 * this.time * angularSpeed);
+                this.figure8CenterY = this.position.y - amplitudeY * Math.sin(this.time * angularSpeed);
+                break;
+            }
+
+            // bounce、random、dash、chase 使用速度累积，不需要同步基准点
         }
     }
 

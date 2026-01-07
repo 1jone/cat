@@ -69,6 +69,28 @@ export class GameStateManager {
     }
 
     /**
+     * 获取无尽模式可用的目标索引
+     * @returns {number[]} 可用目标索引数组
+     */
+    getAvailableTargetIndices() {
+        // 如果配置为使用所有目标，返回全部索引
+        if (ENDLESS_CONFIG.USE_ALL_TARGETS) {
+            return TARGET_TYPES.map((_, i) => i);
+        }
+
+        // 否则只返回选择界面已解锁的目标
+        if (!this.adManager) return [0]; // 安全回退
+
+        const indices = [];
+        for (let i = 0; i < TARGET_TYPES.length; i++) {
+            if (this.adManager.isTargetUnlocked(TARGET_TYPES[i].id)) {
+                indices.push(i);
+            }
+        }
+        return indices.length > 0 ? indices : [0];
+    }
+
+    /**
      * 获取当前状态
      * @returns {string} 当前游戏状态
      */
@@ -132,8 +154,11 @@ export class GameStateManager {
      * 开始无尽模式
      */
     startEndlessMode() {
-        // 随机选择初始目标
-        const initialIndex = Math.floor(Math.random() * TARGET_TYPES.length);
+        // 获取可用目标索引（根据配置决定是全部还是已解锁的）
+        const availableIndices = this.getAvailableTargetIndices();
+        const randomIdx = Math.floor(Math.random() * availableIndices.length);
+        const initialIndex = availableIndices[randomIdx];
+
         this.unlockedTargetIndices = [initialIndex];
         this.nextUnlockScore = ENDLESS_CONFIG.UNLOCK_SCORE_INTERVAL;
 
@@ -208,21 +233,22 @@ export class GameStateManager {
      */
     checkUnlock() {
         if (!this.isEndlessMode) return null;
-        if (this.unlockedTargetIndices.length >= TARGET_TYPES.length) return null;
         if (this.score < this.nextUnlockScore) return null;
 
-        // 找到下一个未解锁的目标
+        // 获取可用目标索引（根据配置决定是全部还是已解锁的）
+        const availableIndices = this.getAvailableTargetIndices();
+
+        // 检查是否所有可用目标都已解锁
+        const allUnlocked = availableIndices.every(idx =>
+            this.unlockedTargetIndices.includes(idx)
+        );
+        if (allUnlocked) return null;
+
+        // 找下一个可用但未解锁的目标
         let nextIndex = -1;
-        for (let i = 0; i < TARGET_TYPES.length; i++) {
-            let unlocked = false;
-            for (let j = 0; j < this.unlockedTargetIndices.length; j++) {
-                if (this.unlockedTargetIndices[j] === i) {
-                    unlocked = true;
-                    break;
-                }
-            }
-            if (!unlocked) {
-                nextIndex = i;
+        for (const idx of availableIndices) {
+            if (!this.unlockedTargetIndices.includes(idx)) {
+                nextIndex = idx;
                 break;
             }
         }
