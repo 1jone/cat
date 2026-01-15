@@ -488,7 +488,7 @@ export const SELECTION_CONFIG = {
     SIDE_SCALE: 0.8,              // 两侧卡片缩放
     SIDE_OPACITY: 0.6,            // 两侧卡片透明度
     AUTO_SCROLL_INTERVAL: 3000,   // 自动轮播间隔(ms)
-    SCROLL_FRICTION: 0.92,        // 滚动摩擦系数
+    SCROLL_FRICTION: 0.88,        // 滚动摩擦系数（降低以更快减速）
     SNAP_SPEED: 0.15,             // 吸附动画速度
     DRAG_THRESHOLD: 10,           // 判定为拖动的最小距离
 };

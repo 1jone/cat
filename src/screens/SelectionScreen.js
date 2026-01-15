@@ -175,11 +175,13 @@ export class SelectionScreen {
         const deltaX = pos.x - this.dragStartX;
         this.scrollOffset = this.dragStartOffset - deltaX;
 
-        // 计算滚动速度
+        // 计算滚动速度（添加上限防止过快滑动）
         const now = performance.now();
         const dt = now - this.lastTouchTime;
         if (dt > 0) {
-            this.scrollVelocity = (this.lastTouchX - pos.x) / dt * 16;
+            const rawVelocity = (this.lastTouchX - pos.x) / dt * 16;
+            const maxVelocity = 25; // 最大速度限制
+            this.scrollVelocity = Math.max(-maxVelocity, Math.min(maxVelocity, rawVelocity));
         }
         this.lastTouchX = pos.x;
         this.lastTouchTime = now;
@@ -355,10 +357,27 @@ export class SelectionScreen {
         const maxOffset = (this.resourceManager.selectionItems.length - 1) * cardStep;
 
         if (!this.isDragging) {
-            // 惯性滚动
-            if (Math.abs(this.scrollVelocity) > 0.5) {
+            // 惯性滚动 - 使用渐进式阻尼
+            if (Math.abs(this.scrollVelocity) > 1) {
+                // 边界附近增加阻尼，防止冲出太远
+                let friction = SELECTION_CONFIG.SCROLL_FRICTION;
+                if (this.scrollOffset < 0 || this.scrollOffset > maxOffset) {
+                    friction = 0.7; // 超出边界时大幅增加阻尼
+                }
+
                 this.scrollOffset += this.scrollVelocity;
-                this.scrollVelocity *= SELECTION_CONFIG.SCROLL_FRICTION;
+                this.scrollVelocity *= friction;
+
+                // 硬边界限制，防止冲出太远
+                const hardLimit = cardStep * 0.5;
+                if (this.scrollOffset < -hardLimit) {
+                    this.scrollOffset = -hardLimit;
+                    this.scrollVelocity = 0;
+                }
+                if (this.scrollOffset > maxOffset + hardLimit) {
+                    this.scrollOffset = maxOffset + hardLimit;
+                    this.scrollVelocity = 0;
+                }
             } else {
                 this.scrollVelocity = 0;
             }

@@ -610,7 +610,7 @@ export class SettingsUI {
         ctx.font = 'bold 16px Arial';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText('返回', btn.x + btn.width / 2, btn.y + btn.height / 2);
+        ctx.fillText('返回游戏', btn.x + btn.width / 2, btn.y + btn.height / 2);
     }
 
     /**
