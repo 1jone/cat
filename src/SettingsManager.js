@@ -13,6 +13,12 @@ export class SettingsManager {
         this.defaultSettings = {
             audio: {
                 bgmVolume: 0.5,
+                // 音频分层：游戏音效（原名 sfxVolume，保持向后兼容）
+                gameSfxVolume: 0.8,
+                // 音频分层：目标音效（新增）
+                targetSfxVolume: 0.8,
+                targetSfxEnabled: true,
+                // 向后兼容：保留 sfxVolume，迁移时映射到 gameSfxVolume
                 sfxVolume: 0.8,
                 muted: false
             },
@@ -76,6 +82,15 @@ export class SettingsManager {
                 const saved = JSON.parse(data);
                 // 深度合并，确保新增的默认设置项也存在
                 this.settings = this.deepMerge(this.defaultSettings, saved);
+
+                // 向后兼容：迁移旧的 sfxVolume 到 gameSfxVolume
+                if (saved.audio && saved.audio.sfxVolume !== undefined) {
+                    if (this.settings.audio.gameSfxVolume === undefined) {
+                        this.settings.audio.gameSfxVolume = saved.audio.sfxVolume;
+                    }
+                    // 保留 sfxVolume 以保持完全兼容
+                    this.settings.audio.sfxVolume = saved.audio.sfxVolume;
+                }
             }
             console.log('Settings loaded:', this.settings);
         } catch (e) {
@@ -161,17 +176,66 @@ export class SettingsManager {
     }
 
     /**
-     * 获取音效音量
+     * 获取音效音量（游戏音效，向后兼容）
      */
     getSFXVolume() {
-        return this.get('audio.sfxVolume');
+        // 优先返回 gameSfxVolume，如果不存在则返回 sfxVolume
+        const gameSfx = this.get('audio.gameSfxVolume');
+        if (gameSfx !== undefined) return gameSfx;
+        return this.get('audio.sfxVolume') || 0.8;
     }
 
     /**
-     * 设置音效音量
+     * 设置音效音量（游戏音效，向后兼容）
      */
     setSFXVolume(volume) {
-        this.set('audio.sfxVolume', Math.max(0, Math.min(1, volume)));
+        const clampedVolume = Math.max(0, Math.min(1, volume));
+        this.set('audio.gameSfxVolume', clampedVolume);
+        this.set('audio.sfxVolume', clampedVolume);  // 保持兼容
+    }
+
+    /**
+     * 获取游戏音效音量（GAME_SFX 层）
+     */
+    getGameSFXVolume() {
+        return this.get('audio.gameSfxVolume') || this.get('audio.sfxVolume') || 0.8;
+    }
+
+    /**
+     * 设置游戏音效音量（GAME_SFX 层）
+     */
+    setGameSFXVolume(volume) {
+        const clampedVolume = Math.max(0, Math.min(1, volume));
+        this.set('audio.gameSfxVolume', clampedVolume);
+        this.set('audio.sfxVolume', clampedVolume);  // 保持兼容
+    }
+
+    /**
+     * 获取目标音效音量（TARGET_SFX 层）
+     */
+    getTargetSFXVolume() {
+        return this.get('audio.targetSfxVolume') || 0.8;
+    }
+
+    /**
+     * 设置目标音效音量（TARGET_SFX 层）
+     */
+    setTargetSFXVolume(volume) {
+        this.set('audio.targetSfxVolume', Math.max(0, Math.min(1, volume)));
+    }
+
+    /**
+     * 获取目标音效开关状态
+     */
+    isTargetSFXEnabled() {
+        return this.get('audio.targetSfxEnabled') !== false;  // 默认启用
+    }
+
+    /**
+     * 设置目标音效开关
+     */
+    setTargetSFXEnabled(enabled) {
+        this.set('audio.targetSfxEnabled', enabled);
     }
 
     /**

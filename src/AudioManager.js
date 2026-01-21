@@ -1,9 +1,20 @@
 /**
  * AudioManager - 游戏音频管理器
  * 管理 BGM 播放和音效触发
+ * 音频分层架构:
+ * - BGM: 背景音乐
+ * - GAME_SFX: 游戏音效（得分、倒计时等）
+ * - TARGET_SFX: 目标音效（动物叫声）
  */
 import { SoundGenerator } from './SoundGenerator';
 import { AUDIO_CONFIG } from './config';
+
+// 音频层枚举
+export const AudioLayer = {
+    BGM: 'bgm',
+    GAME_SFX: 'game_sfx',
+    TARGET_SFX: 'target_sfx'
+};
 
 export class AudioManager {
     constructor() {
@@ -11,10 +22,24 @@ export class AudioManager {
         this.currentBGMName = null;         // 当前 BGM 名称
         this.soundGenerator = null;         // 音效生成器
         this.isMuted = false;               // 静音状态
+
+        // 音频分层音量
         this.bgmVolume = 0.5;               // BGM 音量
-        this.sfxVolume = 0.8;               // 音效音量
+        this.gameSfxVolume = 0.8;           // 游戏音效音量（原名 sfxVolume）
+        this.targetSfxVolume = 0.8;         // 目标音效音量（新增）
+        this.targetSfxEnabled = true;       // 目标音效总开关（新增）
+
+        // 向后兼容：保留 sfxVolume 作为 gameSfxVolume 的别名
+        Object.defineProperty(this, 'sfxVolume', {
+            get() { return this.gameSfxVolume; },
+            set(value) { this.gameSfxVolume = value; }
+        });
+
         this.initialized = false;           // 是否已初始化
         this.fadeInterval = null;           // 淡入淡出定时器
+
+        // 目标音效缓存（避免重复创建音频实例）
+        this.targetSfxCache = new Map();
     }
 
     /**
@@ -206,13 +231,41 @@ export class AudioManager {
     }
 
     /**
-     * 设置音效音量
+     * 设置音效音量（游戏音效，向后兼容）
      */
     setSFXVolume(volume) {
-        this.sfxVolume = Math.max(0, Math.min(1, volume));
+        this.setGameSFXVolume(volume);
+    }
+
+    /**
+     * 设置游戏音效音量（GAME_SFX 层）
+     */
+    setGameSFXVolume(volume) {
+        this.gameSfxVolume = Math.max(0, Math.min(1, volume));
         if (this.soundGenerator) {
-            this.soundGenerator.setVolume(this.sfxVolume);
+            this.soundGenerator.setVolume(this.gameSfxVolume);
         }
+    }
+
+    /**
+     * 设置目标音效音量（TARGET_SFX 层）
+     */
+    setTargetSFXVolume(volume) {
+        this.targetSfxVolume = Math.max(0, Math.min(1, volume));
+    }
+
+    /**
+     * 设置目标音效开关
+     */
+    setTargetSFXEnabled(enabled) {
+        this.targetSfxEnabled = enabled;
+    }
+
+    /**
+     * 获取目标音效开关状态
+     */
+    isTargetSFXEnabled() {
+        return this.targetSfxEnabled;
     }
 
     /**
@@ -226,6 +279,10 @@ export class AudioManager {
         if (this.soundGenerator) {
             this.soundGenerator.mute();
         }
+        // 停止所有播放中的目标音效
+        this.targetSfxCache.forEach(audio => {
+            try { audio.stop(); } catch (e) {}
+        });
     }
 
     /**
@@ -237,7 +294,7 @@ export class AudioManager {
             this.bgm.volume = this.bgmVolume;
         }
         if (this.soundGenerator) {
-            this.soundGenerator.unmute(this.sfxVolume);
+            this.soundGenerator.unmute(this.gameSfxVolume);
         }
     }
 
@@ -320,6 +377,61 @@ export class AudioManager {
         this.soundGenerator.playModeSelect();
     }
 
+    // ============ 目标音效方法（TARGET_SFX 层）============
+
+    /**
+     * 获取目标音效文件路径
+     * @param {string} targetId - 目标类型 ID（如 'captain', 'bear', 'octopus'）
+     * @param {string} soundId - 音效 ID（如 'meow1', 'meow2', 'growl1'）
+     * @returns {string} 音效文件路径
+     */
+    getTargetSFXPath(targetId, soundId) {
+        // 从配置中获取音效路径映射（将在 config.js 中定义）
+        if (AUDIO_CONFIG.TARGET_SFX_PATHS && AUDIO_CONFIG.TARGET_SFX_PATHS[targetId]) {
+            const sounds = AUDIO_CONFIG.TARGET_SFX_PATHS[targetId];
+            return sounds[soundId] || sounds[Object.keys(sounds)[0]];
+        }
+        // 默认路径
+        return `assets/target/${targetId}/${soundId}.mp3`;
+    }
+
+    /**
+     * 播放目标音效（动物叫声等）
+     * @param {string} soundId - 音效 ID
+     * @param {string} targetId - 目标类型 ID
+     */
+    playTargetSFX(soundId, targetId) {
+        // 检查是否启用和静音
+        if (!this.targetSfxEnabled || this.isMuted) return;
+
+        const soundPath = this.getTargetSFXPath(targetId, soundId);
+
+        try {
+            // 创建新的音频实例
+            const audio = tt.createInnerAudioContext();
+            audio.src = soundPath;
+            audio.volume = this.targetSfxVolume;
+
+            // 播放完成后清理缓存
+            audio.onEnded(() => {
+                this.targetSfxCache.delete(soundPath);
+                try { audio.destroy(); } catch (e) {}
+            });
+
+            audio.onError((err) => {
+                console.warn('目标音效播放错误:', soundPath, err);
+                this.targetSfxCache.delete(soundPath);
+                try { audio.destroy(); } catch (e) {}
+            });
+
+            audio.play();
+            this.targetSfxCache.set(soundPath, audio);
+
+        } catch (e) {
+            console.warn('创建目标音效失败:', soundPath, e);
+        }
+    }
+
     /**
      * 销毁音频管理器
      */
@@ -329,6 +441,14 @@ export class AudioManager {
             this.soundGenerator.destroy();
             this.soundGenerator = null;
         }
+        // 清理目标音效缓存
+        this.targetSfxCache.forEach(audio => {
+            try {
+                audio.stop();
+                audio.destroy();
+            } catch (e) {}
+        });
+        this.targetSfxCache.clear();
         this.initialized = false;
     }
 }

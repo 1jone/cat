@@ -90,25 +90,58 @@ export class SettingsUI {
         });
         currentY += cfg.SPACING.row + 30;
 
-        // SFX 音量滑块
+        // 游戏音效滑块（重命名自"音效"）
         this.sliders.push({
-            id: 'sfxVolume',
-            label: '音效',
+            id: 'gameSfxVolume',
+            label: '游戏音效',
             x: contentX,
             y: currentY,
             width: contentWidth,
             trackX: contentX + contentWidth - cfg.SLIDER.width,
             trackWidth: cfg.SLIDER.width,
-            getValue: () => this.settingsManager.getSFXVolume(),
+            getValue: () => this.settingsManager.getGameSFXVolume(),
             setValue: (v) => {
-                this.settingsManager.setSFXVolume(v);
-                this.audioManager.setSFXVolume(v);
+                this.settingsManager.setGameSFXVolume(v);
+                this.audioManager.setGameSFXVolume(v);
+            }
+        });
+        currentY += cfg.SPACING.row + 30;
+
+        // 目标音效滑块（新增）
+        this.sliders.push({
+            id: 'targetSfxVolume',
+            label: '目标音效',
+            x: contentX,
+            y: currentY,
+            width: contentWidth,
+            trackX: contentX + contentWidth - cfg.SLIDER.width,
+            trackWidth: cfg.SLIDER.width,
+            getValue: () => this.settingsManager.getTargetSFXVolume(),
+            setValue: (v) => {
+                this.settingsManager.setTargetSFXVolume(v);
+                this.audioManager.setTargetSFXVolume(v);
             }
         });
         currentY += cfg.SPACING.row + 30;
 
         // 开关组件
         this.toggles = [];
+
+        // 动物叫声开关（新增）
+        this.toggles.push({
+            id: 'targetSfxEnabled',
+            label: '动物叫声',
+            x: contentX,
+            y: currentY,
+            width: contentWidth,
+            toggleX: contentX + contentWidth - cfg.TOGGLE.width,
+            getValue: () => this.settingsManager.isTargetSFXEnabled(),
+            setValue: (v) => {
+                this.settingsManager.setTargetSFXEnabled(v);
+                this.audioManager.setTargetSFXEnabled(v);
+            }
+        });
+        currentY += cfg.SPACING.row + 30;
 
         // 静音开关
         this.toggles.push({

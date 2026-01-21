@@ -11,12 +11,15 @@ import { ParticleTarget } from '../entities/ParticleTarget';
 export class SpawnManager {
     /**
      * @param {import('../SettingsManager').SettingsManager} settingsManager - 设置管理器
+     * @param {import('../AudioManager').AudioManager} audioManager - 音频管理器
      */
-    constructor(settingsManager = null) {
+    constructor(settingsManager = null, audioManager = null) {
         // 生成计时器
         this.spawnTimer = 0;
         // 设置管理器
         this.settingsManager = settingsManager;
+        // 音频管理器
+        this.audioManager = audioManager;
     }
 
     /**
@@ -105,7 +108,12 @@ export class SpawnManager {
         if (targetConfig.renderType === 'particle') {
             return new ParticleTarget(position, targetConfig);
         }
-        return new ImageTarget(position, targetConfig);
+        const target = new ImageTarget(position, targetConfig);
+        // 注入 audioManager 供行为系统使用
+        if (this.audioManager) {
+            target.audioManager = this.audioManager;
+        }
+        return target;
     }
 
     /**

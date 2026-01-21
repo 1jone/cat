@@ -47,8 +47,8 @@ export class Game {
         this.settingsManager = getSettingsManager();
         this.settingsManager.load();
 
-        // 初始化 SpawnManager（传入设置管理器）
-        this.spawnManager = new SpawnManager(this.settingsManager);
+        // // 初始化 SpawnManager（传入设置管理器）
+        // this.spawnManager = new SpawnManager(this.settingsManager);
 
         // 预加载 emoji 精灵图
         this.emojiManager.preload();
@@ -72,6 +72,9 @@ export class Game {
         // 初始化音频管理器
         this.audioManager = getAudioManager();
         this.audioInitialized = false;
+
+        // 初始化 SpawnManager（传入设置管理器和音频管理器）
+        this.spawnManager = new SpawnManager(this.settingsManager, this.audioManager);
 
         // 初始化广告管理器
         this.adManager = new AdManager(this.settingsManager);

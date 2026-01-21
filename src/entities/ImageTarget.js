@@ -1,6 +1,9 @@
 import { Entity } from './Entity';
 import { Vector2 } from '../utils/Vector2';
-import { CONFIG, STARTLE_CONFIG } from '../config';
+import { CONFIG, STARTLE_CONFIG, FEATURE_FLAGS } from '../config';
+import { BehaviorSystem } from '../systems/BehaviorSystem';
+import { PlayDeadBehavior } from '../behaviors/PlayDeadBehavior';
+import { VocalizationBehavior } from '../behaviors/VocalizationBehavior';
 
 export class ImageTarget extends Entity {
     constructor(position, config) {
@@ -63,6 +66,29 @@ export class ImageTarget extends Entity {
 
         // 初始化运动特定状态
         this.initMovement(position);
+
+        // 初始化行为系统（可选，基于特性开关）
+        this.behaviorSystem = null;
+        if (FEATURE_FLAGS.behaviorSystem) {
+            this.initBehaviorSystem();
+        }
+    }
+
+    /**
+     * 初始化行为系统
+     */
+    initBehaviorSystem() {
+        this.behaviorSystem = new BehaviorSystem(this);
+
+        // 注册装死行为
+        if (FEATURE_FLAGS.playDead) {
+            this.behaviorSystem.registerBehavior('playDead', new PlayDeadBehavior());
+        }
+
+        // 注册叫声行为
+        if (FEATURE_FLAGS.vocalization) {
+            this.behaviorSystem.registerBehavior('vocalization', new VocalizationBehavior());
+        }
     }
 
     /**
@@ -141,6 +167,16 @@ export class ImageTarget extends Entity {
 
         // 保存当前位置用于计算移动方向
         this.previousPosition = this.position.clone();
+
+        // 更新行为系统（在运动更新之前）
+        if (this.behaviorSystem) {
+            this.behaviorSystem.update(dt);
+
+            // 检查是否应该跳过运动更新（装死时）
+            if (this.behaviorSystem.shouldSkipMovement()) {
+                return;  // 装死时跳过运动更新
+            }
+        }
 
         // 更新受惊状态
         this.updateStartle(dt);
@@ -602,6 +638,11 @@ export class ImageTarget extends Entity {
      * 触发受惊状态
      */
     triggerStartle(touchPosition) {
+        // 如果当前处于装死状态，强制结束装死行为
+        if (this.isPlayingDead && this.behaviorSystem) {
+            this.behaviorSystem.endBehavior('playDead');
+        }
+
         this.isStartled = true;
         this.startleTimer = STARTLE_CONFIG.DURATION;
         this.exclamationTimer = STARTLE_CONFIG.EXCLAMATION_DURATION;
@@ -888,6 +929,28 @@ export class ImageTarget extends Entity {
         // 绘制惊叹号（在目标上方，不受旋转影响）
         if (this.exclamationTimer > 0) {
             this.renderExclamation(ctx);
+        }
+
+        // 绘制行为相关的视觉效果
+        this.renderBehaviors(ctx);
+    }
+
+    /**
+     * 渲染行为相关的视觉效果
+     */
+    renderBehaviors(ctx) {
+        if (!this.behaviorSystem) return;
+
+        // 绘制装死表情
+        const playDeadBehavior = this.behaviorSystem.behaviors.get('playDead');
+        if (playDeadBehavior && playDeadBehavior.renderExpression) {
+            playDeadBehavior.renderExpression(ctx, this, this.position.x, this.position.y);
+        }
+
+        // 绘制叫声视觉效果
+        const vocalizationBehavior = this.behaviorSystem.behaviors.get('vocalization');
+        if (vocalizationBehavior && vocalizationBehavior.renderVisual) {
+            vocalizationBehavior.renderVisual(ctx, this, this.position.x, this.position.y);
         }
     }
 

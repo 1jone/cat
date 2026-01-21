@@ -548,8 +548,8 @@ export const SETTINGS_CONFIG = {
     PANEL: {
         widthRatio: 0.85,       // 相对于 canvas 宽度的比例
         maxWidth: 340,          // 最大宽度
-        height: 480,            // 面板高度（非游戏中）
-        heightInGame: 620,      // 面板高度（游戏中，多3个滑块）
+        height: 570,            // 面板高度（非游戏中）- 增加90px用于新音频控件
+        heightInGame: 710,      // 面板高度（游戏中）- 增加90px用于新音频控件
         padding: 24,            // 内边距
         borderRadius: 20        // 圆角半径
     },
@@ -686,5 +686,153 @@ export const SIDEBAR_REWARD_CONFIG = {
         rewardTitle: '恭喜获得',
         rewardButton: '立即体验',
     }
+};
+
+// ============ 音频分层配置 ============
+
+/**
+ * 音频层配置
+ * 扩展 AUDIO_CONFIG 以支持分层音量控制
+ */
+export const AUDIO_LAYER_CONFIG = {
+    // 默认音量
+    DEFAULT_VOLUMES: {
+        bgm: 0.5,           // 背景音乐
+        gameSfx: 0.8,       // 游戏音效
+        targetSfx: 0.8      // 目标音效
+    },
+    // 音效文件路径映射（目标音效）
+    TARGET_SFX_PATHS: {
+        captain: {
+            meow1: 'assets/target/captain/meow1.mp3',
+            meow2: 'assets/target/captain/meow2.mp3',
+            meow3: 'assets/target/captain/meow3.mp3',
+            purr: 'assets/target/captain/purr.mp3'
+        },
+        bear: {
+            growl1: 'assets/target/bear/growl1.mp3',
+            growl2: 'assets/target/bear/growl2.mp3',
+            purr1: 'assets/target/bear/purr1.mp3',
+            roar: 'assets/target/bear/roar.mp3'
+        },
+        octopus: {
+            bubble1: 'assets/target/octopus/bubble1.mp3',
+            bubble2: 'assets/target/octopus/bubble2.mp3',
+            squirt: 'assets/target/octopus/squirt.mp3'
+        },
+        mouse: {
+            squeak1: 'assets/target/mouse/squeak1.mp3',
+            squeak2: 'assets/target/mouse/squeak2.mp3',
+            squeak3: 'assets/target/mouse/squeak3.mp3'
+        },
+        // 其他目标可以使用默认音效或保持静默
+        seagull: {
+            call1: 'assets/target/seagull/call1.mp3',
+            call2: 'assets/target/seagull/call2.mp3'
+        },
+        bird: {
+            chirp1: 'assets/target/bird/chirp1.mp3',
+            chirp2: 'assets/target/bird/chirp2.mp3',
+            chirp3: 'assets/target/bird/chirp3.mp3'
+        },
+        fish: {
+            splash: 'assets/target/fish/splash.mp3'
+        },
+        butterfly: {
+            flutter: 'assets/target/butterfly/flutter.mp3'
+        },
+        yarn: {
+            rustle: 'assets/target/yarn/rustle.mp3'
+        },
+        ladybug: {
+            tiny: 'assets/target/ladybug/tiny.mp3'
+        },
+        feather: {
+            rustle: 'assets/target/feather/rustle.mp3'
+        },
+        laser: {
+            zap: 'assets/target/laser/zap.mp3'
+        },
+        // 粒子目标
+        sparkle: {
+            sparkle: 'assets/target/sparkle/sparkle.mp3'
+        }
+    }
+};
+
+// 更新 AUDIO_CONFIG 以包含新的目标音效路径
+AUDIO_CONFIG.TARGET_SFX_PATHS = AUDIO_LAYER_CONFIG.TARGET_SFX_PATHS;
+
+// ============ 行为系统配置 ============
+
+/**
+ * 行为系统配置
+ * 控制动物行为（装死、叫声等）的触发和表现
+ */
+export const BEHAVIOR_CONFIG = {
+    // 全局开关
+    enabled: true,
+
+    // 装死行为配置
+    playDead: {
+        enabled: true,
+        // 支持的目标类型（空数组表示全部支持）
+        supportedTargets: ['captain', 'bear', 'octopus', 'mouse'],
+        // 触发概率（每秒）
+        triggerProbability: 0.08,  // 约12.5秒触发一次 (1/0.08 ≈ 12.5)
+        // 持续时间范围（秒）
+        durationRange: [2, 5],
+        // 冷却时间（秒）
+        cooldown: 10,
+        // 视觉效果
+        visual: {
+            rotation: Math.PI / 2,  // 倒地旋转角度（90度）
+            wobbleAmplitude: 0.05,  // 晃动幅度（弧度）
+            wobbleFrequency: 8,     // 晃动频率（Hz）
+            expression: 'x_x'       // 装死表情
+        }
+    },
+
+    // 叫声行为配置
+    vocalization: {
+        enabled: true,
+        // 支持的目标类型（空数组表示全部支持）
+        supportedTargets: [],  // 空数组表示所有目标都支持
+        // 触发间隔范围（秒）
+        intervalRange: [5, 15],
+        // 每次叫声的持续时间（秒）
+        duration: 1.5,
+        // 最小间隔（防止过于频繁）
+        minInterval: 3,
+        // 音效变体选择
+        randomVariant: true  // 是否随机选择音效变体
+    },
+
+    // 行为优先级（数字越大优先级越高）
+    priorities: {
+        startle: 100,     // 受惊机制优先级最高
+        playDead: 50,     // 装死中等优先级
+        vocalization: 10  // 叫声优先级最低（可以与其他行为同时发生）
+    }
+};
+
+// ============ 特性开关 ============
+
+/**
+ * 特性开关配置
+ * 用于控制新功能的启用/禁用
+ */
+export const FEATURE_FLAGS = {
+    // 行为系统
+    behaviorSystem: true,
+    playDead: true,
+    vocalization: true,
+
+    // 音频分层
+    audioLayering: true,
+
+    // 未来扩展
+    sleepingBehavior: false,      // 睡觉行为（未实现）
+    chasingBehavior: false       // 追逐行为（未实现）
 };
 
