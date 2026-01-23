@@ -4,6 +4,7 @@
  */
 
 import { CONFIG } from '../config';
+import { OffscreenCanvasCache } from '../utils/CanvasUtils';
 
 export class BackgroundRenderer {
     constructor(canvas, ctx) {
@@ -11,8 +12,8 @@ export class BackgroundRenderer {
         this.ctx = ctx;
         this.dpr = 1;  // 设备像素比
 
-        // 草地离屏Canvas缓存（性能优化）
-        this.grassCanvas = null;
+        // 草地离屏Canvas缓存（使用 OffscreenCanvasCache）
+        this.grassCache = new OffscreenCanvasCache({ dpr: this.dpr });
         // 草地装饰元素缓存
         this.grassElements = null;
     }
@@ -42,21 +43,21 @@ export class BackgroundRenderer {
      * @param {number} logicalHeight - 画布逻辑高度
      */
     drawGrass(logicalHeight) {
-        // 如果草地Canvas未生成，先生成
-        if (!this.grassCanvas) {
+        // 如果草地缓存未生成，先生成
+        if (!this.grassCache.isValid()) {
             this.generateGrassElements();
         }
 
-        const dpr = this.dpr;
-        const grassLogicalHeight = this.grassCanvas.height / dpr;
-        const grassLogicalWidth = this.grassCanvas.width / dpr;
+        const grassLogicalHeight = 80;
+        const grassLogicalWidth = this.canvas.width / this.dpr;
 
-        // 直接绘制预渲染的草地（性能优化：从368个绘制调用减少到1个）
-        // 使用9参数形式，指定目标尺寸为逻辑尺寸
-        this.ctx.drawImage(
-            this.grassCanvas,
-            0, 0, this.grassCanvas.width, this.grassCanvas.height,  // 源区域（物理尺寸）
-            0, logicalHeight - grassLogicalHeight, grassLogicalWidth, grassLogicalHeight  // 目标区域（逻辑尺寸）
+        // 使用 OffscreenCanvasCache 的 draw 方法
+        this.grassCache.draw(
+            this.ctx,
+            0,
+            logicalHeight - grassLogicalHeight,
+            grassLogicalWidth,
+            grassLogicalHeight
         );
     }
 
@@ -64,28 +65,10 @@ export class BackgroundRenderer {
      * 生成草地装饰元素（预渲染到离屏Canvas，支持高 DPI）
      */
     generateGrassElements() {
-        const dpr = this.dpr;
         const grassHeight = 80;  // 逻辑高度
-        const logicalWidth = this.canvas.width / dpr;  // 逻辑宽度
+        const logicalWidth = this.canvas.width / this.dpr;  // 逻辑宽度
 
-        // 创建离屏Canvas预渲染草地（物理尺寸）
-        const grassCanvas = tt.createCanvas();
-        grassCanvas.width = Math.floor(logicalWidth * dpr);
-        grassCanvas.height = Math.floor(grassHeight * dpr);
-        const grassCtx = grassCanvas.getContext('2d');
-
-        // 缩放上下文以使用逻辑坐标
-        grassCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-        // 绘制渐变背景（使用逻辑坐标）
-        const gradient = grassCtx.createLinearGradient(0, 0, 0, grassHeight);
-        gradient.addColorStop(0, '#7EC850');   // 顶部较浅的绿色
-        gradient.addColorStop(0.3, '#5DA038'); // 中间绿色
-        gradient.addColorStop(1, '#3D7A28');   // 底部较深的绿色
-        grassCtx.fillStyle = gradient;
-        grassCtx.fillRect(0, 0, logicalWidth, grassHeight);
-
-        // 生成草叶数据（保持高密度，因为使用离屏Canvas只渲染一次）
+        // 生成草叶数据
         const blades = [];
         const grassBladeCount = Math.floor(logicalWidth / 6); // 更密集的草叶
         for (let i = 0; i < grassBladeCount; i++) {
@@ -96,21 +79,7 @@ export class BackgroundRenderer {
             });
         }
 
-        // 绘制草丛到离屏Canvas（使用逻辑坐标）
-        grassCtx.fillStyle = 'rgba(100, 160, 50, 0.35)';
-        for (const blade of blades) {
-            grassCtx.beginPath();
-            grassCtx.moveTo(blade.x, 0);
-            grassCtx.quadraticCurveTo(
-                blade.x + blade.width / 2,
-                -blade.height,
-                blade.x + blade.width,
-                0
-            );
-            grassCtx.fill();
-        }
-
-        // 生成小圆点数据（保持高密度）
+        // 生成小圆点数据
         const dots = [];
         const dotCount = Math.floor(logicalWidth / 12); // 更多小圆点
         for (let i = 0; i < dotCount; i++) {
@@ -121,16 +90,40 @@ export class BackgroundRenderer {
             });
         }
 
-        // 绘制小圆点到离屏Canvas（使用逻辑坐标）
-        grassCtx.fillStyle = 'rgba(70, 140, 35, 0.5)';
-        for (const dot of dots) {
-            grassCtx.beginPath();
-            grassCtx.arc(dot.x, dot.y, dot.size, 0, Math.PI * 2);
-            grassCtx.fill();
-        }
-
-        this.grassCanvas = grassCanvas;
         this.grassElements = { blades, dots };
+
+        // 使用 OffscreenCanvasCache 生成离屏 Canvas
+        this.grassCache.generate(logicalWidth, grassHeight, (ctx, w, h) => {
+            // 绘制渐变背景
+            const gradient = ctx.createLinearGradient(0, 0, 0, h);
+            gradient.addColorStop(0, '#7EC850');   // 顶部较浅的绿色
+            gradient.addColorStop(0.3, '#5DA038'); // 中间绿色
+            gradient.addColorStop(1, '#3D7A28');   // 底部较深的绿色
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, w, h);
+
+            // 绘制草丛
+            ctx.fillStyle = 'rgba(100, 160, 50, 0.35)';
+            for (const blade of blades) {
+                ctx.beginPath();
+                ctx.moveTo(blade.x, 0);
+                ctx.quadraticCurveTo(
+                    blade.x + blade.width / 2,
+                    -blade.height,
+                    blade.x + blade.width,
+                    0
+                );
+                ctx.fill();
+            }
+
+            // 绘制小圆点
+            ctx.fillStyle = 'rgba(70, 140, 35, 0.5)';
+            for (const dot of dots) {
+                ctx.beginPath();
+                ctx.arc(dot.x, dot.y, dot.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        });
     }
 
     /**
@@ -178,7 +171,7 @@ export class BackgroundRenderer {
      */
     resize(dpr = 1) {
         this.dpr = dpr;
-        this.grassCanvas = null;
+        this.grassCache.setDpr(dpr);
         this.grassElements = null;
         this.generateGrassElements();
     }

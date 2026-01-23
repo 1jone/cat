@@ -4,7 +4,6 @@
  */
 
 import { AUDIO_CONFIG, SETTINGS_CONFIG } from '../config';
-import { drawRoundRect } from '../utils/CanvasUtils';
 
 export class HUDRenderer {
     constructor(canvas, ctx, emojiManager) {
