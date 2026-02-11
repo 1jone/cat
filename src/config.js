@@ -887,10 +887,6 @@ export const FEATURE_FLAGS = {
     vocalization: true,
 
     // 音频分层
-    audioLayering: true,
-
-    // 未来扩展
-    sleepingBehavior: false,      // 睡觉行为（未实现）
-    chasingBehavior: false       // 追逐行为（未实现）
+    audioLayering: true
 };
 
