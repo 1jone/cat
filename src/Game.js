@@ -194,7 +194,11 @@ export class Game {
      * @param {number} dt - 时间增量（秒）
      */
     update(dt) {
+        const currentTime = performance.now();
         const state = this.stateManager.getState();
+
+        // 更新草地动画（所有状态下都更新）
+        this.bgRenderer.update(dt, currentTime);
 
         // 设置界面状态：跳过游戏逻辑更新
         if (state === GameState.SETTINGS) {
@@ -356,6 +360,9 @@ export class Game {
      * 处理触摸（兼容旧代码）
      */
     handleTouch(pos) {
+        // 传递触摸事件到草地系统
+        this.bgRenderer.handleTouch(pos);
+
         const state = this.stateManager.getState();
 
         if (state === GameState.START) {
@@ -375,6 +382,9 @@ export class Game {
     handleTouchStart(pos) {
         // 初始化音频（用户首次交互）
         this.initAudio();
+
+        // 传递触摸事件到草地系统
+        this.bgRenderer.handleTouch(pos);
 
         const state = this.stateManager.getState();
 
@@ -446,6 +456,9 @@ export class Game {
      * 处理触摸移动
      */
     handleTouchMove(pos) {
+        // 传递触摸事件到草地系统
+        this.bgRenderer.handleTouch(pos);
+
         const state = this.stateManager.getState();
 
         if (state === GameState.SETTINGS) {

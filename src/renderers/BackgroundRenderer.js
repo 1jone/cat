@@ -3,8 +3,9 @@
  * 负责绘制游戏背景和草地装饰
  */
 
-import { CONFIG } from '../config';
+import { CONFIG, GRASS_CONFIG, FEATURE_FLAGS } from '../config';
 import { OffscreenCanvasCache } from '../utils/CanvasUtils';
+import { GrassRenderer } from './grass/GrassRenderer';
 
 export class BackgroundRenderer {
     constructor(canvas, ctx) {
@@ -12,9 +13,11 @@ export class BackgroundRenderer {
         this.ctx = ctx;
         this.dpr = 1;  // 设备像素比
 
-        // 草地离屏Canvas缓存（使用 OffscreenCanvasCache）
+        // 新的草地渲染器（动画系统）
+        this.grassRenderer = new GrassRenderer(canvas, ctx, this.dpr, GRASS_CONFIG);
+
+        // 保留旧的静态草地缓存作为回退
         this.grassCache = new OffscreenCanvasCache({ dpr: this.dpr });
-        // 草地装饰元素缓存
         this.grassElements = null;
     }
 
@@ -34,54 +37,65 @@ export class BackgroundRenderer {
             // 回退到纯色背景
             this.ctx.fillStyle = CONFIG.COLORS.BACKGROUND;
             this.ctx.fillRect(0, 0, logicalWidth, logicalHeight);
-            this.drawGrass(logicalHeight);
+            this.drawGrass(logicalHeight, logicalWidth);
         }
     }
 
     /**
      * 绘制草地
      * @param {number} logicalHeight - 画布逻辑高度
+     * @param {number} logicalWidth - 画布逻辑宽度
      */
-    drawGrass(logicalHeight) {
-        // 如果草地缓存未生成，先生成
-        if (!this.grassCache.isValid()) {
-            this.generateGrassElements();
+    drawGrass(logicalHeight, logicalWidth) {
+        const grassLogicalHeight = 80;  // 增加草地高度区域
+
+        // 使用新的动画草地渲染器（如果启用）
+        if (FEATURE_FLAGS.animatedGrass && GRASS_CONFIG.enabled) {
+            this.grassRenderer.render(
+                0,
+                logicalHeight - grassLogicalHeight,
+                logicalWidth,
+                grassLogicalHeight
+            );
+        } else {
+            // 回退到静态草地
+            // 如果草地缓存未生成，先生成
+            if (!this.grassCache.isValid()) {
+                this.generateGrassElements(logicalWidth);
+            }
+
+            // 使用 OffscreenCanvasCache 的 draw 方法
+            this.grassCache.draw(
+                this.ctx,
+                0,
+                logicalHeight - grassLogicalHeight,
+                logicalWidth,
+                grassLogicalHeight
+            );
         }
-
-        const grassLogicalHeight = 80;
-        const grassLogicalWidth = this.canvas.width / this.dpr;
-
-        // 使用 OffscreenCanvasCache 的 draw 方法
-        this.grassCache.draw(
-            this.ctx,
-            0,
-            logicalHeight - grassLogicalHeight,
-            grassLogicalWidth,
-            grassLogicalHeight
-        );
     }
 
     /**
      * 生成草地装饰元素（预渲染到离屏Canvas，支持高 DPI）
+     * @param {number} logicalWidth - 逻辑宽度
      */
-    generateGrassElements() {
-        const grassHeight = 80;  // 逻辑高度
-        const logicalWidth = this.canvas.width / this.dpr;  // 逻辑宽度
+    generateGrassElements(logicalWidth) {
+        const grassHeight = 140;  // 增加草地高度区域
 
         // 生成草叶数据
         const blades = [];
-        const grassBladeCount = Math.floor(logicalWidth / 6); // 更密集的草叶
+        const grassBladeCount = Math.floor(logicalWidth / 4); // 更密集的草叶
         for (let i = 0; i < grassBladeCount; i++) {
             blades.push({
-                x: (i * 6) + Math.random() * 3,
-                height: 6 + Math.random() * 14,
-                width: 1.5 + Math.random() * 2.5
+                x: (i * 4) + Math.random() * 2,
+                height: 15 + Math.random() * 35,  // 增加草叶高度范围
+                width: 2 + Math.random() * 3
             });
         }
 
         // 生成小圆点数据
         const dots = [];
-        const dotCount = Math.floor(logicalWidth / 12); // 更多小圆点
+        const dotCount = Math.floor(logicalWidth / 10); // 更多小圆点
         for (let i = 0; i < dotCount; i++) {
             dots.push({
                 x: Math.random() * logicalWidth,
@@ -161,7 +175,7 @@ export class BackgroundRenderer {
 
         // 根据配置决定是否绘制草地
         if (showGrass) {
-            this.drawGrass(logicalHeight);
+            this.drawGrass(logicalHeight, logicalWidth);
         }
     }
 
@@ -172,7 +186,24 @@ export class BackgroundRenderer {
     resize(dpr = 1) {
         this.dpr = dpr;
         this.grassCache.setDpr(dpr);
+        this.grassRenderer.resize(dpr);
         this.grassElements = null;
-        this.generateGrassElements();
+    }
+
+    /**
+     * 更新草地动画
+     * @param {number} dt - 时间增量（秒）
+     * @param {number} time - 当前时间（毫秒）
+     */
+    update(dt, time) {
+        this.grassRenderer.update(dt, time);
+    }
+
+    /**
+     * 处理触摸事件
+     * @param {{x: number, y: number}} position - 触摸位置
+     */
+    handleTouch(position) {
+        this.grassRenderer.handleTouch(position);
     }
 }

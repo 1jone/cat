@@ -816,6 +816,61 @@ export const BEHAVIOR_CONFIG = {
     }
 };
 
+// ============ 草地系统配置 ============
+
+/**
+ * 草地系统配置
+ * 控制多层草地渲染、风效和交互
+ */
+export const GRASS_CONFIG = {
+    // 全局开关
+    enabled: true,
+    animationEnabled: true,
+    interactionEnabled: true,
+
+    // 层级配置
+    layers: {
+        foreground: {
+            bladeHeight: [25, 45],
+            density: 3,
+            opacity: 1.0,
+            color: '#4A9E2D'
+        },
+        midground: {
+            bladeHeight: [18, 30],
+            density: 5,
+            opacity: 0.8,
+            color: '#5DB835'
+        },
+        background: {
+            bladeHeight: [12, 22],
+            density: 7,
+            opacity: 0.6,
+            color: '#7CD14A'
+        }
+    },
+
+    // 风系统配置
+    wind: {
+        baseAngle: 0,              // 基础风向（弧度，0 = 向右）
+        gustDuration: 3000,        // 阵风周期（毫秒）
+        gustIntensity: 0.8         // 阵风强度（0-1）
+    },
+
+    // 触摸交互配置
+    touch: {
+        influenceRadius: 60,       // 触摸影响半径（像素）
+        decay: 0.95,               // 影响衰减系数
+        maxInfluences: 5           // 最大同时影响数量
+    },
+
+    // 性能配置
+    performance: {
+        targetFPS: 60,             // 目标帧率
+        lodEnabled: true           // 启用 LOD（细节层次）
+    }
+};
+
 // ============ 特性开关 ============
 
 /**
@@ -823,6 +878,9 @@ export const BEHAVIOR_CONFIG = {
  * 用于控制新功能的启用/禁用
  */
 export const FEATURE_FLAGS = {
+    // 草地系统
+    animatedGrass: true,
+
     // 行为系统
     behaviorSystem: true,
     playDead: true,
