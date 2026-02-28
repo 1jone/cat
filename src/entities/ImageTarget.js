@@ -1,9 +1,10 @@
 import { Entity } from './Entity';
 import { Vector2 } from '../utils/Vector2';
-import { CONFIG, STARTLE_CONFIG, FEATURE_FLAGS } from '../config';
+import { CONFIG, STARTLE_CONFIG, FEATURE_FLAGS, POPIN_CONFIG } from '../config';
 import { BehaviorSystem } from '../systems/BehaviorSystem';
 import { PlayDeadBehavior } from '../behaviors/PlayDeadBehavior';
 import { VocalizationBehavior } from '../behaviors/VocalizationBehavior';
+import { RabbitRenderer } from './RabbitRenderer';
 
 export class ImageTarget extends Entity {
     constructor(position, config) {
@@ -35,6 +36,20 @@ export class ImageTarget extends Entity {
         this.preStartleMovement = null;  // 受惊前的运动模式
         this.preStartleVelocity = null;  // 受惊前的速度
 
+        // 窜出动画相关属性
+        this.popInState = 'NORMAL';           // 状态: 'NORMAL' | 'POPPING_OUT' | 'FADING'
+        this.popInProgress = 0;               // 动画进度 0-1
+        this.popInDuration = 1.5;             // 动画持续时间（秒）
+        this.popInStartPos = null;            // 起始位置（画布外）
+        this.popInTargetPos = null;           // 目标位置（画布内）
+        this.lastPopInTime = 0;               // 上次窜出时间（冷却）
+        this.prePopInState = null;            // 受惊前的状态备份
+
+        // 若隐若现效果
+        this.opacity = 1;                     // 当前透明度
+        this.flickerPhase = 0;                // 闪烁相位
+        this.isFlickering = false;            // 是否闪烁中
+
         // 动画系统预留属性
         this.animationType = 'static';  // 'static' | 'gif' | 'spritesheet'
         this.spriteFrames = [];
@@ -50,12 +65,22 @@ export class ImageTarget extends Entity {
             ...(config.movementConfig || {})
         };
 
-        // 初始化图片
-        this.image = tt.createImage();
-        this.image.onload = () => {
-            this.imageLoaded = true;
-        };
-        this.image.src = config.image;
+        // 初始化图片或Canvas渲染器
+        this.renderType = config.renderType || 'image';
+        this.renderer = null;
+
+        if (this.renderType === 'canvas') {
+            // Canvas渲染模式（如兔子）
+            this.renderer = new RabbitRenderer(config);
+            this.imageLoaded = true;  // 标记为已加载，跳过图片加载
+        } else {
+            // 图片渲染模式（默认）
+            this.image = tt.createImage();
+            this.image.onload = () => {
+                this.imageLoaded = true;
+            };
+            this.image.src = config.image;
+        }
 
         // 初始速度向量
         const angle = Math.random() * Math.PI * 2;
@@ -159,6 +184,18 @@ export class ImageTarget extends Entity {
             case 'chase':
                 // 追逐运动 - 无需额外初始化
                 break;
+
+            case 'sprintStop':
+                // 冲刺停止运动 - 三阶段循环
+                this.sprintStopPhase = 'slow';  // slow, sprint, stop
+                this.sprintStopTimer = 0;
+                // 随机初始方向
+                const angle = Math.random() * Math.PI * 2;
+                this.sprintStopVelocity = new Vector2(
+                    Math.cos(angle),
+                    Math.sin(angle)
+                );
+                break;
         }
     }
 
@@ -167,6 +204,14 @@ export class ImageTarget extends Entity {
 
         // 保存当前位置用于计算移动方向
         this.previousPosition = this.position.clone();
+
+        // 更新窜出状态（优先级：受惊 > 窜出 > 正常运动）
+        this.updatePopInState(dt);
+
+        // 更新闪烁效果
+        if (this.isFlickering) {
+            this.updateFlicker(dt);
+        }
 
         // 更新行为系统（在运动更新之前）
         if (this.behaviorSystem) {
@@ -178,12 +223,24 @@ export class ImageTarget extends Entity {
             }
         }
 
-        // 更新受惊状态
+        // 更新受惊状态（优先级最高）
         this.updateStartle(dt);
 
         // 如果处于受惊状态，使用受惊运动
         if (this.isStartled) {
             this.updateStartleMovement(dt, canvasWidth, canvasHeight);
+            return;
+        }
+
+        // 处理窜出动画
+        if (this.popInState === 'POPPING_OUT') {
+            this.updatePopInMovement(dt);
+            return;
+        }
+
+        // 检查是否应该触发窜出（仅在 NORMAL 状态）
+        if (this.popInState === 'NORMAL' && this.shouldTriggerPopIn()) {
+            this.startPopIn(canvasWidth, canvasHeight);
             return;
         }
 
@@ -220,6 +277,9 @@ export class ImageTarget extends Entity {
                 break;
             case 'chase':
                 this.updateChase(dt, canvasWidth, canvasHeight);
+                break;
+            case 'sprintStop':
+                this.updateSprintStop(dt, canvasWidth, canvasHeight);
                 break;
             default:
                 this.updateBounce(dt, canvasWidth, canvasHeight);
@@ -495,6 +555,95 @@ export class ImageTarget extends Entity {
     }
 
     /**
+     * 冲刺停止运动 - 三阶段循环：缓慢移动 → 急速冲刺 → 停止
+     */
+    updateSprintStop(dt, canvasWidth, canvasHeight) {
+        const params = this.movementParams;
+        const slowSpeed = params.slowSpeed || 50;        // 缓慢移动速度
+        const sprintSpeed = params.sprintSpeed || 300;    // 急速冲刺速度
+        const slowDuration = params.slowDuration || 2;    // 缓慢移动持续时间（秒）
+        const sprintDuration = params.sprintDuration || 0.5;  // 冲刺持续时间（秒）
+        const stopDuration = params.stopDuration || 1.5;  // 停止持续时间（秒）
+
+        this.sprintStopTimer += dt;
+
+        // 根据当前阶段执行不同的运动逻辑
+        switch (this.sprintStopPhase) {
+            case 'slow':
+                // 阶段1：缓慢移动
+                this.position.x += this.sprintStopVelocity.x * slowSpeed * dt;
+                this.position.y += this.sprintStopVelocity.y * slowSpeed * dt;
+
+                // 边界处理
+                this.handleBoundaryCollision(canvasWidth, canvasHeight);
+
+                // 阶段转换：缓慢 → 冲刺
+                if (this.sprintStopTimer >= slowDuration) {
+                    this.sprintStopPhase = 'sprint';
+                    this.sprintStopTimer = 0;
+                }
+                break;
+
+            case 'sprint':
+                // 阶段2：急速冲刺（在原方向上加速）
+                this.position.x += this.sprintStopVelocity.x * sprintSpeed * dt;
+                this.position.y += this.sprintStopVelocity.y * sprintSpeed * dt;
+
+                // 边界处理
+                this.handleBoundaryCollision(canvasWidth, canvasHeight);
+
+                // 阶段转换：冲刺 → 停止
+                if (this.sprintStopTimer >= sprintDuration) {
+                    this.sprintStopPhase = 'stop';
+                    this.sprintStopTimer = 0;
+                }
+                break;
+
+            case 'stop':
+                // 阶段3：完全停止（轻微呼吸效果）
+                const breathX = Math.sin(this.time * 2) * 1;
+                const breathY = Math.cos(this.time * 2) * 1;
+                this.position.x += breathX * dt;
+                this.position.y += breathY * dt;
+
+                // 阶段转换：停止 → 缓慢移动（开始新的循环）
+                if (this.sprintStopTimer >= stopDuration) {
+                    this.sprintStopPhase = 'slow';
+                    this.sprintStopTimer = 0;
+
+                    // 随机新方向
+                    const angle = Math.random() * Math.PI * 2;
+                    this.sprintStopVelocity = new Vector2(
+                        Math.cos(angle),
+                        Math.sin(angle)
+                    );
+                }
+                break;
+        }
+    }
+
+    /**
+     * 处理边界碰撞（用于冲刺停止模式）
+     */
+    handleBoundaryCollision(canvasWidth, canvasHeight) {
+        if (this.position.x - this.radius < 0) {
+            this.position.x = this.radius;
+            this.sprintStopVelocity.x *= -1;
+        } else if (this.position.x + this.radius > canvasWidth) {
+            this.position.x = canvasWidth - this.radius;
+            this.sprintStopVelocity.x *= -1;
+        }
+
+        if (this.position.y - this.radius < 0) {
+            this.position.y = this.radius;
+            this.sprintStopVelocity.y *= -1;
+        } else if (this.position.y + this.radius > canvasHeight - 80) {
+            this.position.y = canvasHeight - 80 - this.radius;
+            this.sprintStopVelocity.y *= -1;
+        }
+    }
+
+    /**
      * 悬停运动 - 多频率叠加的自然飘动 + 缓慢漂移
      */
     updateHover(dt, canvasWidth, canvasHeight) {
@@ -630,6 +779,17 @@ export class ImageTarget extends Entity {
 
         const distance = this.position.distanceTo(touchPosition);
         if (distance < STARTLE_CONFIG.TRIGGER_RADIUS) {
+            // 如果正在窜出，提前结束
+            if (this.popInState === 'POPPING_OUT') {
+                this.endPopInEarly();
+            }
+
+            // 如果正在闪烁，停止闪烁
+            if (this.isFlickering) {
+                this.isFlickering = false;
+                this.opacity = 1;
+            }
+
             this.triggerStartle(touchPosition);
         }
     }
@@ -642,6 +802,9 @@ export class ImageTarget extends Entity {
         if (this.isPlayingDead && this.behaviorSystem) {
             this.behaviorSystem.endBehavior('playDead');
         }
+
+        // 保存窜出状态用于恢复
+        this.prePopInState = this.popInState;
 
         this.isStartled = true;
         this.startleTimer = STARTLE_CONFIG.DURATION;
@@ -722,6 +885,12 @@ export class ImageTarget extends Entity {
                 if (this.preStartleVelocity) {
                     this.velocity = this.preStartleVelocity;
                     this.preStartleVelocity = null;
+                }
+
+                // 恢复之前的窜出状态（如果需要）
+                if (this.prePopInState && this.prePopInState !== 'NORMAL') {
+                    this.popInState = this.prePopInState;
+                    this.prePopInState = null;
                 }
 
                 // 同步参数化运动模式的基准点，避免位置漂移回位
@@ -872,6 +1041,71 @@ export class ImageTarget extends Entity {
         return targetRotation;
     }
 
+    /**
+     * 检查当前是否正在移动
+     * @returns {boolean}
+     */
+    checkIsMoving() {
+        // 如果受惊，总是认为在移动
+        if (this.isStartled) return true;
+
+        const movement = this.config.movement;
+
+        // 对于冲刺停止运动，检查当前阶段
+        if (movement === 'sprintStop') {
+            return this.sprintStopPhase === 'slow' || this.sprintStopPhase === 'sprint';
+        }
+
+        // 对于冲刺运动，检查是否在冲刺阶段
+        if (movement === 'dash') {
+            return this.isDashing;
+        }
+
+        // 对于其他速度累积模式，检查速度
+        if (this.velocity) {
+            return Math.abs(this.velocity.x) > 1 || Math.abs(this.velocity.y) > 1;
+        }
+
+        return false;
+    }
+
+    /**
+     * 获取当前移动速度
+     * @returns {number} 当前速度值
+     */
+    getCurrentSpeed() {
+        // 受惊时使用受惊速度
+        if (this.isStartled) {
+            return this.originalSpeed * this.startleSpeedFactor;
+        }
+
+        const movement = this.config.movement;
+
+        // 冲刺停止运动的不同阶段有不同的速度
+        if (movement === 'sprintStop') {
+            const params = this.movementParams;
+            if (this.sprintStopPhase === 'slow') {
+                return params.slowSpeed || 50;
+            } else if (this.sprintStopPhase === 'sprint') {
+                return params.sprintSpeed || 300;
+            }
+            return 0;  // stop阶段
+        }
+
+        // 冲刺运动
+        if (movement === 'dash' && this.isDashing) {
+            const params = this.movementParams;
+            return params.dashSpeed || 200;
+        }
+
+        // 默认使用配置的速度
+        if (this.velocity) {
+            return Math.sqrt(this.velocity.x ** 2 + this.velocity.y ** 2);
+        }
+
+        return this.config.speed || 100;
+    }
+
     // ==================== 渲染 ====================
 
     render(ctx) {
@@ -900,10 +1134,29 @@ export class ImageTarget extends Entity {
 
         // 基础晃动 + 受惊缩放
         const wobble = Math.sin(this.time * 3) * 0.1;
-        const baseScale = 1 + wobble * 0.1;
-        const finalScale = baseScale * this.startleScale;
+        let finalScale = (1 + wobble * 0.1) * this.startleScale;
 
-        if (this.imageLoaded) {
+        // 窜出时的额外缩放效果
+        if (this.popInState === 'POPPING_OUT') {
+            const popInScale = 1 + Math.sin(this.popInProgress * Math.PI) * 0.3;
+            finalScale *= popInScale;
+        }
+
+        // 应用透明度（闪烁效果）
+        if (this.isFlickering || this.popInState === 'FADING') {
+            ctx.globalAlpha = this.opacity;
+        }
+
+        // 根据渲染类型选择渲染方式
+        if (this.renderType === 'canvas' && this.renderer) {
+            // Canvas渲染模式（兔子等）
+            ctx.restore();  // 先restore以避免影响renderer内部的变换
+            const isMoving = this.checkIsMoving();
+            const currentSpeed = this.getCurrentSpeed();
+            this.renderer.render(ctx, this.position, this.radius, this.currentRotation, this.time, finalScale, isMoving, currentSpeed);
+            ctx.save();   // 重新save以匹配后面的restore
+        } else if (this.imageLoaded) {
+            // 图片渲染模式（默认）
             const size = this.radius * 2 * finalScale;
             ctx.drawImage(
                 this.image,
@@ -913,6 +1166,7 @@ export class ImageTarget extends Entity {
                 size
             );
         } else {
+            // 加载中占位符
             ctx.fillStyle = '#CCCCCC';
             ctx.beginPath();
             ctx.arc(0, 0, this.radius * finalScale, 0, Math.PI * 2);
@@ -983,5 +1237,170 @@ export class ImageTarget extends Entity {
         ctx.fillText('!', 0, 0);
 
         ctx.restore();
+    }
+
+    // ============ 窜出动画相关方法 ============
+
+    /**
+     * 检查是否应该触发窜出
+     * @returns {boolean} 是否应该触发窜出
+     */
+    shouldTriggerPopIn() {
+        const config = POPIN_CONFIG;
+        const typeConfig = config.OVERRIDE[this.config.id] || {};
+
+        // 1. 概率检查
+        const probability = typeConfig.probability || config.PROBABILITY;
+        if (Math.random() > probability) return false;
+
+        // 2. 冷却时间检查
+        if (this.lastPopInTime && Date.now() - this.lastPopInTime < config.COOLDOWN * 1000) {
+            return false;
+        }
+
+        // 3. 状态检查（不能在受惊时触发）
+        if (this.isStartled) return false;
+
+        // 4. 运动检查（使用速度而不是位置距离）
+        const speed = this.velocity ? this.velocity.magnitude() : this.originalSpeed;
+        if (speed < 10) return false;  // 速度太慢时不触发
+
+        return true;
+    }
+
+    /**
+     * 开始窜出动画
+     * @param {number} canvasWidth - 画布宽度
+     * @param {number} canvasHeight - 画布高度
+     */
+    startPopIn(canvasWidth, canvasHeight) {
+        this.popInState = 'POPPING_OUT';
+        this.popInProgress = 0;
+        this.lastPopInTime = Date.now();
+
+        // 随机选择进入方向（0:上, 1:右, 2:下, 3:左）
+        const edge = Math.floor(Math.random() * 4);
+        const margin = POPIN_CONFIG.POPIN_MARGIN;
+
+        // 保存当前位置作为目标位置
+        this.popInTargetPos = this.position.clone();
+
+        // 计算起始位置（画布外）
+        switch (edge) {
+            case 0: // 从上方
+                this.popInStartPos = new Vector2(this.popInTargetPos.x, -margin);
+                break;
+            case 1: // 从右侧
+                this.popInStartPos = new Vector2(canvasWidth + margin, this.popInTargetPos.y);
+                break;
+            case 2: // 从下方
+                this.popInStartPos = new Vector2(this.popInTargetPos.x, canvasHeight - 80 + margin);
+                break;
+            case 3: // 从左侧
+                this.popInStartPos = new Vector2(-margin, this.popInTargetPos.y);
+                break;
+        }
+
+        // 随机动画持续时间
+        const minDur = POPIN_CONFIG.MIN_POPIN_DURATION;
+        const maxDur = POPIN_CONFIG.MAX_POPIN_DURATION;
+        this.popInDuration = minDur + Math.random() * (maxDur - minDur);
+
+        // 立即移动到起始位置
+        this.position = this.popInStartPos.clone();
+    }
+
+    /**
+     * 更新窜出状态
+     * @param {number} dt - 时间增量（秒）
+     */
+    updatePopInState(dt) {
+        if (this.popInState === 'POPPING_OUT') {
+            this.popInProgress += dt / this.popInDuration;
+
+            if (this.popInProgress >= 1) {
+                // 窜出完成，进入闪烁状态
+                this.popInState = 'FADING';
+                this.popInProgress = 0;
+                this.startFlickering();
+                this.syncMovementBasePoint();
+            }
+        } else if (this.popInState === 'FADING') {
+            // 闪烁持续一段时间后恢复正常
+            if (this.popInProgress >= POPIN_CONFIG.FLICKER_DURATION) {
+                this.popInState = 'NORMAL';
+                this.isFlickering = false;
+                this.opacity = 1;
+            }
+            this.popInProgress += dt;
+        }
+    }
+
+    /**
+     * 更新窜出移动
+     * @param {number} dt - 时间增量（秒）
+     */
+    updatePopInMovement(dt) {
+        const progress = Math.min(this.popInProgress, 1);
+        const easeOut = 1 - Math.pow(1 - progress, 3); // ease-out cubic
+
+        // 位置插值
+        this.position.x = this.popInStartPos.x + (this.popInTargetPos.x - this.popInStartPos.x) * easeOut;
+        this.position.y = this.popInStartPos.y + (this.popInTargetPos.y - this.popInStartPos.y) * easeOut;
+    }
+
+    /**
+     * 开始闪烁
+     */
+    startFlickering() {
+        const typeConfig = POPIN_CONFIG.OVERRIDE[this.config.id] || {};
+
+        // 特殊处理总是闪烁的目标
+        if (typeConfig.isAlwaysFlickering) {
+            this.isFlickering = true;
+            this.flickerPhase = 0;
+            return;
+        }
+
+        // 根据概率决定是否闪烁
+        const flickerProb = typeConfig.flickerProbability || POPIN_CONFIG.FLICKER_PROBABILITY;
+        if (Math.random() < flickerProb) {
+            this.isFlickering = true;
+            this.flickerPhase = 0;
+        }
+    }
+
+    /**
+     * 更新闪烁
+     * @param {number} dt - 时间增量（秒）
+     */
+    updateFlicker(dt) {
+        if (!this.isFlickering) return;
+
+        const config = POPIN_CONFIG;
+        this.flickerPhase += dt * config.FLICKER_SPEED;
+
+        // 正弦波计算透明度
+        const wave = Math.sin(this.flickerPhase);
+        const t = (wave + 1) / 2; // 映射到 0-1
+        this.opacity = config.MIN_OPACITY + (config.MAX_OPACITY - config.MIN_OPACITY) * t;
+    }
+
+    /**
+     * 提前结束窜出（受惊时调用）
+     */
+    endPopInEarly() {
+        if (this.popInState === 'POPPING_OUT') {
+            // 立即移动到目标位置
+            this.position = this.popInTargetPos.clone();
+            this.popInState = 'FADING';
+            this.popInProgress = 0;
+
+            // 开始闪烁
+            this.startFlickering();
+
+            // 同步基准点
+            this.syncMovementBasePoint();
+        }
     }
 }

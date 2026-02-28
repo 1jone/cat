@@ -3,7 +3,7 @@
  * 负责图片和背景资源的预加载与管理
  */
 
-import { TARGET_TYPES, ENDLESS_MODE_CARD } from '../config';
+import { TARGET_TYPES } from '../config';
 
 export class ResourceManager {
     constructor() {
@@ -21,18 +21,8 @@ export class ResourceManager {
      * 预加载所有图片资源
      */
     preloadImages() {
-        // 首先添加无尽模式卡片（不需要加载图片）
-        const endlessItem = {
-            config: ENDLESS_MODE_CARD,
-            image: null,
-            loaded: true,
-            x: 0,
-            y: 0,
-            size: 120
-        };
-
-        // 然后添加所有目标卡片
-        const targetItems = TARGET_TYPES.map((config, _index) => {
+        // 添加所有目标卡片
+        this.selectionItems = TARGET_TYPES.map((config, _index) => {
             const img = tt.createImage();
             const item = {
                 config,
@@ -50,9 +40,6 @@ export class ResourceManager {
 
             return item;
         });
-
-        // 无尽模式卡片作为第一项
-        this.selectionItems = [endlessItem, ...targetItems];
 
         // 预加载背景图片
         this.loadBackgroundImages();

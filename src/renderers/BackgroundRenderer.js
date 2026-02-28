@@ -25,11 +25,19 @@ export class BackgroundRenderer {
      * 渲染背景
      * @param {HTMLImageElement|null} backgroundImage - 背景图片
      * @param {boolean} showGrass - 是否显示草地
+     * @param {string} [targetId=null] - 目标类型ID（用于特殊背景）
      */
-    render(backgroundImage, showGrass = true) {
+    render(backgroundImage, showGrass = true, targetId = null) {
         const dpr = this.dpr;
         const logicalWidth = this.canvas.width / dpr;
         const logicalHeight = this.canvas.height / dpr;
+
+        // 优先级：特殊背景 > 背景图片 > 纯色背景
+        if (targetId && this.hasSpecialBackground(targetId)) {
+            // 渲染特殊背景（不显示草地）
+            this.renderSparkleBackground(logicalWidth, logicalHeight);
+            return;
+        }
 
         if (backgroundImage) {
             this.drawBackgroundWithImage(backgroundImage, showGrass, logicalWidth, logicalHeight);
@@ -177,6 +185,46 @@ export class BackgroundRenderer {
         if (showGrass) {
             this.drawGrass(logicalHeight, logicalWidth);
         }
+    }
+
+    /**
+     * 检查目标是否有特殊背景
+     * @param {string} targetId - 目标类型ID
+     * @returns {boolean}
+     */
+    hasSpecialBackground(targetId) {
+        const specialBackgroundTargets = ['sparkle'];
+        return specialBackgroundTargets.includes(targetId);
+    }
+
+    /**
+     * 渲染光点的深蓝黑渐变背景
+     * @param {number} width - 画布宽度
+     * @param {number} height - 画布高度
+     */
+    renderSparkleBackground(width, height) {
+        const ctx = this.ctx;
+
+        // 计算中心点和最大半径
+        const centerX = width / 2;
+        const centerY = height / 2;
+        const maxRadius = Math.max(width, height) * 0.7;
+
+        // 创建径向渐变（从中心向外）
+        const gradient = ctx.createRadialGradient(
+            centerX, centerY, 0,
+            centerX, centerY, maxRadius
+        );
+
+        // 渐变色标：中心微亮 → 中间深蓝 → 边缘深黑
+        gradient.addColorStop(0, 'rgba(20, 40, 80, 0.4)');     // 中心：微亮深蓝
+        gradient.addColorStop(0.3, 'rgba(10, 25, 50, 0.7)');   // 中层：深蓝
+        gradient.addColorStop(0.6, 'rgba(5, 15, 30, 0.85)');   // 外层：更深蓝
+        gradient.addColorStop(1, 'rgba(0, 0, 0, 1)');          // 边缘：纯黑
+
+        // 填充整个画布
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, width, height);
     }
 
     /**

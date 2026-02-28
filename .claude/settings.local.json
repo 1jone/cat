@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(tree:*)",
-      "WebFetch(domain:cdn.jsdelivr.net)"
+      "WebFetch(domain:cdn.jsdelivr.net)",
+      "mcp__mcp-mermaid__generate_mermaid_diagram",
+      "Bash(curl:*)"
     ]
   }
 }

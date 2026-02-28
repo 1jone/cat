@@ -38,11 +38,6 @@ export class GameStateManager {
         };
         this.attributeChangeTimer = 0;
 
-        // 解锁系统
-        this.unlockedTargetIndices = [];
-        this.nextUnlockScore = ENDLESS_CONFIG.UNLOCK_SCORE_INTERVAL;
-        this.unlockNotification = null;
-
         // 当前选择的目标
         this.selectedTarget = null;
         this.currentTargetId = null;  // 当前目标ID（用于得分统计）
@@ -73,21 +68,8 @@ export class GameStateManager {
      * @returns {number[]} 可用目标索引数组
      */
     getAvailableTargetIndices() {
-        // 如果配置为使用所有目标，返回全部索引
-        if (ENDLESS_CONFIG.USE_ALL_TARGETS) {
-            return TARGET_TYPES.map((_, i) => i);
-        }
-
-        // 否则只返回选择界面已解锁的目标
-        if (!this.adManager) return [0]; // 安全回退
-
-        const indices = [];
-        for (let i = 0; i < TARGET_TYPES.length; i++) {
-            if (this.adManager.isTargetUnlocked(TARGET_TYPES[i].id)) {
-                indices.push(i);
-            }
-        }
-        return indices.length > 0 ? indices : [0];
+        // 直接返回所有目标索引
+        return TARGET_TYPES.map((_, i) => i);
     }
 
     /**
@@ -153,16 +135,9 @@ export class GameStateManager {
     /**
      * 开始无尽模式
      */
-    startEndlessMode() {
-        // 获取可用目标索引（根据配置决定是全部还是已解锁的）
-        const availableIndices = this.getAvailableTargetIndices();
-        const randomIdx = Math.floor(Math.random() * availableIndices.length);
-        const initialIndex = availableIndices[randomIdx];
-
-        this.unlockedTargetIndices = [initialIndex];
-        this.nextUnlockScore = ENDLESS_CONFIG.UNLOCK_SCORE_INTERVAL;
-
-        this.startGame(TARGET_TYPES[initialIndex], true);
+    startEndlessMode(targetConfig) {
+        // 直接使用用户选择的目标启动游戏
+        this.startGame(targetConfig, true);
     }
 
     /**
@@ -232,76 +207,8 @@ export class GameStateManager {
      * @returns {object|null} 解锁的目标配置或 null
      */
     checkUnlock() {
-        if (!this.isEndlessMode) return null;
-        if (this.score < this.nextUnlockScore) return null;
-
-        // 获取可用目标索引（根据配置决定是全部还是已解锁的）
-        const availableIndices = this.getAvailableTargetIndices();
-
-        // 检查是否所有可用目标都已解锁
-        const allUnlocked = availableIndices.every(idx =>
-            this.unlockedTargetIndices.includes(idx)
-        );
-        if (allUnlocked) return null;
-
-        // 找下一个可用但未解锁的目标
-        let nextIndex = -1;
-        for (const idx of availableIndices) {
-            if (!this.unlockedTargetIndices.includes(idx)) {
-                nextIndex = idx;
-                break;
-            }
-        }
-
-        if (nextIndex !== -1) {
-            this.unlockedTargetIndices.push(nextIndex);
-            this.unlockNotification = {
-                message: `解锁新目标：${TARGET_TYPES[nextIndex].name}！`,
-                time: ENDLESS_CONFIG.UNLOCK_NOTIFICATION_DURATION / 1000
-            };
-            this.nextUnlockScore += ENDLESS_CONFIG.UNLOCK_SCORE_INTERVAL;
-
-            // 检查是否应该触发无尽模式解锁广告（50%概率）
-            if (this.adManager && this.adManager.shouldTriggerEndlessAd('unlock')) {
-                console.log('[GameStateManager] 触发无尽模式解锁广告');
-                // 标记需要显示广告（异步处理，不阻塞游戏）
-                this.triggerUnlockAd(TARGET_TYPES[nextIndex]);
-            }
-
-            return TARGET_TYPES[nextIndex];
-        }
-
+        // 无尽模式不再有解锁系统，直接返回 null
         return null;
-    }
-
-    /**
-     * 触发解锁广告（异步，不阻塞游戏）
-     * @param {Object} unlockedTarget - 解锁的目标配置
-     */
-    async triggerUnlockAd(unlockedTarget) {
-        if (!this.adManager) return;
-
-        // 延迟显示广告，让玩家先看到解锁通知
-        await new Promise(resolve => setTimeout(resolve, 500));
-
-        const adShown = await this.adManager.showRewardedAd('endless_unlock_' + unlockedTarget.id);
-        if (adShown) {
-            this.adManager.recordAdShown();
-            console.log(`[GameStateManager] 解锁广告完成: ${unlockedTarget.name}`);
-        }
-    }
-
-    /**
-     * 更新解锁通知
-     * @param {number} dt - 时间增量
-     */
-    updateUnlockNotification(dt) {
-        if (this.unlockNotification) {
-            this.unlockNotification.time -= dt;
-            if (this.unlockNotification.time <= 0) {
-                this.unlockNotification = null;
-            }
-        }
     }
 
     /**
@@ -362,7 +269,6 @@ export class GameStateManager {
 
         // 更新特效
         this.updateCatchEffect(dt);
-        this.updateUnlockNotification(dt);
 
         return result;
     }

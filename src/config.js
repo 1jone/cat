@@ -1,13 +1,3 @@
-// 无尽模式卡片配置（作为列表第一项）
-export const ENDLESS_MODE_CARD = {
-    id: 'endless',
-    name: '无尽模式',
-    image: null,
-    isEndless: true,
-    points: 0,
-    description: '挑战无限关卡'
-};
-
 export const TARGET_TYPES = [
     {
         id: 'captain',
@@ -50,11 +40,11 @@ export const TARGET_TYPES = [
             image: '/backgrounds/octopus_bg.jpg',
             showGrass: false
         },
-        // 广告配置 - 需要广告解锁（24小时）
+        // 广告配置 - 需要广告解锁（48小时）
         unlock: {
             type: 'free',
-            adRequired: false,
-            unlockDuration: 24 * 60 * 60 * 1000  // 24小时
+            adRequired: true,
+            unlockDuration: 48 * 60 * 60 * 1000  // 48小时
         },
         adTrigger: {
             enabled: true,
@@ -79,11 +69,11 @@ export const TARGET_TYPES = [
             image: '/backgrounds/bear_bg.jpg',
             showGrass: false
         },
-        // 广告配置 - 需要广告解锁（24小时）
+        // 广告配置 - 需要广告解锁（48小时）
         unlock: {
             type: 'free',
-            adRequired: false,
-            unlockDuration: 24 * 60 * 60 * 1000  // 24小时
+            adRequired: true,
+            unlockDuration: 48 * 60 * 60 * 1000  // 48小时
         },
         adTrigger: {
             enabled: true,
@@ -108,11 +98,11 @@ export const TARGET_TYPES = [
             image: '/backgrounds/seagull_bg.jpg',
             showGrass: false
         },
-        // 广告配置 - 免费但有概率广告
+        // 广告配置 - 需要广告解锁（48小时）
         unlock: {
             type: 'free',
-            adRequired: false,
-            unlockDuration: 0
+            adRequired: true,
+            unlockDuration: 48 * 60 * 60 * 1000  // 48小时
         },
         adTrigger: {
             enabled: true,
@@ -140,7 +130,7 @@ export const TARGET_TYPES = [
         },
         background: {
             image: null,
-            showGrass: true
+            showGrass: false  // 光点使用特殊背景，不显示草地
         },
         unlock: {
             type: 'free',
@@ -372,7 +362,7 @@ export const TARGET_TYPES = [
         speed: 180,
         radius: 20,  // 最小体积
         points: 25,
-        movement: 'chase',
+        movement: 'random',
         movementConfig: {
             chaseSpeed: 120,
             targetRadius: 80,
@@ -398,6 +388,68 @@ export const TARGET_TYPES = [
         },
         // 特殊渲染标记
         renderType: 'particle'
+    },
+    // ========== Canvas渲染兔子 ==========
+    {
+        id: 'rabbit',
+        name: '兔子',
+        image: '/target/rabbit_re.png',  // 保留图片路径作为备用
+        renderType: 'canvas',             // 使用Canvas渲染
+        speed: 100,
+        radius: 30,
+        points: 20,
+        movement: 'sprintStop',
+        movementConfig: {
+            slowSpeed: 50,        // 缓慢移动速度
+            sprintSpeed: 350,     // 急速冲刺速度
+            slowDuration: 2,      // 缓慢移动持续时间（秒）
+            sprintDuration: 0.4,  // 冲刺持续时间（秒）
+            stopDuration: 1.2     // 停止持续时间（秒）
+        },
+        background: {
+            image: null,
+            showGrass: true
+        },
+        // Canvas渲染配置
+        renderConfig: {
+            // 颜色配置 - 纯白色+粉色细节
+            bodyColor: '#FFFFFF',      // 白色身体
+            earInnerColor: '#FFB6C1',  // 粉色内耳
+            noseColor: '#FFB6C1',      // 粉色鼻子
+            eyeColor: '#333333',       // 深色眼睛
+            eyeHighlight: '#FFFFFF',   // 眼睛高光
+
+            // 发光配置 - 金色光晕
+            glow: {
+                enabled: true,
+                color: '#FFD700',      // 金色光晕
+                blur: 20,
+                pulseSpeed: 2,
+                minIntensity: 0.5,
+                maxIntensity: 1.0
+            },
+
+            // 弹跳配置
+            bounce: {
+                amplitude: 8,          // 弹跳高度（像素）
+                frequency: 8,          // 弹跳频率
+                squashAmount: 0.15     // 落地时挤压程度
+            }
+        },
+        unlock: {
+            type: 'free',
+            adRequired: false,
+            unlockDuration: 0
+        },
+        adTrigger: {
+            enabled: false,
+            probability: 0,
+            cooldown: 0,
+            maxPerSession: 0
+        },
+        sidebarReward: {
+            canBeRewarded: false
+        }
     }
 ];
 export const CONFIG = {
@@ -449,6 +501,14 @@ export const CONFIG = {
             chaseSpeed: 80,        // 追逐速度
             targetRadius: 100,     // 目标点运动半径
             targetSpeed: 1         // 目标点运动速度
+        },
+        // 冲刺停止运动（三阶段）
+        sprintStop: {
+            slowSpeed: 50,         // 缓慢移动速度
+            sprintSpeed: 300,      // 急速冲刺速度
+            slowDuration: 2,       // 缓慢移动持续时间（秒）
+            sprintDuration: 0.5,   // 冲刺持续时间（秒）
+            stopDuration: 1.5      // 停止持续时间（秒）
         }
     },
     SPAWN: {
@@ -476,10 +536,7 @@ export const ENDLESS_CONFIG = {
     ATTRIBUTE_CHANGE_INTERVAL: 5000,
     SPEED_MULTIPLIER_RANGE: [0.7, 1.5],
     RADIUS_MULTIPLIER_RANGE: [0.8, 1.3],
-    POINTS_MULTIPLIER_RANGE: [0.8, 1.5],
-    UNLOCK_SCORE_INTERVAL: 500, // 每500分解锁一个新目标
-    UNLOCK_NOTIFICATION_DURATION: 2000, // 解锁提示显示时长(ms)
-    USE_ALL_TARGETS: false // true: 使用所有目标, false: 只使用选择界面已解锁的目标
+    POINTS_MULTIPLIER_RANGE: [0.8, 1.5]
 };
 export const SELECTION_CONFIG = {
     CARD_WIDTH: 140,              // 卡片宽度
@@ -773,25 +830,25 @@ export const BEHAVIOR_CONFIG = {
     // 全局开关
     enabled: true,
 
-    // 装死行为配置
-    playDead: {
-        enabled: true,
-        // 支持的目标类型（空数组表示全部支持）
-        supportedTargets: ['captain', 'bear', 'octopus', 'mouse'],
-        // 触发概率（每秒）
-        triggerProbability: 0.08,  // 约12.5秒触发一次 (1/0.08 ≈ 12.5)
-        // 持续时间范围（秒）
-        durationRange: [2, 5],
-        // 冷却时间（秒）
-        cooldown: 10,
-        // 视觉效果
-        visual: {
-            rotation: Math.PI / 2,  // 倒地旋转角度（90度）
-            wobbleAmplitude: 0.05,  // 晃动幅度（弧度）
-            wobbleFrequency: 8,     // 晃动频率（Hz）
-            expression: 'x_x'       // 装死表情
-        }
-    },
+    // // 装死行为配置
+    // playDead: {
+    //     enabled: true,
+    //     // 支持的目标类型（空数组表示全部支持）
+    //     supportedTargets: ['captain', 'bear', 'octopus', 'mouse'],
+    //     // 触发概率（每秒）
+    //     triggerProbability: 0.08,  // 约12.5秒触发一次 (1/0.08 ≈ 12.5)
+    //     // 持续时间范围（秒）
+    //     durationRange: [2, 5],
+    //     // 冷却时间（秒）
+    //     cooldown: 10,
+    //     // 视觉效果
+    //     visual: {
+    //         rotation: Math.PI / 2,  // 倒地旋转角度（90度）
+    //         wobbleAmplitude: 0.05,  // 晃动幅度（弧度）
+    //         wobbleFrequency: 8,     // 晃动频率（Hz）
+    //         expression: 'x_x'       // 装死表情
+    //     }
+    // },
 
     // 叫声行为配置
     vocalization: {
@@ -890,3 +947,43 @@ export const FEATURE_FLAGS = {
     audioLayering: true
 };
 
+// ============ 窜出动画配置 ============
+
+/**
+ * 窜出动画配置
+ * 控制目标从画布边界外窜入、若隐若现的效果
+ */
+export const POPIN_CONFIG = {
+    // 基础配置
+    PROBABILITY: 0.5,          // 窜出触发概率 (0-1) - 100%便于测试
+    COOLDOWN: 5,              // 窜出冷却时间（秒）- 缩短便于测试
+    MIN_POPIN_DURATION: 1,     // 最小窜出持续时间（秒）
+    MAX_POPIN_DURATION: 2.5,   // 最大窜出持续时间（秒）
+
+    // 闪烁配置
+    FLICKER_DURATION: 3,       // 闪烁持续时间（秒）
+    FLICKER_PROBABILITY: 0.6,  // 触发闪烁的概率
+    FLICKER_SPEED: 3,          // 闪烁频率
+    MIN_OPACITY: 0.3,          // 最小透明度
+    MAX_OPACITY: 1,            // 最大透明度
+
+    // 边界配置
+    POPIN_MARGIN: 100,         // 窜出起点距离边界的距离
+
+    // 按目标类型的覆盖配置
+    OVERRIDE: {
+        'captain': {
+            probability: 0.1,        // 船长不常窜出
+            flickerProbability: 0.2
+        },
+        'butterfly': {
+            probability: 0.8,        // 蝴蝶经常窜出
+            flickerProbability: 0.9,
+            isAlwaysFlickering: true // 总是闪烁
+        },
+        'mouse': {
+            probability: 0.5,        // 老鼠中等频率
+            flickerProbability: 0.4
+        }
+    }
+};

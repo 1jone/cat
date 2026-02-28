@@ -11,7 +11,13 @@
         "mockLogin": false,
         "autoPush": true
     },
-    "appid": "tt0c697ad4920b501302",
+    "appid": "testAppId",
     "projectname": "catGame",
-    "douyinProjectType": "native"
+    "douyinProjectType": "native",
+    "condition": {
+        "game": {
+            "current": -1,
+            "list": []
+        }
+    }
 }

@@ -3,7 +3,7 @@
  * 负责目标选择界面的逻辑和渲染
  */
 
-import { SELECTION_CONFIG, TARGET_TYPES, ENDLESS_MODE_CARD } from '../config';
+import { SELECTION_CONFIG, TARGET_TYPES } from '../config';
 import { drawRoundRect } from '../utils/CanvasUtils';
 
 export class SelectionScreen {
@@ -31,6 +31,10 @@ export class SelectionScreen {
         // 解锁确认弹窗状态
         this.showUnlockDialog = false;
         this.unlockDialogTarget = null;
+
+        // 模式选择弹窗状态
+        this.showModeDialog = false;
+        this.selectedTarget = null;
 
         // 粒子动画时间
         this.particleTime = 0;
@@ -130,6 +134,8 @@ export class SelectionScreen {
         this.isSnapping = false;
         this.showUnlockDialog = false;
         this.unlockDialogTarget = null;
+        this.showModeDialog = false;
+        this.selectedTarget = null;
     }
 
     /**
@@ -205,7 +211,12 @@ export class SelectionScreen {
      * @returns {object|null} 选中的目标配置或 null
      */
     handleTouchEnd(pos) {
-        // 如果解锁弹窗显示中，处理弹窗点击
+        // 优先级1: 模式选择弹窗
+        if (this.showModeDialog) {
+            return this.handleModeDialogClick(pos);
+        }
+
+        // 优先级2: 解锁弹窗
         if (this.showUnlockDialog) {
             return this.handleUnlockDialogClick(pos);
         }
@@ -265,7 +276,10 @@ export class SelectionScreen {
                 }
             }
 
-            return selectedItem;
+            // 显示模式选择弹窗（而不是直接返回配置）
+            this.showModeDialog = true;
+            this.selectedTarget = selectedItem;
+            return null;
         }
 
         return null;
@@ -343,6 +357,51 @@ export class SelectionScreen {
             this.showUnlockDialog = false;
             this.unlockDialogTarget = null;
         }
+    }
+
+    /**
+     * 处理模式选择弹窗点击
+     * @param {object} pos - 点击位置 { x, y }
+     * @returns {object|null} 选择结果 { config, mode } 或 null
+     */
+    handleModeDialogClick(pos) {
+        const { width: logicalWidth, height: logicalHeight } = this.getLogicalSize();
+        const centerX = logicalWidth / 2;
+        const centerY = logicalHeight / 2;
+        const buttonWidth = 120;
+        const buttonHeight = 50;
+        const buttonY = centerY + 30;
+
+        // 无限模式按钮（左侧）
+        const endlessX = centerX - 70;
+        if (pos.x >= endlessX - buttonWidth / 2 &&
+            pos.x <= endlessX + buttonWidth / 2 &&
+            pos.y >= buttonY - buttonHeight / 2 &&
+            pos.y <= buttonY + buttonHeight / 2) {
+            return { config: this.selectedTarget, mode: 'endless' };
+        }
+
+        // 闯关模式按钮（右侧）
+        const challengeX = centerX + 70;
+        if (pos.x >= challengeX - buttonWidth / 2 &&
+            pos.x <= challengeX + buttonWidth / 2 &&
+            pos.y >= buttonY - buttonHeight / 2 &&
+            pos.y <= buttonY + buttonHeight / 2) {
+            return { config: this.selectedTarget, mode: 'challenge' };
+        }
+
+        // 点击弹窗外部关闭
+        const dialogWidth = 320;
+        const dialogHeight = 200;
+        if (pos.x < centerX - dialogWidth / 2 ||
+            pos.x > centerX + dialogWidth / 2 ||
+            pos.y < centerY - dialogHeight / 2 ||
+            pos.y > centerY + dialogHeight / 2) {
+            this.showModeDialog = false;
+            this.selectedTarget = null;
+        }
+
+        return null;
     }
 
     /**
@@ -468,6 +527,11 @@ export class SelectionScreen {
         // 渲染指示器小圆点
         this.renderIndicators(centerY);
 
+        // 渲染模式选择弹窗（优先级最高）
+        if (this.showModeDialog) {
+            this.renderModeDialog();
+        }
+
         // 渲染解锁确认弹窗
         if (this.showUnlockDialog && this.unlockDialogTarget) {
             this.renderUnlockDialog();
@@ -500,12 +564,6 @@ export class SelectionScreen {
 
         // 如果卡片完全超出屏幕，不渲染
         if (x < -cardWidth || x > logicalWidth + cardWidth) {
-            return;
-        }
-
-        // 无尽模式卡片使用特殊渲染
-        if (item.config.isEndless) {
-            this.renderEndlessCard({ x, y }, scale, opacity);
             return;
         }
 
@@ -672,87 +730,6 @@ export class SelectionScreen {
     }
 
     /**
-     * 渲染无尽模式卡片
-     * @param {object} center - 中心位置 { x, y }
-     * @param {number} scale - 缩放比例
-     * @param {number} alpha - 透明度
-     */
-    renderEndlessCard(center, scale, alpha) {
-        const ctx = this.ctx;
-        const cardWidth = SELECTION_CONFIG.CARD_WIDTH;
-        const cardHeight = SELECTION_CONFIG.CARD_HEIGHT;
-        const width = cardWidth * scale;
-        const height = cardHeight * scale;
-        const x = center.x - width / 2;
-        const y = center.y - height / 2;
-
-        ctx.globalAlpha = alpha;
-
-        // 渐变背景（紫色到深紫色）
-        const gradient = ctx.createLinearGradient(x, y, x + width, y + height);
-        gradient.addColorStop(0, '#9C27B0');
-        gradient.addColorStop(1, '#6A1B9A');
-
-        // 圆角矩形背景
-        drawRoundRect(ctx, x - 10, y - 10, width + 20, height + 60, 15);
-        ctx.fillStyle = gradient;
-        ctx.fill();
-
-        // 金色发光边框
-        ctx.strokeStyle = '#FFD700';
-        ctx.lineWidth = 4 * scale;
-        ctx.shadowColor = '#FFD700';
-        ctx.shadowBlur = 20;
-        ctx.stroke();
-        ctx.shadowBlur = 0;
-
-        // ∞ 图标 - 使用 emoji 图片渲染 (♾️)
-        if (this.emojiManager) {
-            this.emojiManager.draw(ctx, 'infinite', center.x, center.y - 20 * scale, 60 * scale);
-        } else {
-            ctx.font = `bold ${60 * scale}px Arial`;
-            ctx.fillStyle = '#FFFFFF';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText('∞', center.x, center.y - 20 * scale);
-        }
-
-        // 标题文字
-        ctx.font = `bold ${20 * scale}px Arial`;
-        ctx.fillStyle = '#FFD700';
-        ctx.textBaseline = 'alphabetic';
-        ctx.fillText('无尽模式', center.x, center.y + 35 * scale);
-
-        // 无尽模式统计（如果有）
-        if (this.settingsManager) {
-            const endlessStats = this.settingsManager.getEndlessStats();
-            if (endlessStats.highScore > 0 || endlessStats.longestTime > 0) {
-                ctx.font = `${12 * scale}px Arial`;
-                ctx.fillStyle = '#FFFFFF';
-
-                if (endlessStats.highScore > 0) {
-                    ctx.fillText(`最高: ${endlessStats.highScore}分`, center.x, center.y + 55 * scale);
-                }
-                if (endlessStats.longestTime > 0) {
-                    ctx.fillText(`最长: ${endlessStats.longestTime}秒`, center.x, center.y + 72 * scale);
-                }
-            } else {
-                // 没有记录时显示描述
-                ctx.font = `${14 * scale}px Arial`;
-                ctx.fillStyle = '#FFFFFF';
-                ctx.fillText('挑战无限关卡', center.x, center.y + 55 * scale);
-            }
-        } else {
-            // 没有 settingsManager 时显示默认描述
-            ctx.font = `${14 * scale}px Arial`;
-            ctx.fillStyle = '#FFFFFF';
-            ctx.fillText('挑战无限关卡', center.x, center.y + 55 * scale);
-        }
-
-        ctx.globalAlpha = 1;
-    }
-
-    /**
      * 渲染指示器小圆点
      * @param {number} centerY - 中心 Y 坐标
      */
@@ -861,6 +838,108 @@ export class SelectionScreen {
         ctx.stroke();
         ctx.fillStyle = '#FFFFFF';
         ctx.fillText('取消', cancelX, buttonY);
+    }
+
+    /**
+     * 渲染模式选择弹窗
+     */
+    renderModeDialog() {
+        const ctx = this.ctx;
+        const { width: logicalWidth, height: logicalHeight } = this.getLogicalSize();
+        const centerX = logicalWidth / 2;
+        const centerY = logicalHeight / 2;
+        const dialogWidth = 320;
+        const dialogHeight = 200;
+
+        // 全屏遮罩
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.fillRect(0, 0, logicalWidth, logicalHeight);
+
+        // 弹窗背景
+        const gradient = ctx.createLinearGradient(
+            centerX - dialogWidth / 2,
+            centerY - dialogHeight / 2,
+            centerX + dialogWidth / 2,
+            centerY + dialogHeight / 2
+        );
+        gradient.addColorStop(0, 'rgba(50, 50, 70, 0.98)');
+        gradient.addColorStop(1, 'rgba(30, 30, 50, 0.98)');
+
+        drawRoundRect(
+            ctx,
+            centerX - dialogWidth / 2,
+            centerY - dialogHeight / 2,
+            dialogWidth,
+            dialogHeight,
+            20
+        );
+        ctx.fillStyle = gradient;
+        ctx.fill();
+
+        // 金色边框
+        ctx.strokeStyle = '#FFD700';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // 标题
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = 'bold 22px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('选择游戏模式', centerX, centerY - 60);
+
+        // 目标名称
+        ctx.fillStyle = '#FFD700';
+        ctx.font = 'bold 20px Arial';
+        ctx.fillText(this.selectedTarget.name, centerX, centerY - 25);
+
+        // 按钮
+        const buttonWidth = 120;
+        const buttonHeight = 50;
+        const buttonY = centerY + 30;
+
+        // 无限模式按钮
+        const endlessX = centerX - 70;
+        const endlessGradient = ctx.createLinearGradient(
+            endlessX - buttonWidth / 2,
+            buttonY - buttonHeight / 2,
+            endlessX + buttonWidth / 2,
+            buttonY + buttonHeight / 2
+        );
+        endlessGradient.addColorStop(0, '#9C27B0');
+        endlessGradient.addColorStop(1, '#6A1B9A');
+
+        drawRoundRect(ctx, endlessX - buttonWidth / 2, buttonY - buttonHeight / 2,
+                     buttonWidth, buttonHeight, 12);
+        ctx.fillStyle = endlessGradient;
+        ctx.fill();
+        ctx.strokeStyle = '#FFD700';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = 'bold 16px Arial';
+        ctx.fillText('♾️ 无限模式', endlessX, buttonY - 8);
+        ctx.font = '12px Arial';
+        ctx.fillStyle = '#CCCCCC';
+        ctx.fillText('无时间限制', endlessX, buttonY + 12);
+
+        // 闯关模式按钮
+        const challengeX = centerX + 70;
+        drawRoundRect(ctx, challengeX - buttonWidth / 2, buttonY - buttonHeight / 2,
+                     buttonWidth, buttonHeight, 12);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = 'bold 16px Arial';
+        ctx.fillText('⏱️ 闯关模式', challengeX, buttonY - 8);
+        ctx.font = '12px Arial';
+        ctx.fillStyle = '#CCCCCC';
+        ctx.fillText('60秒挑战', challengeX, buttonY + 12);
     }
 
     /**

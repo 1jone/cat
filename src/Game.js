@@ -253,7 +253,6 @@ export class Game {
             targets: this.targets,
             selectedTarget: this.stateManager.selectedTarget,
             isEndlessMode: this.stateManager.isEndlessMode,
-            unlockedIndices: this.stateManager.unlockedTargetIndices,
             multipliers: this.stateManager.currentMultipliers
         });
 
@@ -275,8 +274,9 @@ export class Game {
             ? this.resourceManager.getBackground(currentConfig.id)
             : null;
         const showGrass = currentConfig && currentConfig.background && currentConfig.background.showGrass !== false;
+        const targetId = currentConfig ? currentConfig.id : null;  // 获取目标ID
 
-        this.bgRenderer.render(backgroundImage, showGrass);
+        this.bgRenderer.render(backgroundImage, showGrass, targetId);  // 传递目标ID
 
         // 根据状态渲染不同界面
         switch (state) {
@@ -501,12 +501,13 @@ export class Game {
                 return;
             }
 
-            const selectedConfig = this.selectionScreen.handleTouchEnd(pos);
-            if (selectedConfig) {
-                if (selectedConfig.isEndless) {
-                    this.startEndlessMode();
+            const selectionResult = this.selectionScreen.handleTouchEnd(pos);
+            if (selectionResult) {
+                const { config, mode } = selectionResult;
+                if (mode === 'endless') {
+                    this.startEndlessMode(config);
                 } else {
-                    this.startGame(selectedConfig);
+                    this.startGame(config);
                 }
             }
         }
@@ -569,6 +570,11 @@ export class Game {
         this.targets = [];
         this.spawnManager.reset();
 
+        // 保持屏幕常亮
+        if (tt && tt.setKeepScreenOn) {
+            tt.setKeepScreenOn({ keepScreenOn: true });
+        }
+
         // 播放游戏开始音效
         this.audioManager.playGameStart();
         this.audioManager.playBGM('game', { volume: AUDIO_CONFIG.BGM_VOLUME.game });
@@ -579,7 +585,6 @@ export class Game {
             canvasHeight: this.logicalHeight,
             selectedTarget: targetConfig,
             isEndlessMode: false,
-            unlockedIndices: [],
             multipliers: { speed: 1, radius: 1, points: 1 }
         });
     }
@@ -587,7 +592,7 @@ export class Game {
     /**
      * 开始无尽模式
      */
-    async startEndlessMode() {
+    async startEndlessMode(targetConfig) {
         // 增加游戏次数统计
         this.settingsManager.incrementPlayCount();
         this.adManager.incrementConsecutivePlays();
@@ -601,13 +606,17 @@ export class Game {
             }
         }
 
-        // 先传递 AdManager，让 startEndlessMode 能获取解锁状态
+        // 传递目标配置给 stateManager
         this.stateManager.setAdManager(this.adManager);
-
-        this.stateManager.startEndlessMode();
+        this.stateManager.startEndlessMode(targetConfig);
 
         this.targets = [];
         this.spawnManager.reset();
+
+        // 保持屏幕常亮
+        if (tt && tt.setKeepScreenOn) {
+            tt.setKeepScreenOn({ keepScreenOn: true });
+        }
 
         // 播放模式选择音效
         this.audioManager.playModeSelect();
@@ -620,7 +629,6 @@ export class Game {
             canvasHeight: this.logicalHeight,
             selectedTarget: this.stateManager.selectedTarget,
             isEndlessMode: true,
-            unlockedIndices: this.stateManager.unlockedTargetIndices,
             multipliers: this.stateManager.currentMultipliers
         });
     }
@@ -629,6 +637,11 @@ export class Game {
      * 结束游戏
      */
     async endGame() {
+        // 取消屏幕常亮
+        if (tt && tt.setKeepScreenOn) {
+            tt.setKeepScreenOn({ keepScreenOn: false });
+        }
+
         // 保存当前模式和分数信息（在 endGame 之前保存）
         const wasEndlessMode = this.stateManager.isEndlessMode;
         const finalScore = this.stateManager.score;

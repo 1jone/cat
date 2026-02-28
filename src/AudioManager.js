@@ -317,8 +317,30 @@ export class AudioManager {
      * @param {number} points - 得分（影响音调）
      */
     playCatch(points = 10) {
-        if (this.isMuted || !this.soundGenerator) return;
-        this.soundGenerator.playCatch(points);
+        if (this.isMuted) return;
+
+        try {
+            // 创建音效实例
+            const sfx = tt.createInnerAudioContext();
+            sfx.src = 'music/click.mp3';
+            sfx.volume = this.gameSfxVolume;
+            sfx.loop = false;
+
+            // 播放完成后销毁实例
+            sfx.onEnded(() => {
+                sfx.destroy();
+            });
+
+            // 错误处理
+            sfx.onError((err) => {
+                console.warn('播放点击音效失败:', err);
+                sfx.destroy();
+            });
+
+            sfx.play();
+        } catch (error) {
+            console.warn('创建点击音效失败:', error);
+        }
     }
 
     /**

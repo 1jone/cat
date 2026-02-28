@@ -38,11 +38,10 @@ export class SpawnManager {
      * @param {Array} params.targets - 当前目标数组
      * @param {object} params.selectedTarget - 选中的目标配置
      * @param {boolean} params.isEndlessMode - 是否无尽模式
-     * @param {number[]} params.unlockedIndices - 已解锁的目标索引
      * @param {object} params.multipliers - 属性乘数
      * @returns {ImageTarget|null} 新生成的目标或 null
      */
-    update(dt, { canvasWidth, canvasHeight, targets, selectedTarget, isEndlessMode, unlockedIndices, multipliers }) {
+    update(dt, { canvasWidth, canvasHeight, targets, selectedTarget, isEndlessMode, multipliers }) {
         this.spawnTimer += dt * 1000;
 
         const targetId = selectedTarget ? selectedTarget.id : undefined;
@@ -60,7 +59,6 @@ export class SpawnManager {
                 canvasHeight,
                 selectedTarget,
                 isEndlessMode,
-                unlockedIndices,
                 multipliers
             });
         }
@@ -73,7 +71,7 @@ export class SpawnManager {
      * @param {object} params - 参数
      * @returns {ImageTarget} 新生成的目标
      */
-    spawnTarget({ canvasWidth, canvasHeight, selectedTarget, isEndlessMode, unlockedIndices, multipliers }) {
+    spawnTarget({ canvasWidth, canvasHeight, selectedTarget, isEndlessMode, multipliers }) {
         const padding = 100;
         const x = padding + Math.random() * (canvasWidth - padding * 2);
         const y = padding + Math.random() * (canvasHeight - padding * 2 - 80);
@@ -84,14 +82,13 @@ export class SpawnManager {
         // 获取用户设置的速度乘数
         const userSpeedMultiplier = (this.settingsManager && this.settingsManager.getSpeedMultiplier(targetId, isEndlessMode)) || 1;
 
-        // 无尽模式：从已解锁的目标中随机选择，应用随机属性
+        // 两种模式都使用用户选择的目标，但无尽模式会应用随机属性乘数来增加难度
+        const baseTarget = selectedTarget;
         let targetConfig;
-        if (isEndlessMode && unlockedIndices && unlockedIndices.length > 0) {
-            const randomIndex = unlockedIndices[Math.floor(Math.random() * unlockedIndices.length)];
-            const baseTarget = TARGET_TYPES[randomIndex];
+        if (isEndlessMode) {
+            // 无尽模式：应用游戏内随机乘数和用户设置的速度乘数
             targetConfig = {
                 ...baseTarget,
-                // 应用游戏内随机乘数和用户设置的速度乘数
                 speed: baseTarget.speed * (multipliers && multipliers.speed || 1) * userSpeedMultiplier,
                 radius: baseTarget.radius * (multipliers && multipliers.radius || 1),
                 points: Math.floor(baseTarget.points * (multipliers && multipliers.points || 1))
@@ -99,8 +96,8 @@ export class SpawnManager {
         } else {
             // 计时模式：应用用户设置的速度乘数
             targetConfig = {
-                ...selectedTarget,
-                speed: selectedTarget.speed * userSpeedMultiplier
+                ...baseTarget,
+                speed: baseTarget.speed * userSpeedMultiplier
             };
         }
 
