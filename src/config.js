@@ -151,15 +151,36 @@ export const TARGET_TYPES = [
     },
     {
         id: 'butterfly',
+        type: 'butterfly',
         name: '蝴蝶',
-        image: '/target/butterfly_re.png',
+        image: null,              // 改为 Canvas 渲染
+        renderType: 'canvas',
         speed: 90,
         radius: 30,
         points: 12,
-        movement: 'wave',
+        movement: 'butterfly',
         background: {
             image: null,
-            showGrass: true
+            showGrass: false
+        },
+        // 渲染配置
+        renderConfig: {
+            primaryWingColor: '#FFD700',
+            secondaryWingColor: '#FFC125',
+            wingFlapSpeed: 15,
+            wingFlapAmplitude: 0.4,
+            glow: {
+                enabled: true,
+                color: 'rgba(255, 215, 0, 0.3)',
+                blur: 15
+            }
+        },
+        // 运动参数
+        butterflyParams: {
+            directionChangeProbability: 0.08,
+            edgeHuggingProbability: 0.3,
+            edgeDistance: 60,
+            speedVariation: 0.4
         },
         unlock: {
             type: 'free',
@@ -179,10 +200,12 @@ export const TARGET_TYPES = [
     {
         id: 'mouse',
         name: '老鼠',
-        image: '/target/mouse_re.png',
+        type: 'mouse',
+        image: null,              // 改为 Canvas 渲染
+        renderer: 'mouse',        // 指定渲染器类型
         speed: 150,
-        radius: 28,
-        points: 18,
+        radius: 25,               // 稍微减小碰撞半径
+        points: 15,
         movement: 'dash',
         movementConfig: {
             dashSpeed: 250,
@@ -206,20 +229,34 @@ export const TARGET_TYPES = [
         },
         sidebarReward: {
             canBeRewarded: false
+        },
+        // 老鼠特有配置
+        mouseConfig: {
+            jitterAmplitude: 2.0,      // 抖动幅度
+            jitterFrequency: 15,       // 抖动频率
+            dashSpeedMultiplier: 1.5,  // 冲刺速度倍数
+            tailSwingSpeed: 8,         // 尾巴摆动速度
+            tailSwingAmplitude: 0.15   // 尾巴摆动幅度
         }
     },
     // ========== 新增广告目标 (24h) ==========
     {
         id: 'fish',
         name: '小鱼',
-        image: '/target/fish_re.png',
-        speed: 100,
+        icon: '🐠',
+        image: null,              // 改为 Canvas 渲染
+        renderer: 'fish',         // 指定渲染器类型
+        speed: 120,
         radius: 32,
         points: 12,
-        movement: 'wave',
+        movement: 'zigzag',       // 改为锯齿运动
+        movementConfig: {
+            amplitude: 50,        // Z字幅度
+            frequency: 1.5        // Z字频率
+        },
         background: {
             image: null,
-            showGrass: true
+            showGrass: false      // 不显示草地，使用水体背景
         },
         unlock: {
             type: 'free',
@@ -234,6 +271,12 @@ export const TARGET_TYPES = [
         },
         sidebarReward: {
             canBeRewarded: true
+        },
+        // 小鱼特有配置
+        fishConfig: {
+            shimmerSpeed: 3,      // 闪烁速度
+            scaleShimmerSpeed: 2, // 鳞片闪烁速度
+            tailFlutterSpeed: 12  // 尾巴抖动速度
         }
     },
     {

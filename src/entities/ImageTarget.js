@@ -7,7 +7,7 @@ import { VocalizationBehavior } from '../behaviors/VocalizationBehavior';
 import { RabbitRenderer } from './RabbitRenderer';
 
 export class ImageTarget extends Entity {
-    constructor(position, config) {
+    constructor(position, config, mouseRenderer = null, butterflyRenderer = null, fishRenderer = null) {
         super(position, config.radius);
 
         // 基础属性
@@ -20,6 +20,20 @@ export class ImageTarget extends Entity {
         this.baseY = position.y;
         this.baseX = position.x;
         this.direction = Math.random() < 0.5 ? -1 : 1;
+
+        // 保存渲染器实例
+        this.mouseRenderer = mouseRenderer;
+        this.butterflyRenderer = butterflyRenderer;
+        this.fishRenderer = fishRenderer;
+
+        // 如果使用 butterfly 运动模式，初始化速度
+        if (config.movement === 'butterfly') {
+            const angle = Math.random() * Math.PI * 2;
+            this.velocity = new Vector2(
+                Math.cos(angle) * config.speed,
+                Math.sin(angle) * config.speed
+            );
+        }
 
         // 头部朝向相关属性
         this.currentRotation = 0;  // 当前旋转角度
@@ -35,6 +49,11 @@ export class ImageTarget extends Entity {
         this.startleSpeedFactor = 1;     // 速度渐变因子
         this.preStartleMovement = null;  // 受惊前的运动模式
         this.preStartleVelocity = null;  // 受惊前的速度
+
+        // 点击反馈相关属性
+        this.isClicked = false;           // 是否被点击
+        this.clickTime = 0;               // 点击时间戳
+        this.clickIntensity = 0;          // 点击强度（0-1，随时间衰减）
 
         // 窜出动画相关属性
         this.popInState = 'NORMAL';           // 状态: 'NORMAL' | 'POPPING_OUT' | 'FADING'
@@ -70,8 +89,15 @@ export class ImageTarget extends Entity {
         this.renderer = null;
 
         if (this.renderType === 'canvas') {
-            // Canvas渲染模式（如兔子）
-            this.renderer = new RabbitRenderer(config);
+            // Canvas渲染模式 - 根据目标ID选择渲染器
+            if (config.id === 'butterfly' && butterflyRenderer) {
+                this.renderer = butterflyRenderer;
+            } else if (config.id === 'mouse' && mouseRenderer) {
+                this.renderer = mouseRenderer;
+            } else {
+                // 默认使用 RabbitRenderer（兼容其他Canvas渲染目标）
+                this.renderer = new RabbitRenderer(config);
+            }
             this.imageLoaded = true;  // 标记为已加载，跳过图片加载
         } else {
             // 图片渲染模式（默认）
@@ -251,6 +277,9 @@ export class ImageTarget extends Entity {
             case 'wave':
                 this.updateWave(dt, canvasWidth, canvasHeight);
                 break;
+            case 'butterfly':
+                this.updateButterflyFlight(dt, canvasWidth, canvasHeight);
+                break;
             case 'random':
                 this.updateRandom(dt, canvasWidth, canvasHeight);
                 break;
@@ -337,6 +366,119 @@ export class ImageTarget extends Entity {
             );
         }
         this.updateBounce(dt, canvasWidth, canvasHeight);
+    }
+
+    /**
+     * 蝴蝶飞行模式 - 频繁变向 + 贴边飞行
+     */
+    updateButterflyFlight(dt, canvasWidth, canvasHeight) {
+        const params = this.config.butterflyParams || {
+            directionChangeProbability: 0.08,  // 8% 概率变向
+            edgeHuggingProbability: 0.3,        // 30% 概率贴边
+            edgeDistance: 60,                    // 边缘距离
+            speedVariation: 0.4                  // 速度变化 ±40%
+        };
+
+        // 1. 频繁方向改变
+        if (Math.random() < params.directionChangeProbability) {
+            const angle = Math.random() * Math.PI * 2;
+            const speedVariation = 1 + (Math.random() - 0.5) * params.speedVariation;
+            this.velocity = new Vector2(
+                Math.cos(angle) * this.config.speed * speedVariation,
+                Math.sin(angle) * this.config.speed * speedVariation
+            );
+        }
+
+        // 2. 贴边吸引行为
+        if (Math.random() < params.edgeHuggingProbability) {
+            this.applyEdgeAttraction(params.edgeDistance, canvasWidth, canvasHeight);
+        }
+
+        // 3. 应用移动（使用边界反弹）
+        this.updateBounce(dt, canvasWidth, canvasHeight);
+    }
+
+    /**
+     * 应用边缘吸引力（贴边飞行）
+     * @param {number} edgeDistance - 边缘触发距离
+     * @param {number} canvasWidth - 画布宽度
+     * @param {number} canvasHeight - 画布高度
+     */
+    applyEdgeAttraction(edgeDistance, canvasWidth, canvasHeight) {
+        const distToLeft = this.position.x;
+        const distToRight = canvasWidth - this.position.x;
+        const distToTop = this.position.y;
+        const distToBottom = canvasHeight - 80 - this.position.y;
+
+        const minDist = Math.min(distToLeft, distToRight, distToTop, distToBottom);
+
+        // 如果靠近某条边，减少垂直或水平移动，沿边飞行
+        if (minDist < edgeDistance * 2) {
+            if (minDist === distToLeft || minDist === distToRight) {
+                // 靠近左右边，减少垂直移动
+                this.velocity.y *= 0.3;
+            } else if (minDist === distToTop || minDist === distToBottom) {
+                // 靠近上下边，减少水平移动
+                this.velocity.x *= 0.3;
+            }
+        }
+    }
+
+    /**
+     * 计算朝向旋转角度（用于蝴蝶等需要根据运动方向旋转的目标）
+     * @returns {number} 旋转角度（弧度）
+     */
+    calculateRotation() {
+        // 如果使用速度运动，根据速度计算旋转
+        if (this.velocity && (this.velocity.x !== 0 || this.velocity.y !== 0)) {
+            const rotation = Math.atan2(this.velocity.y, this.velocity.x);
+
+            // 蝴蝶需要调整90度，因为默认朝向是向上的
+            const adjustedRotation = this.config.id === 'butterfly' ? rotation + Math.PI / 2 : rotation;
+
+            // 平滑插值旋转
+            if (this.currentRotation !== undefined) {
+                let rotationDiff = adjustedRotation - this.currentRotation;
+
+                // 处理角度跳变（-PI 到 PI）
+                if (rotationDiff > Math.PI) rotationDiff -= Math.PI * 2;
+                if (rotationDiff < -Math.PI) rotationDiff += Math.PI * 2;
+
+                this.currentRotation += rotationDiff * 0.1;  // 平滑因子
+            } else {
+                this.currentRotation = adjustedRotation;
+            }
+
+            return this.currentRotation;
+        }
+
+        // 对于参数化运动模式，跟踪位置变化
+        if (this.previousPosition) {
+            const deltaX = this.position.x - this.previousPosition.x;
+            const deltaY = this.position.y - this.previousPosition.y;
+
+            // 如果有显著移动
+            if (Math.abs(deltaX) > 0.1 || Math.abs(deltaY) > 0.1) {
+                const rotation = Math.atan2(deltaY, deltaX);
+                const adjustedRotation = this.config.id === 'butterfly' ? rotation + Math.PI / 2 : rotation;
+
+                if (this.currentRotation !== undefined) {
+                    let rotationDiff = adjustedRotation - this.currentRotation;
+
+                    if (rotationDiff > Math.PI) rotationDiff -= Math.PI * 2;
+                    if (rotationDiff < -Math.PI) rotationDiff += Math.PI * 2;
+
+                    this.currentRotation += rotationDiff * 0.1;
+                } else {
+                    this.currentRotation = adjustedRotation;
+                }
+
+                return this.currentRotation;
+            }
+        }
+
+        this.previousPosition = this.position.clone();
+        return this.currentRotation || 0;
     }
 
     // ==================== 新增运动模式 ====================
@@ -495,20 +637,41 @@ export class ImageTarget extends Entity {
     }
 
     /**
-     * 冲刺运动 - 快速冲刺 + 停顿
+     * 冲刺运动 - 快速冲刺 + 停顿（增强版）
+     * 老鼠特有：停顿期高频抖动，冲刺时爆发加速
      */
     updateDash(dt, canvasWidth, canvasHeight) {
         const params = this.movementParams;
-        const dashSpeed = params.dashSpeed || 200;
+
+        // 检查是否为老鼠
+        const isMouse = this.config.renderer === 'mouse';
+        const mouseConfig = isMouse ? (this.config.mouseConfig || {}) : {};
+
+        // 配置参数（老鼠使用增强参数）
+        const baseDashSpeed = params.dashSpeed || 200;
+        const dashSpeedMultiplier = isMouse ? (mouseConfig.dashSpeedMultiplier || 1.5) : 1.0;
         const dashDuration = params.dashDuration || 0.4;
         const pauseDuration = params.pauseDuration || 0.8;
+
+        // 老鼠特有抖动参数
+        const jitterAmplitude = isMouse ? (mouseConfig.jitterAmplitude || 2.0) : 1.0;
+        const jitterFrequency = isMouse ? (mouseConfig.jitterFrequency || 15) : 8;
 
         this.dashTimer += dt;
 
         if (this.isDashing) {
-            // 冲刺阶段 - 快速移动
+            // === 冲刺阶段 - 快速移动 ===
             this.position.x += this.dashVelocity.x * dt;
             this.position.y += this.dashVelocity.y * dt;
+
+            // 老鼠冲刺时的剧烈抖动
+            if (isMouse) {
+                const dashJitterIntensity = 5.0;
+                const dashJitterX = (Math.random() - 0.5) * dashJitterIntensity;
+                const dashJitterY = (Math.random() - 0.5) * dashJitterIntensity;
+                this.position.x += dashJitterX;
+                this.position.y += dashJitterY;
+            }
 
             // 边界碰撞处理
             if (this.position.x - this.radius < 0) {
@@ -533,11 +696,11 @@ export class ImageTarget extends Entity {
                 this.dashTimer = 0;
             }
         } else {
-            // 停顿阶段 - 轻微晃动
-            const wobbleX = Math.sin(this.time * 8) * 2;
-            const wobbleY = Math.cos(this.time * 8) * 2;
-            this.position.x += wobbleX * dt;
-            this.position.y += wobbleY * dt;
+            // === 停顿阶段 - 小幅抖动（老鼠警觉效果）===
+            const jitterX = Math.sin(this.time * jitterFrequency) * jitterAmplitude;
+            const jitterY = Math.cos(this.time * jitterFrequency * 1.3) * jitterAmplitude;
+            this.position.x += jitterX * dt * 60;
+            this.position.y += jitterY * dt * 60;
 
             // 停顿结束，开始新的冲刺
             if (this.dashTimer >= pauseDuration) {
@@ -546,9 +709,10 @@ export class ImageTarget extends Entity {
 
                 // 随机新方向
                 const angle = Math.random() * Math.PI * 2;
+                const actualDashSpeed = baseDashSpeed * dashSpeedMultiplier;
                 this.dashVelocity = new Vector2(
-                    Math.cos(angle) * dashSpeed,
-                    Math.sin(angle) * dashSpeed
+                    Math.cos(angle) * actualDashSpeed,
+                    Math.sin(angle) * actualDashSpeed
                 );
             }
         }
@@ -1147,8 +1311,64 @@ export class ImageTarget extends Entity {
             ctx.globalAlpha = this.opacity;
         }
 
+        // 点击反馈：变亮和抖动效果
+        if (this.isClicked) {
+            this.renderClickFeedback(ctx);
+        }
+
         // 根据渲染类型选择渲染方式
-        if (this.renderType === 'canvas' && this.renderer) {
+        if (this.config.renderer === 'mouse' && this.mouseRenderer) {
+            // Canvas渲染模式（老鼠）
+            ctx.restore();  // 先restore以避免影响renderer内部的变换
+            const mouseState = {
+                isStartled: this.isStartled,
+                isClicked: this.isClicked,
+                clickIntensity: this.clickIntensity
+            };
+            this.mouseRenderer.render(
+                ctx,
+                this.position.x,
+                this.position.y,
+                finalScale,
+                this.time,
+                mouseState
+            );
+            ctx.save();   // 重新save以匹配后面的restore
+        } else if (this.config.renderer === 'fish' && this.fishRenderer) {
+            // Canvas渲染模式（小鱼）
+            ctx.restore();  // 先restore以避免影响renderer内部的变换
+            const fishState = {
+                isStartled: this.isStartled,
+                isClicked: this.isClicked,
+                clickIntensity: this.clickIntensity
+            };
+            this.fishRenderer.render(
+                ctx,
+                this.position.x,
+                this.position.y,
+                finalScale,
+                this.time,
+                fishState
+            );
+            ctx.save();   // 重新save以匹配后面的restore
+        } else if (this.config.renderType === 'canvas' && this.config.id === 'butterfly' && this.butterflyRenderer) {
+            // Canvas渲染模式（蝴蝶）
+            ctx.restore();  // 先restore以避免影响renderer内部的变换
+            const rotation = this.calculateRotation();
+            const isMoving = this.velocity && this.velocity.magnitude() > 0;
+            const speed = isMoving ? this.velocity.magnitude() : this.config.speed;
+            this.butterflyRenderer.render(
+                ctx,
+                this.position,
+                this.radius,
+                rotation,
+                this.time,
+                finalScale * this.startleScale,
+                isMoving,
+                speed
+            );
+            ctx.save();   // 重新save以匹配后面的restore
+        } else if (this.renderType === 'canvas' && this.renderer) {
             // Canvas渲染模式（兔子等）
             ctx.restore();  // 先restore以避免影响renderer内部的变换
             const isMoving = this.checkIsMoving();
@@ -1187,6 +1407,36 @@ export class ImageTarget extends Entity {
 
         // 绘制行为相关的视觉效果
         this.renderBehaviors(ctx);
+    }
+
+    /**
+     * 渲染点击反馈效果（变亮和抖动）
+     */
+    renderClickFeedback(ctx) {
+        // 计算点击强度（随时间衰减）
+        const timeSinceClick = Date.now() - this.clickTime;
+        const maxDuration = 300; // 300ms
+
+        if (timeSinceClick >= maxDuration) {
+            this.isClicked = false;
+            this.clickIntensity = 0;
+            return;
+        }
+
+        // 线性衰减
+        this.clickIntensity = 1 - (timeSinceClick / maxDuration);
+
+        // 变亮效果
+        ctx.globalAlpha = 0.8 + this.clickIntensity * 0.2;
+        ctx.shadowColor = '#FFFFFF';
+        ctx.shadowBlur = 20 * this.clickIntensity;
+
+        // 抖动效果
+        const jitterAmount = 5 * this.clickIntensity;
+        const jitterX = (Math.random() - 0.5) * jitterAmount;
+        const jitterY = (Math.random() - 0.5) * jitterAmount;
+
+        ctx.translate(jitterX, jitterY);
     }
 
     /**

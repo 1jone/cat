@@ -62,7 +62,9 @@ export class AudioManager {
     getBGMPath(name) {
         const paths = {
             'menu': 'music/summer_breeze_cruise-52322afd-e3d0-4d6d-aa63-57e653a2337c.mp3',
-            'game': 'music/summer_breeze_cruise-817a5819-90e8-48ad-a24e-8c7268c6c4f4.mp3'
+            'game': 'music/summer_breeze_cruise-817a5819-90e8-48ad-a24e-8c7268c6c4f4.mp3',
+            'mouse': 'assets/sfx/mouse.mp3',
+            'butterfly':'assets/sfx/butterfly.mp3'
         };
         return paths[name] || paths['menu'];
     }

@@ -5,15 +5,21 @@
 
 import { SELECTION_CONFIG, TARGET_TYPES } from '../config';
 import { drawRoundRect } from '../utils/CanvasUtils';
+import { ButterflyRenderer } from '../entities/ButterflyRenderer';
+import { MouseRenderer } from '../entities/MouseRenderer';
+import { FishRenderer } from '../entities/FishRenderer';
 
 export class SelectionScreen {
-    constructor(canvas, ctx, resourceManager, adManager = null, settingsManager = null, emojiManager = null) {
+    constructor(canvas, ctx, resourceManager, adManager = null, settingsManager = null, emojiManager = null, butterflyRenderer = null, mouseRenderer = null, fishRenderer = null) {
         this.canvas = canvas;
         this.ctx = ctx;
         this.resourceManager = resourceManager;
         this.adManager = adManager;  // 广告管理器
         this.settingsManager = settingsManager;  // 设置管理器（用于获取最高分）
         this.emojiManager = emojiManager;  // Emoji 管理器
+        this.butterflyRenderer = butterflyRenderer || new ButterflyRenderer();  // 蝴蝶渲染器
+        this.mouseRenderer = mouseRenderer || new MouseRenderer();  // 老鼠渲染器
+        this.fishRenderer = fishRenderer || new FishRenderer();  // 小鱼渲染器
         this.dpr = 1;  // 设备像素比
 
         // 滚动选择相关属性
@@ -602,6 +608,9 @@ export class SelectionScreen {
             const imgSize = scaledWidth * 0.85;
             const imgCenterY = y - scaledHeight / 2 + 10 + imgSize / 2;
             this.renderParticlePreview(x, imgCenterY, scaledWidth, item.config, scale);
+        } else if (item.config.renderType === 'canvas' || item.config.renderer) {
+            // Canvas 渲染的目标（如蝴蝶、老鼠、小鱼）- 使用 CanvasRenderer 渲染预览
+            this.renderCanvasPreview(x, y, scaledWidth, scaledHeight, item.config, scale);
         } else if (item.loaded) {
             // 渲染普通图片
             const imgSize = scaledWidth * 0.85;
@@ -1098,5 +1107,51 @@ export class SelectionScreen {
             return `rgb(${dr}, ${dg}, ${db})`;
         }
         return color;
+    }
+
+    /**
+     * 渲染 Canvas 预览效果（用于 Canvas 渲染的目标，如蝴蝶）
+     * @param {number} x - 中心 X 坐标
+     * @param {number} y - 中心 Y 坐标
+     * @param {number} scaledWidth - 缩放后的卡片宽度
+     * @param {number} scaledHeight - 缩放后的卡片高度
+     * @param {object} config - 目标配置
+     * @param {number} scale - 缩放比例
+     */
+    renderCanvasPreview(x, y, scaledWidth, scaledHeight, config, scale) {
+        const ctx = this.ctx;
+        const imgSize = scaledWidth * 0.85;
+        const imgCenterY = y - scaledHeight / 2 + 10 + imgSize / 2;
+
+        // 根据目标 ID 渲染不同的 Canvas 预览
+        const time = this.particleTime;  // 使用粒子动画时间实现动画效果
+
+        if (config.id === 'butterfly') {
+            // 使用 ButterflyRenderer 渲染蝴蝶预览
+            const position = { x: x, y: imgCenterY };
+            const rotation = 0;  // 预览时不旋转
+            const radius = imgSize / 2;
+            const isMoving = false;  // 预览时静止
+            const speed = 0;
+
+            this.butterflyRenderer.render(ctx, position, radius, rotation, time, scale, isMoving, speed);
+        } else if (config.id === 'mouse') {
+            // 使用 MouseRenderer 渲染老鼠预览
+            const rendererScale = (imgSize / 2) / 25;  // 根据卡片大小调整缩放
+            this.mouseRenderer.render(ctx, x, imgCenterY, rendererScale, time, { isStartled: false });
+        } else if (config.id === 'fish') {
+            // 使用 FishRenderer 渲染小鱼预览
+            const rendererScale = (imgSize / 2) / 32;  // 根据卡片大小调整缩放
+            this.fishRenderer.render(ctx, x, imgCenterY, rendererScale, time, { isStartled: false });
+        } else {
+            // 未知 Canvas 渲染类型，显示占位符
+            ctx.fillStyle = '#CCCCCC';
+            ctx.fillRect(x - imgSize / 2, imgCenterY - imgSize / 2, imgSize, imgSize);
+            ctx.fillStyle = '#666666';
+            ctx.font = `${12 * scale}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('Canvas', x, imgCenterY);
+        }
     }
 }

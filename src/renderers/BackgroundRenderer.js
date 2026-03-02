@@ -26,16 +26,23 @@ export class BackgroundRenderer {
      * @param {HTMLImageElement|null} backgroundImage - 背景图片
      * @param {boolean} showGrass - 是否显示草地
      * @param {string} [targetId=null] - 目标类型ID（用于特殊背景）
+     * @param {number} [time=0] - 当前时间（用于动画）
      */
-    render(backgroundImage, showGrass = true, targetId = null) {
+    render(backgroundImage, showGrass = true, targetId = null, time = 0) {
         const dpr = this.dpr;
         const logicalWidth = this.canvas.width / dpr;
         const logicalHeight = this.canvas.height / dpr;
 
         // 优先级：特殊背景 > 背景图片 > 纯色背景
         if (targetId && this.hasSpecialBackground(targetId)) {
-            // 渲染特殊背景（不显示草地）
-            this.renderSparkleBackground(logicalWidth, logicalHeight);
+            // 根据目标类型渲染特殊背景
+            if (targetId === 'fish') {
+                this.renderWaterBackground(logicalWidth, logicalHeight, time);
+            } else if (targetId === 'butterfly') {
+                this.renderButterflyGrassBackground(logicalWidth, logicalHeight);
+            } else {
+                this.renderSparkleBackground(logicalWidth, logicalHeight);
+            }
             return;
         }
 
@@ -45,7 +52,7 @@ export class BackgroundRenderer {
             // 回退到纯色背景
             this.ctx.fillStyle = CONFIG.COLORS.BACKGROUND;
             this.ctx.fillRect(0, 0, logicalWidth, logicalHeight);
-            this.drawGrass(logicalHeight, logicalWidth);
+                        this.drawGrass(logicalHeight, logicalWidth);
         }
     }
 
@@ -193,8 +200,103 @@ export class BackgroundRenderer {
      * @returns {boolean}
      */
     hasSpecialBackground(targetId) {
-        const specialBackgroundTargets = ['sparkle'];
+        const specialBackgroundTargets = ['sparkle', 'butterfly', 'fish'];
         return specialBackgroundTargets.includes(targetId);
+    }
+
+    /**
+     * 渲染深蓝黑渐变背景（全局背景）
+     * @param {number} width - 画布宽度
+     * @param {number} height - 画布高度
+     */
+    renderDarkGradientBackground(width, height) {
+        const ctx = this.ctx;
+
+        // 清空画布
+        ctx.clearRect(0, 0, width, height);
+
+        // === 深蓝黑径向渐变 ===
+        const gradient = ctx.createRadialGradient(
+            width / 2, height / 2, 0,
+            width / 2, height / 2, Math.max(width, height) * 0.8
+        );
+
+        // 渐变色标 - 从中心到边缘
+        gradient.addColorStop(0, '#0A1628');      // 中心深蓝黑
+        gradient.addColorStop(0.5, '#0D1F3C');    // 中间深蓝灰
+        gradient.addColorStop(1, '#000000');      // 边缘纯黑
+
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, width, height);
+
+        // === 微弱地面质感 ===
+        this.renderGroundTexture(ctx, width, height);
+    }
+
+    /**
+     * 渲染地面纹理（微弱质感）
+     * @param {CanvasRenderingContext2D} ctx - Canvas上下文
+     * @param {number} width - 画布宽度
+     * @param {number} height - 画布高度
+     */
+    renderGroundTexture(ctx, width, height) {
+        const time = Date.now() / 1000;  // 当前时间（秒）
+
+        ctx.save();
+        ctx.globalAlpha = 0.05;  // 低不透明度
+        ctx.strokeStyle = '#1A2A4A';
+        ctx.lineWidth = 1;
+
+        // === 绘制细密的网格纹理 ===
+        const gridSize = 40;
+        const offsetX = Math.floor(time * 10) % gridSize;
+        const offsetY = Math.floor(time * 5) % gridSize;
+
+        // 垂直线
+        for (let x = offsetX; x < width; x += gridSize) {
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, height);
+            ctx.stroke();
+        }
+
+        // 水平线
+        for (let y = offsetY; y < height; y += gridSize) {
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(width, y);
+            ctx.stroke();
+        }
+
+        // === 添加随机噪点（模拟地面质感）===
+        this.renderGroundNoise(ctx, width, height, time);
+
+        ctx.restore();
+    }
+
+    /**
+     * 渲染地面噪点
+     * @param {CanvasRenderingContext2D} ctx - Canvas上下文
+     * @param {number} width - 画布宽度
+     * @param {number} height - 画布高度
+     * @param {number} time - 当前时间（秒）
+     */
+    renderGroundNoise(ctx, width, height, time) {
+        const noiseCount = 50;
+        const noiseSize = 2;
+
+        ctx.fillStyle = '#1A2A4A';
+
+        for (let i = 0; i < noiseCount; i++) {
+            // 使用确定性随机（基于时间和索引）
+            const seed = (time * 0.1 + i * 100) % 1000;
+            const x = (Math.sin(seed) * 0.5 + 0.5) * width;
+            const y = (Math.cos(seed * 1.3) * 0.5 + 0.5) * height;
+
+            ctx.beginPath();
+            ctx.arc(x, y, noiseSize, 0, Math.PI * 2);
+            ctx.fill();
+        }
     }
 
     /**
@@ -228,6 +330,105 @@ export class BackgroundRenderer {
     }
 
     /**
+     * 渲染深绿草地背景（蝴蝶专用）
+     * @param {number} width - 画布宽度
+     * @param {number} height - 画布高度
+     */
+    renderButterflyGrassBackground(width, height) {
+        const ctx = this.ctx;
+
+        // 1. 基础渐变（天空到草地）
+        const gradient = ctx.createLinearGradient(0, 0, 0, height);
+        gradient.addColorStop(0, '#87CEEB');       // 天空浅蓝
+        gradient.addColorStop(0.6, '#98D8AA');     // 地平线雾绿
+        gradient.addColorStop(1, '#2D5016');       // 前景深绿
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, width, height);
+
+        // 2. 密集草地层（底部 120px）
+        const grassHeight = 120;
+        const grassY = height - grassHeight;
+
+        // 深绿草地渐变
+        const grassGradient = ctx.createLinearGradient(0, grassY, 0, height);
+        grassGradient.addColorStop(0, '#4A7C23');     // 中绿顶部
+        grassGradient.addColorStop(0.3, '#3D6B1C');   // 中绿
+        grassGradient.addColorStop(1, '#1A3D0C');     // 深绿底部
+        ctx.fillStyle = grassGradient;
+        ctx.fillRect(0, grassY, width, grassHeight);
+
+        // 3. 绘制密集草叶
+        this.renderDenseGrassBlades(width, grassY, grassHeight);
+
+        // 4. 绘制漂浮粒子（花粉/灰尘）
+        this.renderFloatingParticles(width, height);
+    }
+
+    /**
+     * 渲染密集草叶
+     * @param {number} width - 宽度
+     * @param {number} startY - 起始Y坐标
+     * @param {number} height - 草地高度
+     */
+    renderDenseGrassBlades(width, startY, height) {
+        const ctx = this.ctx;
+        const bladeCount = Math.floor(width / 3);  // 密集草叶（3px间距）
+
+        for (let i = 0; i < bladeCount; i++) {
+            const x = i * 3 + Math.random() * 2;
+            const bladeHeight = 20 + Math.random() * 50;
+            const leanAngle = (Math.random() - 0.5) * 0.3;
+
+            ctx.save();
+            ctx.translate(x, startY);
+            ctx.rotate(leanAngle);
+
+            // 绘制草叶（二次曲线）
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.quadraticCurveTo(
+                bladeHeight * 0.3, -bladeHeight * 0.7,
+                0, -bladeHeight
+            );
+
+            // 草叶渐变
+            const bladeGradient = ctx.createLinearGradient(0, 0, 0, -bladeHeight);
+            bladeGradient.addColorStop(0, '#2D5016');      // 深绿基部
+            bladeGradient.addColorStop(0.6, '#4A7C23');    // 中绿
+            bladeGradient.addColorStop(1, '#6B8E23');      // 浅绿尖端
+
+            ctx.strokeStyle = bladeGradient;
+            ctx.lineWidth = 2 + Math.random() * 2;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+
+            ctx.restore();
+        }
+    }
+
+    /**
+     * 渲染漂浮粒子（花粉/灰尘）
+     * @param {number} width - 宽度
+     * @param {number} height - 高度
+     */
+    renderFloatingParticles(width, height) {
+        const ctx = this.ctx;
+        const particleCount = 30;
+
+        for (let i = 0; i < particleCount; i++) {
+            const x = Math.random() * width;
+            const y = Math.random() * height * 0.8;  // 仅在上层 80%
+            const size = 1 + Math.random() * 2;
+            const alpha = 0.2 + Math.random() * 0.3;
+
+            ctx.beginPath();
+            ctx.arc(x, y, size, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(255, 255, 200, ${alpha})`;  // 浅黄粒子
+            ctx.fill();
+        }
+    }
+
+    /**
      * 窗口大小变化时重新生成草地
      * @param {number} dpr - 设备像素比
      */
@@ -253,5 +454,101 @@ export class BackgroundRenderer {
      */
     handleTouch(position) {
         this.grassRenderer.handleTouch(position);
+    }
+
+    /**
+     * 渲染水体背景（深蓝渐变 + 水波 + 气泡）
+     * @param {number} width - 画布宽度
+     * @param {number} height - 画布高度
+     * @param {number} time - 当前时间（用于动画）
+     */
+    renderWaterBackground(width, height, time) {
+        const ctx = this.ctx;
+
+        // 1. 深蓝渐变背景
+        const gradient = ctx.createLinearGradient(0, 0, 0, height);
+        gradient.addColorStop(0, '#0A2463');   // 深蓝
+        gradient.addColorStop(0.5, '#1E3A8A'); // 中蓝
+        gradient.addColorStop(1, '#0F4C75');   // 底部蓝
+
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, width, height);
+
+        // 2. 微弱水波效果（正弦波线条）
+        this.renderWaterWaves(width, height, time);
+
+        // 3. 漂浮气泡
+        this.renderBubbles(width, height, time);
+    }
+
+    /**
+     * 渲染水波效果
+     * @param {number} width - 画布宽度
+     * @param {number} height - 画布高度
+     * @param {number} time - 当前时间
+     */
+    renderWaterWaves(width, height, time) {
+        const ctx = this.ctx;
+        const waveCount = 5;
+
+        for (let w = 0; w < waveCount; w++) {
+            const y = (height / waveCount) * w + 50;
+            const amplitude = 10 + w * 2;
+            const frequency = 0.01 + w * 0.002;
+            const phase = time * (0.5 + w * 0.1);
+            const alpha = 0.05 + w * 0.01;
+
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+
+            for (let x = 0; x <= width; x += 10) {
+                const waveY = y + Math.sin(x * frequency + phase) * amplitude;
+                ctx.lineTo(x, waveY);
+            }
+
+            ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+    }
+
+    /**
+     * 渲染漂浮气泡
+     * 使用伪随机生成固定位置的气泡，但透明度和位置有轻微波动
+     * @param {number} width - 画布宽度
+     * @param {number} height - 画布高度
+     * @param {number} time - 当前时间
+     */
+    renderBubbles(width, height, time) {
+        const ctx = this.ctx;
+
+        // 使用固定的种子生成10个气泡（基于位置的伪随机）
+        const bubbleCount = 10;
+        const seed = [123, 456, 789, 234, 567, 890, 345, 678, 901, 234];
+
+        for (let i = 0; i < bubbleCount; i++) {
+            // 基于种子的伪随机位置
+            const baseX = (seed[i] % width);
+            const baseY = (seed[(i + 1) % seed.length] % height);
+            const bubbleSize = 3 + (seed[i] % 10);
+
+            // 气泡缓慢上升动画
+            const riseOffset = (time * 20 + i * 50) % height;
+            const y = (baseY - riseOffset + height) % height;
+
+            // 透明度波动
+            const alpha = 0.1 + Math.sin(time * 2 + i) * 0.05;
+
+            ctx.beginPath();
+            ctx.arc(baseX, y, bubbleSize, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+            ctx.fill();
+
+            // 气泡高光
+            ctx.beginPath();
+            ctx.arc(baseX - bubbleSize * 0.3, y - bubbleSize * 0.3, bubbleSize * 0.2, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(255, 255, 255, ${alpha * 1.5})`;
+            ctx.fill();
+        }
     }
 }

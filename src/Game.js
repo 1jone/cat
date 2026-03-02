@@ -28,6 +28,11 @@ import { BackgroundRenderer } from './renderers/BackgroundRenderer';
 import { HUDRenderer } from './renderers/HUDRenderer';
 import { EffectsRenderer } from './renderers/EffectsRenderer';
 
+// 实体渲染器
+import { MouseRenderer } from './entities/MouseRenderer';
+import { ButterflyRenderer } from './entities/ButterflyRenderer';
+import { FishRenderer } from './entities/FishRenderer';
+
 export class Game {
     constructor(canvas) {
         this.canvas = canvas;
@@ -62,6 +67,14 @@ export class Game {
         this.hudRenderer = new HUDRenderer(canvas, ctx, this.emojiManager);
         this.effectsRenderer = new EffectsRenderer(canvas, ctx, this.emojiManager);
 
+        // 初始化实体渲染器
+        this.mouseRenderer = new MouseRenderer();
+        this.butterflyRenderer = new ButterflyRenderer();
+        this.fishRenderer = new FishRenderer();
+
+        // 全局访问（供 ImageTarget 使用）
+        // window.MouseRenderer = this.mouseRenderer;
+
         // 初始化输入管理器
         this.inputManager = new InputManager(canvas);
         this.inputManager.onTouchStart = (pos) => this.handleTouchStart(pos);
@@ -73,8 +86,8 @@ export class Game {
         this.audioManager = getAudioManager();
         this.audioInitialized = false;
 
-        // 初始化 SpawnManager（传入设置管理器和音频管理器）
-        this.spawnManager = new SpawnManager(this.settingsManager, this.audioManager);
+        // 初始化 SpawnManager（传入设置管理器、音频管理器和渲染器）
+        this.spawnManager = new SpawnManager(this.settingsManager, this.audioManager, this.mouseRenderer, this.butterflyRenderer, this.fishRenderer);
 
         // 初始化广告管理器
         this.adManager = new AdManager(this.settingsManager);
@@ -92,7 +105,7 @@ export class Game {
         this.resourceManager.preloadImages();
 
         // 初始化选择界面（需要在资源管理器之后，传入广告管理器和设置管理器）
-        this.selectionScreen = new SelectionScreen(canvas, ctx, this.resourceManager, this.adManager, this.settingsManager, this.emojiManager);
+        this.selectionScreen = new SelectionScreen(canvas, ctx, this.resourceManager, this.adManager, this.settingsManager, this.emojiManager, this.butterflyRenderer, this.mouseRenderer, this.fishRenderer);
 
         // 防止点击穿透
         this.skipNextTouchEnd = false;
@@ -265,6 +278,7 @@ export class Game {
      * 渲染游戏
      */
     render() {
+        const currentTime = performance.now();
         const state = this.stateManager.getState();
 
         // 渲染背景
@@ -276,7 +290,7 @@ export class Game {
         const showGrass = currentConfig && currentConfig.background && currentConfig.background.showGrass !== false;
         const targetId = currentConfig ? currentConfig.id : null;  // 获取目标ID
 
-        this.bgRenderer.render(backgroundImage, showGrass, targetId);  // 传递目标ID
+        this.bgRenderer.render(backgroundImage, showGrass, targetId, currentTime / 1000);  // 传递目标ID和时间（秒）
 
         // 根据状态渲染不同界面
         switch (state) {
@@ -525,6 +539,11 @@ export class Game {
                 target.isActive = false;
                 this.stateManager.addScore(target.points);
 
+                // 设置点击反馈状态
+                target.isClicked = true;
+                target.clickTime = Date.now();
+                target.clickIntensity = 1.0;
+
                 // 播放得分音效
                 this.audioManager.playCatch(target.points);
 
@@ -539,8 +558,8 @@ export class Game {
                     this.audioManager.playUnlock();
                 }
 
-                // 设置抓取特效
-                this.stateManager.setCatchEffect(target.position.x, target.position.y, target.points);
+                // 设置抓取特效（包含目标类型）
+                this.stateManager.setCatchEffect(target.position.x, target.position.y, target.points, target.config.type || 'default');
                 return;
             }
         }
@@ -577,7 +596,14 @@ export class Game {
 
         // 播放游戏开始音效
         this.audioManager.playGameStart();
-        this.audioManager.playBGM('game', { volume: AUDIO_CONFIG.BGM_VOLUME.game });
+        // 根据目标类型选择BGM（老鼠和蝴蝶使用专属音乐）
+        let bgmName = 'game';
+        if (targetConfig.id === 'mouse') {
+            bgmName = 'mouse';
+        } else if (targetConfig.id === 'butterfly') {
+            bgmName = 'butterfly';
+        }
+        this.audioManager.playBGM(bgmName, { volume: AUDIO_CONFIG.BGM_VOLUME.game }); 
 
         // 生成初始目标
         this.targets = this.spawnManager.spawnInitialTargets({
@@ -621,7 +647,14 @@ export class Game {
         // 播放模式选择音效
         this.audioManager.playModeSelect();
         this.audioManager.playGameStart();
-        this.audioManager.playBGM('menu', { volume: AUDIO_CONFIG.BGM_VOLUME.endless });
+        // 根据目标类型选择BGM（老鼠和蝴蝶使用专属音乐）
+        let bgmName = 'menu';
+        if (targetConfig.id === 'mouse') {
+            bgmName = 'mouse';
+        } else if (targetConfig.id === 'butterfly') {
+            bgmName = 'butterfly';
+        }
+        this.audioManager.playBGM(bgmName, { volume: AUDIO_CONFIG.BGM_VOLUME.endless }); 
 
         // 生成初始目标
         this.targets = this.spawnManager.spawnInitialTargets({

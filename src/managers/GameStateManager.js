@@ -179,13 +179,15 @@ export class GameStateManager {
      * @param {number} x - X 坐标
      * @param {number} y - Y 坐标
      * @param {number} points - 分数
+     * @param {string} type - 目标类型（用于调整爪印大小）
      */
-    setCatchEffect(x, y, points) {
+    setCatchEffect(x, y, points, type = 'default') {
         this.catchEffect = {
             x,
             y,
             time: 0.4,
-            points
+            points,
+            type
         };
     }
 

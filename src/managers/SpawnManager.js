@@ -7,19 +7,29 @@ import { CONFIG, TARGET_TYPES } from '../config';
 import { Vector2 } from '../utils/Vector2';
 import { ImageTarget } from '../entities/ImageTarget';
 import { ParticleTarget } from '../entities/ParticleTarget';
+import { FishRenderer } from '../entities/FishRenderer';
 
 export class SpawnManager {
     /**
      * @param {import('../SettingsManager').SettingsManager} settingsManager - 设置管理器
      * @param {import('../AudioManager').AudioManager} audioManager - 音频管理器
+     * @param {import('../entities/MouseRenderer').MouseRenderer} mouseRenderer - 老鼠渲染器
+     * @param {import('../entities/ButterflyRenderer').ButterflyRenderer} butterflyRenderer - 蝴蝶渲染器
+     * @param {import('../entities/FishRenderer').FishRenderer} fishRenderer - 小鱼渲染器
      */
-    constructor(settingsManager = null, audioManager = null) {
+    constructor(settingsManager = null, audioManager = null, mouseRenderer = null, butterflyRenderer = null, fishRenderer = null) {
         // 生成计时器
         this.spawnTimer = 0;
         // 设置管理器
         this.settingsManager = settingsManager;
         // 音频管理器
         this.audioManager = audioManager;
+        // 老鼠渲染器
+        this.mouseRenderer = mouseRenderer;
+        // 蝴蝶渲染器
+        this.butterflyRenderer = butterflyRenderer;
+        // 小鱼渲染器
+        this.fishRenderer = fishRenderer;
     }
 
     /**
@@ -105,7 +115,9 @@ export class SpawnManager {
         if (targetConfig.renderType === 'particle') {
             return new ParticleTarget(position, targetConfig);
         }
-        const target = new ImageTarget(position, targetConfig);
+
+        // 传入所有渲染器，由 ImageTarget 根据 config.id 选择
+        const target = new ImageTarget(position, targetConfig, this.mouseRenderer, this.butterflyRenderer, this.fishRenderer);
         // 注入 audioManager 供行为系统使用
         if (this.audioManager) {
             target.audioManager = this.audioManager;
