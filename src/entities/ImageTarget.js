@@ -5,9 +5,11 @@ import { BehaviorSystem } from '../systems/BehaviorSystem';
 import { PlayDeadBehavior } from '../behaviors/PlayDeadBehavior';
 import { VocalizationBehavior } from '../behaviors/VocalizationBehavior';
 import { RabbitRenderer } from './RabbitRenderer';
+import { YarnRenderer } from './YarnRenderer';
+import { MultiLineRenderer } from './MultiLineRenderer';
 
 export class ImageTarget extends Entity {
-    constructor(position, config, mouseRenderer = null, butterflyRenderer = null, fishRenderer = null) {
+    constructor(position, config, mouseRenderer = null, butterflyRenderer = null, fishRenderer = null, yarnRenderer = null, multilineRenderer = null, birdRenderer = null, ladybugRenderer = null) {
         super(position, config.radius);
 
         // 基础属性
@@ -25,6 +27,14 @@ export class ImageTarget extends Entity {
         this.mouseRenderer = mouseRenderer;
         this.butterflyRenderer = butterflyRenderer;
         this.fishRenderer = fishRenderer;
+        this.yarnRenderer = yarnRenderer;
+        this.multilineRenderer = multilineRenderer;
+        this.birdRenderer = birdRenderer;
+        this.ladybugRenderer = ladybugRenderer;
+
+        // 存储 canvas 尺寸供渲染使用
+        this.canvasWidth = 0;
+        this.canvasHeight = 0;
 
         // 如果使用 butterfly 运动模式，初始化速度
         if (config.movement === 'butterfly') {
@@ -88,12 +98,20 @@ export class ImageTarget extends Entity {
         this.renderType = config.renderType || 'image';
         this.renderer = null;
 
-        if (this.renderType === 'canvas') {
+        if (this.renderType === 'canvas' || this.renderType === 'multiline') {
             // Canvas渲染模式 - 根据目标ID选择渲染器
             if (config.id === 'butterfly' && butterflyRenderer) {
                 this.renderer = butterflyRenderer;
             } else if (config.id === 'mouse' && mouseRenderer) {
                 this.renderer = mouseRenderer;
+            } else if (config.id === 'yarn' && yarnRenderer) {
+                this.renderer = yarnRenderer;
+            } else if (config.id === 'yarn' && multilineRenderer) {
+                this.renderer = multilineRenderer;
+            } else if (config.id === 'bird' && birdRenderer) {
+                this.renderer = birdRenderer;
+            } else if (config.id === 'ladybug' && ladybugRenderer) {
+                this.renderer = ladybugRenderer;
             } else {
                 // 默认使用 RabbitRenderer（兼容其他Canvas渲染目标）
                 this.renderer = new RabbitRenderer(config);
@@ -227,6 +245,15 @@ export class ImageTarget extends Entity {
 
     update(dt, canvasWidth, canvasHeight) {
         this.time += dt * 2;
+
+        // 存储 canvas 尺寸供渲染使用
+        this.canvasWidth = canvasWidth;
+        this.canvasHeight = canvasHeight;
+
+        // 更新多线渲染器（yarn目标使用multiline类型时）
+        if (this.config.id === 'yarn' && this.multilineRenderer) {
+            this.multilineRenderer.update(dt, canvasWidth, canvasHeight);
+        }
 
         // 保存当前位置用于计算移动方向
         this.previousPosition = this.position.clone();
@@ -1368,11 +1395,40 @@ export class ImageTarget extends Entity {
                 speed
             );
             ctx.save();   // 重新save以匹配后面的restore
+        } else if (this.renderType === 'canvas' && this.config.renderer === 'ladybug' && this.ladybugRenderer) {
+            // Canvas渲染模式（瓢虫）
+            ctx.restore();  // 先restore以避免影响renderer内部的变换
+            const isMoving = this.checkIsMoving();
+            const currentSpeed = isMoving ? this.velocity ? this.velocity.magnitude() : this.config.speed : 0;
+
+            this.ladybugRenderer.render(
+                ctx,
+                this.position,
+                this.radius,
+                this.currentRotation,
+                this.time,
+                finalScale,
+                isMoving,
+                currentSpeed,
+                this.isStartled  // ← 传递受惊状态（关键参数）
+            );
+            ctx.save();   // 重新save以匹配后面的restore
+        } else if (this.renderType === 'multiline' && this.multilineRenderer) {
+            // 多线渲染模式（多彩线群）
+            ctx.restore();  // 先restore以避免影响multiline renderer内部的变换
+            this.multilineRenderer.render(ctx, this.canvasWidth, this.canvasHeight, this.time);
+            ctx.save();   // 重新save以匹配后面的restore
         } else if (this.renderType === 'canvas' && this.renderer) {
-            // Canvas渲染模式（兔子等）
+            // Canvas渲染模式（兔子、毛线球等）
             ctx.restore();  // 先restore以避免影响renderer内部的变换
             const isMoving = this.checkIsMoving();
             const currentSpeed = this.getCurrentSpeed();
+
+            // 更新毛线球轨迹
+            if (this.config.id === 'yarn' && this.renderer.updateTrail) {
+                this.renderer.updateTrail(this.position, currentSpeed);
+            }
+
             this.renderer.render(ctx, this.position, this.radius, this.currentRotation, this.time, finalScale, isMoving, currentSpeed);
             ctx.save();   // 重新save以匹配后面的restore
         } else if (this.imageLoaded) {

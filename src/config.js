@@ -282,7 +282,8 @@ export const TARGET_TYPES = [
     {
         id: 'bird',
         name: '小鸟',
-        image: '/target/bird_re.png',
+        renderType: 'canvas',              // Canvas渲染
+        // image: '/target/bird_re.png',   // 改用Canvas绘制
         speed: 130,
         radius: 30,
         points: 15,
@@ -290,6 +291,19 @@ export const TARGET_TYPES = [
         movementConfig: {
             amplitude: 80,
             frequency: 1.2
+        },
+        renderConfig: {                    // Canvas渲染配置
+            // 颜色方案
+            bodyColor: '#9C7B5E',          // 暖棕身体
+            bellyColor: '#EAD7C5',         // 米色腹部
+            wingColor: '#6B4F3A',          // 深棕翅膀
+            beakColor: '#D79B3B',          // 柔橙嘴
+            eyeColor: '#111111',           // 黑色眼睛
+
+            // 尺寸比例（相对于radius=30）
+            bodyRadius: 0.93,              // 28/30
+            headRadius: 0.73,              // 22/30
+            wingLength: 1.17               // 35/30
         },
         background: {
             image: null,
@@ -312,15 +326,30 @@ export const TARGET_TYPES = [
     },
     {
         id: 'yarn',
-        name: '毛线球',
-        image: '/target/yarn_re.png',
-        speed: 80,
-        radius: 35,
-        points: 10,
-        movement: 'bounce',
+        name: '多彩线群',
+        renderType: 'multiline',      // 多线渲染类型
+        speed: 30,                   // 较慢的游走速度
+        radius: 40,                  // 点击判定半径
+        points: 15,
+        movement: 'free',            // 自由移动模式
+        renderConfig: {
+            lineCount: 5,             // 线的数量
+            segmentCount: 60,         // 每条线的段数（增加到30，线更长）
+            segmentLength: 12,        // 每段长度（增加到12）
+            baseSpeed: 30,            // 基础速度
+            wiggleAmplitude: 15,      // 扭动幅度
+            wiggleFrequency: 2,       // 扭动频率
+            colors: [                 // 配色方案
+                '#FF6B6B', // 红
+                '#4ECDC4', // 蓝
+                '#95E1D3', // 青
+                '#F38181', // 粉
+                '#AA96DA'  // 紫
+            ]
+        },
         background: {
             image: null,
-            showGrass: true
+            showGrass: false          // 不显示草地，使用深蓝背景
         },
         unlock: {
             type: 'free',
@@ -341,11 +370,44 @@ export const TARGET_TYPES = [
     {
         id: 'ladybug',
         name: '瓢虫',
-        image: '/target/ladybug_re.png',
+        renderType: 'canvas',            // Canvas渲染
+        renderer: 'ladybug',             // 指定渲染器类型
+        // image: '/target/ladybug_re.png',  // 改用Canvas绘制
         speed: 60,
         radius: 22,  // 小体积，难点击
         points: 20,
         movement: 'random',
+        renderConfig: {                 // Canvas渲染配置
+            // 身体颜色（4层渐变，模拟半球形立体感）
+            bodyColorLight: '#FF3333',   // 高光区（亮红）
+            bodyColorMain: '#FF0000',    // 主体区（鲜红）
+            bodyColorMid: '#CC0000',     // 过渡区（深红）
+            bodyColorDark: '#990000',    // 边缘区（暗红）
+
+            // 头部颜色
+            headColorLight: '#1a1a1a',   // 头部渐变亮部
+            headColorMain: '#000000',    // 头部渐变暗部
+
+            // 斑点配置
+            spotColor: '#000000',        // 斑点颜色
+            spotEdgeSoftness: 0.85,      // 边缘柔和度
+
+            // 其他颜色（保持兼容）
+            wingColor: 'rgba(255, 255, 255, 0.6)',  // 半透明白色翅膀
+            antennaColor: '#000000',     // 触角颜色
+
+            // 尺寸比例
+            headRadius: 0.4,
+            bodyLength: 0.85,
+            bodyWidth: 0.75,
+            wingLength: 0.7,
+            wingWidth: 0.65,
+
+            // 动画参数
+            legMoveSpeed: 8,
+            wingFlapSpeed: 25,
+            wingOpenDuration: 0.15
+        },
         background: {
             image: null,
             showGrass: true
@@ -413,7 +475,7 @@ export const TARGET_TYPES = [
         },
         background: {
             image: null,
-            showGrass: true
+            showGrass: false
         },
         unlock: {
             type: 'free',
@@ -432,68 +494,6 @@ export const TARGET_TYPES = [
         // 特殊渲染标记
         renderType: 'particle'
     },
-    // ========== Canvas渲染兔子 ==========
-    {
-        id: 'rabbit',
-        name: '兔子',
-        image: '/target/rabbit_re.png',  // 保留图片路径作为备用
-        renderType: 'canvas',             // 使用Canvas渲染
-        speed: 100,
-        radius: 30,
-        points: 20,
-        movement: 'sprintStop',
-        movementConfig: {
-            slowSpeed: 50,        // 缓慢移动速度
-            sprintSpeed: 350,     // 急速冲刺速度
-            slowDuration: 2,      // 缓慢移动持续时间（秒）
-            sprintDuration: 0.4,  // 冲刺持续时间（秒）
-            stopDuration: 1.2     // 停止持续时间（秒）
-        },
-        background: {
-            image: null,
-            showGrass: true
-        },
-        // Canvas渲染配置
-        renderConfig: {
-            // 颜色配置 - 纯白色+粉色细节
-            bodyColor: '#FFFFFF',      // 白色身体
-            earInnerColor: '#FFB6C1',  // 粉色内耳
-            noseColor: '#FFB6C1',      // 粉色鼻子
-            eyeColor: '#333333',       // 深色眼睛
-            eyeHighlight: '#FFFFFF',   // 眼睛高光
-
-            // 发光配置 - 金色光晕
-            glow: {
-                enabled: true,
-                color: '#FFD700',      // 金色光晕
-                blur: 20,
-                pulseSpeed: 2,
-                minIntensity: 0.5,
-                maxIntensity: 1.0
-            },
-
-            // 弹跳配置
-            bounce: {
-                amplitude: 8,          // 弹跳高度（像素）
-                frequency: 8,          // 弹跳频率
-                squashAmount: 0.15     // 落地时挤压程度
-            }
-        },
-        unlock: {
-            type: 'free',
-            adRequired: false,
-            unlockDuration: 0
-        },
-        adTrigger: {
-            enabled: false,
-            probability: 0,
-            cooldown: 0,
-            maxPerSession: 0
-        },
-        sidebarReward: {
-            canBeRewarded: false
-        }
-    }
 ];
 export const CONFIG = {
     GAME_DURATION: 60,

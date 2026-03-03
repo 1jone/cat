@@ -16,8 +16,12 @@ export class SpawnManager {
      * @param {import('../entities/MouseRenderer').MouseRenderer} mouseRenderer - 老鼠渲染器
      * @param {import('../entities/ButterflyRenderer').ButterflyRenderer} butterflyRenderer - 蝴蝶渲染器
      * @param {import('../entities/FishRenderer').FishRenderer} fishRenderer - 小鱼渲染器
+     * @param {import('../entities/YarnRenderer').YarnRenderer} yarnRenderer - 毛线球渲染器
+     * @param {import('../entities/MultiLineRenderer').MultiLineRenderer} multilineRenderer - 多线渲染器
+     * @param {import('../entities/BirdRenderer').BirdRenderer} birdRenderer - 小鸟渲染器
+     * @param {import('../entities/LadybugRenderer').LadybugRenderer} ladybugRenderer - 瓢虫渲染器
      */
-    constructor(settingsManager = null, audioManager = null, mouseRenderer = null, butterflyRenderer = null, fishRenderer = null) {
+    constructor(settingsManager = null, audioManager = null, mouseRenderer = null, butterflyRenderer = null, fishRenderer = null, yarnRenderer = null, multilineRenderer = null, birdRenderer = null, ladybugRenderer = null) {
         // 生成计时器
         this.spawnTimer = 0;
         // 设置管理器
@@ -30,6 +34,14 @@ export class SpawnManager {
         this.butterflyRenderer = butterflyRenderer;
         // 小鱼渲染器
         this.fishRenderer = fishRenderer;
+        // 毛线球渲染器
+        this.yarnRenderer = yarnRenderer;
+        // 多线渲染器
+        this.multilineRenderer = multilineRenderer;
+        // 小鸟渲染器
+        this.birdRenderer = birdRenderer;
+        // 瓢虫渲染器
+        this.ladybugRenderer = ladybugRenderer;
     }
 
     /**
@@ -117,7 +129,7 @@ export class SpawnManager {
         }
 
         // 传入所有渲染器，由 ImageTarget 根据 config.id 选择
-        const target = new ImageTarget(position, targetConfig, this.mouseRenderer, this.butterflyRenderer, this.fishRenderer);
+        const target = new ImageTarget(position, targetConfig, this.mouseRenderer, this.butterflyRenderer, this.fishRenderer, this.yarnRenderer, this.multilineRenderer, this.birdRenderer, this.ladybugRenderer);
         // 注入 audioManager 供行为系统使用
         if (this.audioManager) {
             target.audioManager = this.audioManager;

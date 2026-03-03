@@ -39,7 +39,9 @@ export class BackgroundRenderer {
             if (targetId === 'fish') {
                 this.renderWaterBackground(logicalWidth, logicalHeight, time);
             } else if (targetId === 'butterfly') {
-                this.renderButterflyGrassBackground(logicalWidth, logicalHeight);
+                this.renderButterflyGrassBackground(logicalWidth, logicalHeight, time);
+            } else if (targetId === 'yarn') {
+                this.renderDarkGradientBackground(logicalWidth, logicalHeight);
             } else {
                 this.renderSparkleBackground(logicalWidth, logicalHeight);
             }
@@ -200,7 +202,7 @@ export class BackgroundRenderer {
      * @returns {boolean}
      */
     hasSpecialBackground(targetId) {
-        const specialBackgroundTargets = ['sparkle', 'butterfly', 'fish'];
+        const specialBackgroundTargets = ['sparkle', 'butterfly', 'fish', 'yarn'];
         return specialBackgroundTargets.includes(targetId);
     }
 
@@ -333,8 +335,9 @@ export class BackgroundRenderer {
      * 渲染深绿草地背景（蝴蝶专用）
      * @param {number} width - 画布宽度
      * @param {number} height - 画布高度
+     * @param {number} time - 当前时间（秒）
      */
-    renderButterflyGrassBackground(width, height) {
+    renderButterflyGrassBackground(width, height, time) {
         const ctx = this.ctx;
 
         // 1. 基础渐变（天空到草地）
@@ -358,10 +361,10 @@ export class BackgroundRenderer {
         ctx.fillRect(0, grassY, width, grassHeight);
 
         // 3. 绘制密集草叶
-        this.renderDenseGrassBlades(width, grassY, grassHeight);
+        this.renderDenseGrassBlades(width, grassY, grassHeight, time);
 
         // 4. 绘制漂浮粒子（花粉/灰尘）
-        this.renderFloatingParticles(width, height);
+        this.renderFloatingParticles(width, height, time);
     }
 
     /**
@@ -369,15 +372,26 @@ export class BackgroundRenderer {
      * @param {number} width - 宽度
      * @param {number} startY - 起始Y坐标
      * @param {number} height - 草地高度
+     * @param {number} time - 当前时间（秒）
      */
-    renderDenseGrassBlades(width, startY, height) {
+    renderDenseGrassBlades(width, startY, height, time) {
         const ctx = this.ctx;
         const bladeCount = Math.floor(width / 3);  // 密集草叶（3px间距）
 
         for (let i = 0; i < bladeCount; i++) {
-            const x = i * 3 + Math.random() * 2;
-            const bladeHeight = 20 + Math.random() * 50;
-            const leanAngle = (Math.random() - 0.5) * 0.3;
+            // 基于索引的固定位置
+            const baseX = i * 3;
+
+            // 微小的风吹摆动动画（基于时间）
+            const sway = Math.sin(time * 1.5 + i * 0.1) * 1.5;  // ±1.5px
+            const x = baseX + sway;
+
+            // 基于索引的固定高度
+            const bladeHeight = 25 + (i % 5) * 8;  // 25, 33, 41, 49, 57 循环
+
+            // 固定的倾斜角度（基于索引）
+            const baseAngle = ((i % 7) - 3) * 0.04;  // -0.12 到 +0.12
+            const leanAngle = baseAngle + Math.sin(time * 2 + i * 0.2) * 0.03;  // 微小摆动
 
             ctx.save();
             ctx.translate(x, startY);
@@ -398,7 +412,7 @@ export class BackgroundRenderer {
             bladeGradient.addColorStop(1, '#6B8E23');      // 浅绿尖端
 
             ctx.strokeStyle = bladeGradient;
-            ctx.lineWidth = 2 + Math.random() * 2;
+            ctx.lineWidth = 2;  // 固定线宽
             ctx.lineCap = 'round';
             ctx.stroke();
 
@@ -410,16 +424,35 @@ export class BackgroundRenderer {
      * 渲染漂浮粒子（花粉/灰尘）
      * @param {number} width - 宽度
      * @param {number} height - 高度
+     * @param {number} time - 当前时间（秒）
      */
-    renderFloatingParticles(width, height) {
+    renderFloatingParticles(width, height, time) {
         const ctx = this.ctx;
         const particleCount = 30;
+        const seed = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000,
+                      110, 220, 330, 440, 550, 660, 770, 880, 990, 110,
+                      120, 240, 360, 480, 600, 720, 840, 960, 1080, 120];
 
         for (let i = 0; i < particleCount; i++) {
-            const x = Math.random() * width;
-            const y = Math.random() * height * 0.8;  // 仅在上层 80%
-            const size = 1 + Math.random() * 2;
-            const alpha = 0.2 + Math.random() * 0.3;
+            // 使用固定种子确定基础位置
+            const seedX = seed[i] % width;
+            const seedY = seed[(i + 1) % seed.length] % (height * 0.8);
+            const baseX = seedX;
+            const baseY = seedY;
+
+            // 缓慢的水平漂移动画
+            const driftOffset = (time * 5 + i * 50) % width;  // 5px/s 慢速
+            const x = (baseX + driftOffset) % width;
+
+            // 垂直方向的缓慢波动
+            const floatOffset = Math.sin(time * 0.5 + i * 0.3) * 10;
+            const y = (baseY + floatOffset) % (height * 0.8);
+
+            // 基于索引的大小（固定）
+            const size = 1 + (i % 3);  // 1-3px
+
+            // 透明度基于时间波动
+            const alpha = 0.2 + Math.sin(time * 1.5 + i) * 0.1;  // 0.1-0.3
 
             ctx.beginPath();
             ctx.arc(x, y, size, 0, Math.PI * 2);

@@ -3,7 +3,7 @@
  * 负责协调各个模块，处理游戏主循环
  */
 
-import { CONFIG, AUDIO_CONFIG } from './config';
+import { CONFIG, AUDIO_CONFIG, TARGET_TYPES } from './config';
 import { InputManager } from './InputManager';
 import { getAudioManager } from './AudioManager';
 import { getSettingsManager } from './SettingsManager';
@@ -32,6 +32,10 @@ import { EffectsRenderer } from './renderers/EffectsRenderer';
 import { MouseRenderer } from './entities/MouseRenderer';
 import { ButterflyRenderer } from './entities/ButterflyRenderer';
 import { FishRenderer } from './entities/FishRenderer';
+import { YarnRenderer } from './entities/YarnRenderer';
+import { MultiLineRenderer } from './entities/MultiLineRenderer';
+import { BirdRenderer } from './entities/BirdRenderer';
+import { LadybugRenderer } from './entities/LadybugRenderer';
 
 export class Game {
     constructor(canvas) {
@@ -71,6 +75,14 @@ export class Game {
         this.mouseRenderer = new MouseRenderer();
         this.butterflyRenderer = new ButterflyRenderer();
         this.fishRenderer = new FishRenderer();
+        this.yarnRenderer = new YarnRenderer(
+            TARGET_TYPES.find(t => t.id === 'yarn') || {}
+        );
+        this.multilineRenderer = new MultiLineRenderer(
+            TARGET_TYPES.find(t => t.id === 'yarn')?.renderConfig || {}
+        );
+        this.birdRenderer = new BirdRenderer();
+        this.ladybugRenderer = new LadybugRenderer();
 
         // 全局访问（供 ImageTarget 使用）
         // window.MouseRenderer = this.mouseRenderer;
@@ -87,7 +99,7 @@ export class Game {
         this.audioInitialized = false;
 
         // 初始化 SpawnManager（传入设置管理器、音频管理器和渲染器）
-        this.spawnManager = new SpawnManager(this.settingsManager, this.audioManager, this.mouseRenderer, this.butterflyRenderer, this.fishRenderer);
+        this.spawnManager = new SpawnManager(this.settingsManager, this.audioManager, this.mouseRenderer, this.butterflyRenderer, this.fishRenderer, this.yarnRenderer, this.multilineRenderer, this.birdRenderer, this.ladybugRenderer);
 
         // 初始化广告管理器
         this.adManager = new AdManager(this.settingsManager);
@@ -105,7 +117,7 @@ export class Game {
         this.resourceManager.preloadImages();
 
         // 初始化选择界面（需要在资源管理器之后，传入广告管理器和设置管理器）
-        this.selectionScreen = new SelectionScreen(canvas, ctx, this.resourceManager, this.adManager, this.settingsManager, this.emojiManager, this.butterflyRenderer, this.mouseRenderer, this.fishRenderer);
+        this.selectionScreen = new SelectionScreen(canvas, ctx, this.resourceManager, this.adManager, this.settingsManager, this.emojiManager, this.butterflyRenderer, this.mouseRenderer, this.fishRenderer, this.yarnRenderer, this.multilineRenderer);
 
         // 防止点击穿透
         this.skipNextTouchEnd = false;
@@ -119,6 +131,7 @@ export class Game {
             this.update(deltaTime);
             this.render();
             requestAnimationFrame(this.gameLoop);
+            // requestAnimationFrame(()=>this.gameLoop)
         };
 
         // 调整大小并应用设置
@@ -318,6 +331,7 @@ export class Game {
                 }
                 // 渲染特效
                 this.effectsRenderer.renderCatchEffect(this.stateManager.catchEffect);
+                this.effectsRenderer.renderFireworkEffect(this.stateManager.fireworkEffect);
                 this.effectsRenderer.renderUnlockNotification(this.stateManager.unlockNotification);
                 // 渲染 HUD
                 this.hudRenderer.renderHUD({
@@ -354,6 +368,7 @@ export class Game {
                         target.render(this.ctx);
                     }
                     this.effectsRenderer.renderCatchEffect(this.stateManager.catchEffect);
+                    this.effectsRenderer.renderFireworkEffect(this.stateManager.fireworkEffect);
                     this.effectsRenderer.renderUnlockNotification(this.stateManager.unlockNotification);
                     this.hudRenderer.renderHUD({
                         score: this.stateManager.score,
@@ -560,6 +575,13 @@ export class Game {
 
                 // 设置抓取特效（包含目标类型）
                 this.stateManager.setCatchEffect(target.position.x, target.position.y, target.points, target.config.type || 'default');
+
+                // 如果是多彩线群，触发烟花特效
+                if (target.config.id === 'yarn' && target.config.renderType === 'multiline') {
+                    const colors = target.config.renderConfig?.colors || ['#FF6B6B', '#4ECDC4', '#95E1D3', '#F38181', '#AA96DA'];
+                    this.stateManager.setFireworkEffect(target.position.x, target.position.y, colors);
+                }
+
                 return;
             }
         }

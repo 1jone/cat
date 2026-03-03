@@ -83,6 +83,58 @@ export class EffectsRenderer {
     }
 
     /**
+     * 渲染烟花绽开特效（多彩线群专用）
+     * @param {object|null} effect - 烟花特效对象 {
+     *   x, y,           // 点击位置
+     *   time,           // 已持续时间（秒）
+     *   colors,         // 颜色数组
+     *   particles       // 粒子数组
+     * }
+     */
+    renderFireworkEffect(effect) {
+        if (!effect || !effect.particles) return;
+
+        const ctx = this.ctx;
+        const maxDuration = 0.8;  // 持续800ms
+        const progress = Math.min(effect.time / maxDuration, 1);
+
+        ctx.save();
+
+        // 渲染每个粒子
+        for (const particle of effect.particles) {
+            // 更新粒子位置（考虑重力）
+            const gravity = 200; // 重力加速度
+            const timeAlive = effect.time;
+
+            // 粒子当前位置 = 初始位置 + 速度向量 * 时间 + 0.5 * 重力 * 时间²
+            const currentX = particle.x + particle.vx * timeAlive;
+            const currentY = particle.y + particle.vy * timeAlive + 0.5 * gravity * timeAlive * timeAlive;
+
+            // 距离衰减（距离中心越远越透明）
+            const distance = Math.sqrt(
+                Math.pow(currentX - effect.x, 2) +
+                Math.pow(currentY - effect.y, 2)
+            );
+            const distanceAlpha = Math.max(0, 1 - distance / 200);
+
+            // 时间衰减（逐渐消失）
+            const timeAlpha = 1 - progress;
+
+            // 粒子大小逐渐缩小
+            const size = particle.size * (1 - progress * 0.5);
+
+            // 绘制粒子
+            ctx.globalAlpha = distanceAlpha * timeAlpha;
+            ctx.fillStyle = particle.color;
+            ctx.beginPath();
+            ctx.arc(currentX, currentY, size, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        ctx.restore();
+    }
+
+    /**
      * 渲染解锁通知
      * @param {object|null} notification - 通知对象 { message, time }
      */

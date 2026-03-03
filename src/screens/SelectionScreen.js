@@ -10,7 +10,7 @@ import { MouseRenderer } from '../entities/MouseRenderer';
 import { FishRenderer } from '../entities/FishRenderer';
 
 export class SelectionScreen {
-    constructor(canvas, ctx, resourceManager, adManager = null, settingsManager = null, emojiManager = null, butterflyRenderer = null, mouseRenderer = null, fishRenderer = null) {
+    constructor(canvas, ctx, resourceManager, adManager = null, settingsManager = null, emojiManager = null, butterflyRenderer = null, mouseRenderer = null, fishRenderer = null, yarnRenderer = null, multilineRenderer = null) {
         this.canvas = canvas;
         this.ctx = ctx;
         this.resourceManager = resourceManager;
@@ -20,6 +20,8 @@ export class SelectionScreen {
         this.butterflyRenderer = butterflyRenderer || new ButterflyRenderer();  // 蝴蝶渲染器
         this.mouseRenderer = mouseRenderer || new MouseRenderer();  // 老鼠渲染器
         this.fishRenderer = fishRenderer || new FishRenderer();  // 小鱼渲染器
+        this.yarnRenderer = yarnRenderer;  // 毛线球渲染器
+        this.multilineRenderer = multilineRenderer;  // 多线渲染器
         this.dpr = 1;  // 设备像素比
 
         // 滚动选择相关属性
@@ -1143,6 +1145,29 @@ export class SelectionScreen {
             // 使用 FishRenderer 渲染小鱼预览
             const rendererScale = (imgSize / 2) / 32;  // 根据卡片大小调整缩放
             this.fishRenderer.render(ctx, x, imgCenterY, rendererScale, time, { isStartled: false });
+        } else if (config.id === 'yarn' && config.renderType === 'multiline' && this.multilineRenderer) {
+            // 使用 MultiLineRenderer 渲染多线预览
+            // 预览时在固定区域内显示几条线
+            const previewWidth = imgSize * 2;
+            const previewHeight = imgSize * 2;
+            const previewX = x - previewWidth / 2;
+            const previewY = imgCenterY - previewHeight / 2;
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(x - imgSize / 2, imgCenterY - imgSize / 2, imgSize, imgSize);
+            ctx.clip();  // 限制预览在卡片区域内
+            this.multilineRenderer.render(ctx, this.canvas.width, this.canvas.height, time);
+            ctx.restore();
+        } else if (config.id === 'yarn' && this.yarnRenderer) {
+            // 使用 YarnRenderer 渲染毛线球预览
+            const position = { x: x, y: imgCenterY };
+            const rotation = 0;
+            const radius = imgSize / 2;
+            const isMoving = false;
+            const speed = 0;
+
+            this.yarnRenderer.render(ctx, position, radius, rotation, time, scale, isMoving, speed);
         } else {
             // 未知 Canvas 渲染类型，显示占位符
             ctx.fillStyle = '#CCCCCC';

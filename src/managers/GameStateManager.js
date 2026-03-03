@@ -45,6 +45,9 @@ export class GameStateManager {
         // 抓取特效
         this.catchEffect = null;
 
+        // 烟花特效（多彩线群专用）
+        this.fireworkEffect = null;
+
         // 倒计时音效状态
         this.lastCountdownSecond = -1;
 
@@ -205,6 +208,56 @@ export class GameStateManager {
     }
 
     /**
+     * 设置烟花绽开特效
+     * @param {number} x - 点击位置X
+     * @param {number} y - 点击位置Y
+     * @param {string[]} colors - 颜色数组
+     */
+    setFireworkEffect(x, y, colors) {
+        // 生成粒子数组
+        const particleCount = 30; // 粒子数量
+        const particles = [];
+
+        for (let i = 0; i < particleCount; i++) {
+            // 随机角度（0-2π）
+            const angle = (Math.PI * 2 * i) / particleCount + Math.random() * 0.2;
+
+            // 随机速度（100-200 像素/秒）
+            const speed = 100 + Math.random() * 100;
+
+            particles.push({
+                x: x,
+                y: y,
+                vx: Math.cos(angle) * speed,  // X方向速度
+                vy: Math.sin(angle) * speed,  // Y方向速度
+                color: colors[Math.floor(Math.random() * colors.length)], // 随机颜色
+                size: 3 + Math.random() * 3     // 粒子大小 3-6px
+            });
+        }
+
+        this.fireworkEffect = {
+            x,
+            y,
+            time: 0,
+            colors,
+            particles
+        };
+    }
+
+    /**
+     * 更新烟花特效
+     * @param {number} dt - 时间增量（秒）
+     */
+    updateFireworkEffect(dt) {
+        if (this.fireworkEffect) {
+            this.fireworkEffect.time += dt;
+            if (this.fireworkEffect.time >= 0.8) {  // 超过持续时间
+                this.fireworkEffect = null;
+            }
+        }
+    }
+
+    /**
      * 检查是否解锁新目标（无尽模式）
      * @returns {object|null} 解锁的目标配置或 null
      */
@@ -271,6 +324,7 @@ export class GameStateManager {
 
         // 更新特效
         this.updateCatchEffect(dt);
+        this.updateFireworkEffect(dt);
 
         return result;
     }
