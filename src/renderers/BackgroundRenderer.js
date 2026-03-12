@@ -42,6 +42,8 @@ export class BackgroundRenderer {
                 this.renderButterflyGrassBackground(logicalWidth, logicalHeight, time);
             } else if (targetId === 'yarn') {
                 this.renderDarkGradientBackground(logicalWidth, logicalHeight);
+            } else if (targetId === 'ladybug') {
+                this.renderFireflyBackground(logicalWidth, logicalHeight, time);
             } else {
                 this.renderSparkleBackground(logicalWidth, logicalHeight);
             }
@@ -202,7 +204,7 @@ export class BackgroundRenderer {
      * @returns {boolean}
      */
     hasSpecialBackground(targetId) {
-        const specialBackgroundTargets = ['sparkle', 'butterfly', 'fish', 'yarn'];
+        const specialBackgroundTargets = ['sparkle', 'butterfly', 'fish', 'yarn', 'ladybug','laser'];
         return specialBackgroundTargets.includes(targetId);
     }
 
@@ -329,6 +331,75 @@ export class BackgroundRenderer {
         // 填充整个画布
         ctx.fillStyle = gradient;
         ctx.fillRect(0, 0, width, height);
+    }
+
+    /**
+     * 渲染萤火虫夜晚背景
+     * @param {number} width - 画布宽度
+     * @param {number} height - 画布高度
+     * @param {number} time - 当前时间（秒）
+     */
+    renderFireflyBackground(width, height, time) {
+        const ctx = this.ctx;
+
+        // === 1. 三层垂直渐变背景 ===
+        const gradient = ctx.createLinearGradient(0, 0, 0, height);
+        gradient.addColorStop(0, '#0B1F3A');      // 深夜蓝
+        gradient.addColorStop(0.5, '#132F4C');    // 深蓝
+        gradient.addColorStop(1, '#0F3A2E');      // 暗绿色
+
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, width, height);
+
+        // === 2. 微粒子效果 ===
+        this.renderFireflyParticles(width, height, time);
+    }
+
+    /**
+     * 渲染萤火虫微粒子效果
+     * @param {number} width - 画布宽度
+     * @param {number} height - 画布高度
+     * @param {number} time - 当前时间（秒）
+     */
+    renderFireflyParticles(width, height, time) {
+        const ctx = this.ctx;
+        const particleCount = 12;  // 非常少
+
+        // 粒子颜色配置
+        const particleColors = [
+            'rgba(255, 255, 255, 0.2)',   // 白色
+            'rgba(180, 220, 255, 0.15)'    // 淡蓝色
+        ];
+
+        // 使用确定性随机（固定种子）
+        const seed = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000,
+                      110, 220, 330, 440, 550, 660, 770, 880, 990, 110];
+
+        for (let i = 0; i < particleCount; i++) {
+            // 基础位置（固定种子）
+            const baseX = seed[i] % width;
+            const baseY = seed[(i + 1) % seed.length] % (height * 0.8);
+
+            // 缓慢水平漂移（5px/s）
+            const driftOffset = (time * 5 + i * 50) % width;
+            const x = (baseX + driftOffset) % width;
+
+            // 垂直缓慢波动（正弦波）
+            const floatOffset = Math.sin(time * 0.3 + i * 0.5) * 15;
+            const y = (baseY + floatOffset) % (height * 0.8);
+
+            // 粒子大小（1-2px）
+            const size = 1 + (i % 2);
+
+            // 粒子颜色（交替使用）
+            const color = particleColors[i % particleColors.length];
+
+            // 绘制粒子
+            ctx.beginPath();
+            ctx.arc(x, y, size, 0, Math.PI * 2);
+            ctx.fillStyle = color;
+            ctx.fill();
+        }
     }
 
     /**

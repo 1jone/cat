@@ -8,9 +8,16 @@ import { drawRoundRect } from '../utils/CanvasUtils';
 import { ButterflyRenderer } from '../entities/ButterflyRenderer';
 import { MouseRenderer } from '../entities/MouseRenderer';
 import { FishRenderer } from '../entities/FishRenderer';
+import { BirdRenderer } from '../entities/BirdRenderer';
+import { LadybugRenderer } from '../entities/LadybugRenderer';
+import { StaticLineRenderer } from '../entities/StaticLineRenderer';
 
 export class SelectionScreen {
-    constructor(canvas, ctx, resourceManager, adManager = null, settingsManager = null, emojiManager = null, butterflyRenderer = null, mouseRenderer = null, fishRenderer = null, yarnRenderer = null, multilineRenderer = null) {
+    constructor(canvas, ctx, resourceManager, adManager = null, settingsManager = null,
+                emojiManager = null, butterflyRenderer = null, mouseRenderer = null,
+                fishRenderer = null, yarnRenderer = null, multilineRenderer = null,
+                birdRenderer = null, ladybugRenderer = null, staticLineRenderer = null,
+                staminaManager = null) {
         this.canvas = canvas;
         this.ctx = ctx;
         this.resourceManager = resourceManager;
@@ -22,6 +29,10 @@ export class SelectionScreen {
         this.fishRenderer = fishRenderer || new FishRenderer();  // 小鱼渲染器
         this.yarnRenderer = yarnRenderer;  // 毛线球渲染器
         this.multilineRenderer = multilineRenderer;  // 多线渲染器
+        this.birdRenderer = birdRenderer || new BirdRenderer();  // 小鸟渲染器
+        this.ladybugRenderer = ladybugRenderer || new LadybugRenderer();  // 萤火虫渲染器
+        this.staticLineRenderer = staticLineRenderer || new StaticLineRenderer();  // 静态线群渲染器
+        this.staminaManager = staminaManager;  // 体力管理器
         this.dpr = 1;  // 设备像素比
 
         // 滚动选择相关属性
@@ -497,6 +508,60 @@ export class SelectionScreen {
     }
 
     /**
+     * 渲染体力显示（左上角）
+     */
+    renderStaminaDisplay() {
+        if (!this.staminaManager) return;
+
+        const current = this.staminaManager.getCurrentStamina();
+        const max = this.staminaManager.getMaxStamina();
+        const x = 20;  // 左上角x坐标
+        const y = 30;  // 左上角y坐标
+
+        const text = `⚡ ${current}/${max}`;
+
+        // 文本样式（与HUDRenderer一致）
+        this.ctx.fillStyle = '#FFFFFF';
+        this.ctx.font = 'bold 16px Arial';
+        this.ctx.textAlign = 'left';
+        this.ctx.textBaseline = 'middle';
+
+        // 文本描边效果（增强可见度）
+        this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.6)';
+        this.ctx.lineWidth = 3;
+        this.ctx.lineJoin = 'round';
+
+        // 渲染文本
+        this.ctx.strokeText(text, x, y);
+        this.ctx.fillText(text, x, y);
+
+        // 当体力未满时显示恢复时间
+        if (current < max) {
+            const nextRestoreTime = this.staminaManager.getNextRestoreTime();
+
+            if (nextRestoreTime > 0) {
+                // 格式化时间
+                const minutes = Math.floor(nextRestoreTime / 60000);
+                const seconds = Math.floor((nextRestoreTime % 60000) / 1000);
+                const timeStr = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+
+                // 在体力下方显示恢复时间
+                const restoreY = y + 22;  // 在体力文本下方22px
+                const restoreText = `⏰ ${timeStr} 后恢复`;
+
+                // 使用较小的字体
+                this.ctx.font = '12px Arial';
+                this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+                this.ctx.textBaseline = 'top';
+
+                // 渲染恢复时间
+                this.ctx.strokeText(restoreText, x, restoreY);
+                this.ctx.fillText(restoreText, x, restoreY);
+            }
+        }
+    }
+
+    /**
      * 渲染选择界面
      */
     render() {
@@ -506,6 +571,9 @@ export class SelectionScreen {
         // 半透明背景
         ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
         ctx.fillRect(0, 0, logicalWidth, logicalHeight);
+
+        // 体力显示（左上角）
+        this.renderStaminaDisplay();
 
         // 标题
         ctx.fillStyle = '#FFFFFF';
@@ -612,6 +680,9 @@ export class SelectionScreen {
             this.renderParticlePreview(x, imgCenterY, scaledWidth, item.config, scale);
         } else if (item.config.renderType === 'canvas' || item.config.renderer) {
             // Canvas 渲染的目标（如蝴蝶、老鼠、小鱼）- 使用 CanvasRenderer 渲染预览
+            this.renderCanvasPreview(x, y, scaledWidth, scaledHeight, item.config, scale);
+        } else if (item.config.renderType === 'multiline') {
+            // 多彩线群渲染（使用 StaticLineRenderer）
             this.renderCanvasPreview(x, y, scaledWidth, scaledHeight, item.config, scale);
         } else if (item.loaded) {
             // 渲染普通图片
@@ -1145,30 +1216,29 @@ export class SelectionScreen {
             // 使用 FishRenderer 渲染小鱼预览
             const rendererScale = (imgSize / 2) / 32;  // 根据卡片大小调整缩放
             this.fishRenderer.render(ctx, x, imgCenterY, rendererScale, time, { isStartled: false });
-        } else if (config.id === 'yarn' && config.renderType === 'multiline' && this.multilineRenderer) {
-            // 使用 MultiLineRenderer 渲染多线预览
-            // 预览时在固定区域内显示几条线
-            const previewWidth = imgSize * 2;
-            const previewHeight = imgSize * 2;
-            const previewX = x - previewWidth / 2;
-            const previewY = imgCenterY - previewHeight / 2;
+        } else if (config.id === 'bird') {
+            // 使用 BirdRenderer 渲染小鸟预览
+            const position = { x: x, y: imgCenterY };
+            const rotation = 0;  // 预览时不旋转
+            const radius = imgSize / 2;
+            const isMoving = false;  // 预览时静止
+            const speed = 0;
 
-            ctx.save();
-            ctx.beginPath();
-            ctx.rect(x - imgSize / 2, imgCenterY - imgSize / 2, imgSize, imgSize);
-            ctx.clip();  // 限制预览在卡片区域内
-            this.multilineRenderer.render(ctx, this.canvas.width, this.canvas.height, time);
-            ctx.restore();
-        } else if (config.id === 'yarn' && this.yarnRenderer) {
-            // 使用 YarnRenderer 渲染毛线球预览
+            this.birdRenderer.render(ctx, position, radius, rotation, time, scale, isMoving, speed);
+        } else if (config.id === 'ladybug') {
+            // 使用 LadybugRenderer 渲染萤火虫预览
             const position = { x: x, y: imgCenterY };
             const rotation = 0;
             const radius = imgSize / 2;
-            const isMoving = false;
-            const speed = 0;
 
-            this.yarnRenderer.render(ctx, position, radius, rotation, time, scale, isMoving, speed);
-        } else {
+            this.ladybugRenderer.render(ctx, position, radius, rotation, time, scale);
+        } else if ( config.id === 'yarn' ) {
+            // 使用 StaticLineRenderer 渲染静态线群预览
+            const position = { x: x, y: imgCenterY };
+            this.staticLineRenderer.render(ctx, position.x, position.y, scale);
+         } 
+
+         else {
             // 未知 Canvas 渲染类型，显示占位符
             ctx.fillStyle = '#CCCCCC';
             ctx.fillRect(x - imgSize / 2, imgCenterY - imgSize / 2, imgSize, imgSize);

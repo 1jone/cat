@@ -403,4 +403,61 @@ export class AdManager {
             adRequired: target.unlock.adRequired
         };
     }
+
+    /**
+     * 显示体力恢复激励视频广告
+     * @returns {Promise<Object>} 结果对象 {success: boolean, message: string}
+     */
+    async showStaminaAd() {
+        console.log('[AdManager] 请求显示体力恢复激励视频广告');
+
+        return new Promise((resolve) => {
+            // 非抖音环境模拟
+            if (typeof tt === 'undefined' || !this.rewardedAd) {
+                console.log('[AdManager] 广告API不可用，模拟观看完成');
+                setTimeout(() => {
+                    resolve({ success: true, message: '广告观看完成（模拟）' });
+                }, 500);
+                return;
+            }
+
+            const onClose = (res) => {
+                this.rewardedAd.offClose(onClose);
+                this.rewardedAd.offError(onError);
+
+                if (res && res.isEnded) {
+                    console.log('[AdManager] 体力恢复广告观看完成');
+                    this.recordAdShown('stamina');
+                    resolve({ success: true, message: '广告观看完成' });
+                } else {
+                    console.log('[AdManager] 体力恢复广告未完整观看');
+                    resolve({ success: false, message: '广告未完整观看' });
+                }
+
+                // 重新加载下一个广告
+                this.rewardedAd.load();
+            };
+
+            const onError = (err) => {
+                this.rewardedAd.offClose(onClose);
+                this.rewardedAd.offError(onError);
+                console.error('[AdManager] 体力恢复广告错误:', err);
+                resolve({ success: false, message: '广告加载失败' });
+            };
+
+            this.rewardedAd.onClose(onClose);
+            this.rewardedAd.onError(onError);
+
+            this.rewardedAd.show().catch((err) => {
+                console.log('[AdManager] 体力恢复广告显示失败，尝试重新加载');
+                this.rewardedAd.load()
+                    .then(() => this.rewardedAd.show())
+                    .catch(() => {
+                        this.rewardedAd.offClose(onClose);
+                        this.rewardedAd.offError(onError);
+                        resolve({ success: false, message: '广告显示失败' });
+                    });
+            });
+        });
+    }
 }

@@ -16,8 +16,19 @@
     "douyinProjectType": "native",
     "condition": {
         "game": {
-            "current": -1,
-            "list": []
+            "current": 1773120375105,
+            "list": [
+                {
+                    "id": 1773120375105,
+                    "name": "新分享",
+                    "pathName": "新分享",
+                    "query": "",
+                    "scene": "",
+                    "launchFrom": "",
+                    "location": "",
+                    "mockUpdateType": "Noupdate"
+                }
+            ]
         }
     }
 }

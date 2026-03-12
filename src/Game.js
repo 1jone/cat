@@ -34,8 +34,10 @@ import { ButterflyRenderer } from './entities/ButterflyRenderer';
 import { FishRenderer } from './entities/FishRenderer';
 import { YarnRenderer } from './entities/YarnRenderer';
 import { MultiLineRenderer } from './entities/MultiLineRenderer';
+import { StaticLineRenderer } from './entities/StaticLineRenderer';
 import { BirdRenderer } from './entities/BirdRenderer';
 import { LadybugRenderer } from './entities/LadybugRenderer';
+import { StaminaManager } from './managers/StaminaManager';
 
 export class Game {
     constructor(canvas) {
@@ -81,8 +83,18 @@ export class Game {
         this.multilineRenderer = new MultiLineRenderer(
             TARGET_TYPES.find(t => t.id === 'yarn')?.renderConfig || {}
         );
+        // 创建静态线渲染器用于选择界面预览
+        this.staticLineRenderer = new StaticLineRenderer(
+            TARGET_TYPES.find(t => t.id === 'yarn')?.renderConfig || {}
+        );
         this.birdRenderer = new BirdRenderer();
         this.ladybugRenderer = new LadybugRenderer();
+
+        // 初始化体力管理器
+        this.staminaManager = new StaminaManager(this.settingsManager);
+        // 设置广告管理器（用于体力恢复广告）
+        this.staminaManager.adManager = this.adManager;
+        this.showStaminaDialog = false; // 体力不足弹窗状态
 
         // 全局访问（供 ImageTarget 使用）
         // window.MouseRenderer = this.mouseRenderer;
@@ -117,7 +129,7 @@ export class Game {
         this.resourceManager.preloadImages();
 
         // 初始化选择界面（需要在资源管理器之后，传入广告管理器和设置管理器）
-        this.selectionScreen = new SelectionScreen(canvas, ctx, this.resourceManager, this.adManager, this.settingsManager, this.emojiManager, this.butterflyRenderer, this.mouseRenderer, this.fishRenderer, this.yarnRenderer, this.multilineRenderer);
+        this.selectionScreen = new SelectionScreen(canvas, ctx, this.resourceManager, this.adManager, this.settingsManager, this.emojiManager, this.butterflyRenderer, this.mouseRenderer, this.fishRenderer, this.yarnRenderer, this.multilineRenderer, this.birdRenderer, this.ladybugRenderer, this.staticLineRenderer, this.staminaManager);
 
         // 防止点击穿透
         this.skipNextTouchEnd = false;
@@ -225,6 +237,9 @@ export class Game {
 
         // 更新草地动画（所有状态下都更新）
         this.bgRenderer.update(dt, currentTime);
+
+        // 更新体力恢复（所有状态下都更新）
+        this.staminaManager.update(dt);
 
         // 设置界面状态：跳过游戏逻辑更新
         if (state === GameState.SETTINGS) {
@@ -383,6 +398,144 @@ export class Game {
                 }
                 break;
         }
+
+        // 渲染体力不足弹窗（所有状态下都可能显示）
+        if (this.showStaminaDialog) {
+            this.renderStaminaDialog();
+        }
+    }
+
+    /**
+     * 渲染体力不足弹窗
+     */
+    renderStaminaDialog() {
+        const ctx = this.ctx;
+        const canvasWidth = this.logicalWidth;
+        const canvasHeight = this.logicalHeight;
+
+        // 半透明遮罩
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+        // 弹窗参数
+        const dialogWidth = Math.min(400, canvasWidth * 0.85);
+        const dialogHeight = 380;
+        const dialogX = (canvasWidth - dialogWidth) / 2;
+        const dialogY = (canvasHeight - dialogHeight) / 2;
+
+        // 弹窗背景
+        ctx.save();
+        ctx.fillStyle = '#FFFFFF';
+        this.roundRect(ctx, dialogX, dialogY, dialogWidth, dialogHeight, 16);
+        ctx.fill();
+
+        // 标题
+        ctx.fillStyle = '#333333';
+        ctx.font = 'bold 28px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        ctx.fillText('💔 体力不足', dialogX + dialogWidth / 2, dialogY + 30);
+
+        // 当前体力
+        const currentStamina = this.staminaManager.getCurrentStamina();
+        const maxStamina = this.staminaManager.getMaxStamina();
+        ctx.font = '20px Arial';
+        ctx.fillText(`当前体力: ${currentStamina}/${maxStamina}`, dialogX + dialogWidth / 2, dialogY + 80);
+
+        // 恢复倒计时
+        const nextRestoreTime = this.staminaManager.getNextRestoreTime();
+        if (nextRestoreTime > 0) {
+            const minutes = Math.floor(nextRestoreTime / 60000);
+            const seconds = Math.floor((nextRestoreTime % 60000) / 1000);
+            const timeStr = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            ctx.font = '18px Arial';
+            ctx.fillStyle = '#666666';
+            ctx.fillText(`⏰ ${timeStr} 后恢复1点体力`, dialogX + dialogWidth / 2, dialogY + 120);
+        }
+
+        // 按钮样式
+        const buttonWidth = dialogWidth - 60;
+        const buttonHeight = 60;
+        const buttonY1 = dialogY + 170;
+        const buttonY2 = dialogY + 260;
+
+        // 看广告按钮
+        const adCount = this.staminaManager.getRemainingDailyAdCount();
+        ctx.fillStyle = '#FF6B6B';
+        this.roundRect(ctx, dialogX + 30, buttonY1, buttonWidth, buttonHeight, 12);
+        ctx.fill();
+
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = 'bold 20px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('🎬 看广告恢复体力', dialogX + dialogWidth / 2, buttonY1 + 22);
+        ctx.font = '16px Arial';
+        ctx.fillText(`+1 体力 (今日剩余${adCount}次)`, dialogX + dialogWidth / 2, buttonY1 + 45);
+
+        // 分享按钮
+        ctx.fillStyle = '#4ECDC4';
+        this.roundRect(ctx, dialogX + 30, buttonY2, buttonWidth, buttonHeight, 12);
+        ctx.fill();
+
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = 'bold 20px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('📤 分享获取体力', dialogX + dialogWidth / 2, buttonY2 + 22);
+        ctx.font = '16px Arial';
+        ctx.fillText('+2 体力', dialogX + dialogWidth / 2, buttonY2 + 45);
+
+        // 提示文字
+        ctx.fillStyle = '#999999';
+        ctx.font = '16px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        ctx.fillText('或等待3分钟自动恢复', dialogX + dialogWidth / 2, dialogY + 340);
+
+        // 关闭按钮
+        const closeSize = 40;
+        const closeX = dialogX + dialogWidth - closeSize - 10;
+        const closeY = dialogY + 10;
+
+        ctx.fillStyle = '#CCCCCC';
+        this.roundRect(ctx, closeX, closeY, closeSize, closeSize, 8);
+        ctx.fill();
+
+        ctx.strokeStyle = '#999999';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(closeX + 12, closeY + 12);
+        ctx.lineTo(closeX + closeSize - 12, closeY + closeSize - 12);
+        ctx.moveTo(closeX + closeSize - 12, closeY + 12);
+        ctx.lineTo(closeX + 12, closeY + closeSize - 12);
+        ctx.stroke();
+
+        ctx.restore();
+
+        // 保存按钮区域用于点击检测
+        this.staminaDialogButtons = {
+            ad: { x: dialogX + 30, y: buttonY1, width: buttonWidth, height: buttonHeight },
+            share: { x: dialogX + 30, y: buttonY2, width: buttonWidth, height: buttonHeight },
+            close: { x: closeX, y: closeY, width: closeSize, height: closeSize }
+        };
+    }
+
+    /**
+     * 绘制圆角矩形
+     */
+    roundRect(ctx, x, y, width, height, radius) {
+        ctx.beginPath();
+        ctx.moveTo(x + radius, y);
+        ctx.lineTo(x + width - radius, y);
+        ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+        ctx.lineTo(x + width, y + height - radius);
+        ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+        ctx.lineTo(x + radius, y + height);
+        ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+        ctx.lineTo(x, y + radius);
+        ctx.quadraticCurveTo(x, y, x + radius, y);
+        ctx.closePath();
     }
 
     /**
@@ -508,6 +661,12 @@ export class Game {
     handleTouchEnd(pos) {
         const state = this.stateManager.getState();
 
+        // 体力弹窗按钮处理
+        if (this.showStaminaDialog) {
+            this.handleStaminaDialogClick(pos);
+            return;
+        }
+
         // 设置页面状态下，交给 settingsUI 处理
         if (state === GameState.SETTINGS) {
             if (this.settingsUI) {
@@ -581,9 +740,70 @@ export class Game {
                     const colors = target.config.renderConfig?.colors || ['#FF6B6B', '#4ECDC4', '#95E1D3', '#F38181', '#AA96DA'];
                     this.stateManager.setFireworkEffect(target.position.x, target.position.y, colors);
                 }
+                // 如果是萤火虫，触发爆炸粒子特效
+                else if (target.config.id === 'ladybug') {
+                    const colors = target.config.renderConfig?.explosionColors || ['#B6FF00', '#FFFF66', '#88DD00'];
+                    this.stateManager.setFireworkEffect(target.position.x, target.position.y, colors);
+                }    else if (target.config.id === 'sparkle') {
+                    const colors = target.config.renderConfig?.explosionColors || ['#FFF176', '#FFD54F', '#FFEE58','#FFF9C4'];
+                    this.stateManager.setFireworkEffect(target.position.x, target.position.y, colors);
+                } else if (target.config.id === 'fish') {
+                    const colors = target.config.renderConfig?.explosionColors || ['#FFFFFF', '#E6F7FF', '#B3ECFF','#80DFFF','rgba(200,240,255,0.3)'];
+                    this.stateManager.setFireworkEffect(target.position.x, target.position.y, colors);
+                
+                } else if (target.config.id === 'butterfly') {
+                    const colors = target.config.renderConfig?.explosionColors || ['#FFF176', '#FFD54F', '#FFD54F'];
+                    this.stateManager.setFireworkEffect(target.position.x, target.position.y, colors);
+                }
 
                 return;
             }
+        }
+    }
+
+    /**
+     * 处理体力弹窗按钮点击
+     * @param {Vector2} pos - 点击位置
+     */
+    async handleStaminaDialogClick(pos) {
+        if (!this.staminaDialogButtons) return;
+
+        const { ad, share, close } = this.staminaDialogButtons;
+
+        // 检查是否点击看广告按钮
+        if (pos.x >= ad.x && pos.x <= ad.x + ad.width &&
+            pos.y >= ad.y && pos.y <= ad.y + ad.height) {
+            // 调用广告恢复体力
+            const result = await this.staminaManager.restoreByAd();
+            if (result.success) {
+                // 关闭弹窗
+                this.showStaminaDialog = false;
+                this.staminaDialogButtons = null;
+            }
+            // TODO: 显示结果消息（result.message）
+            return;
+        }
+
+        // 检查是否点击分享按钮
+        if (pos.x >= share.x && pos.x <= share.x + share.width &&
+            pos.y >= share.y && pos.y <= share.y + share.height) {
+            // 调用分享恢复体力
+            const result = await this.staminaManager.restoreByShare();
+            if (result.success) {
+                // 关闭弹窗
+                this.showStaminaDialog = false;
+                this.staminaDialogButtons = null;
+            }
+            // TODO: 显示结果消息（result.message）
+            return;
+        }
+
+        // 检查是否点击关闭按钮
+        if (pos.x >= close.x && pos.x <= close.x + close.width &&
+            pos.y >= close.y && pos.y <= close.y + close.height) {
+            // 关闭弹窗
+            this.showStaminaDialog = false;
+            this.staminaDialogButtons = null;
         }
     }
 
@@ -593,6 +813,15 @@ export class Game {
      * @param {boolean} skipAdCheck - 是否跳过广告检查（广告后调用时为true）
      */
     async startGame(targetConfig, skipAdCheck = false) {
+        // 检查体力是否足够
+        if (!this.staminaManager.hasEnoughStamina()) {
+            this.showStaminaDialog = true;
+            return;  // 体力不足，不开始游戏
+        }
+
+        // 消耗体力
+        this.staminaManager.consumeStamina();
+
         // 增加游戏次数统计（用于广告概率计算）
         this.settingsManager.incrementPlayCount();
         this.adManager.incrementConsecutivePlays();
@@ -624,6 +853,21 @@ export class Game {
             bgmName = 'mouse';
         } else if (targetConfig.id === 'butterfly') {
             bgmName = 'butterfly';
+        }else if (targetConfig.id === 'sparkle') {
+            bgmName = 'sparkle';
+        
+        }else if (targetConfig.id === 'fish') {
+            bgmName = 'fish';
+        
+        }else if (targetConfig.id === 'bird') {
+            bgmName = 'bird';
+        
+        }else if (targetConfig.id === 'yarn') {
+            bgmName = 'yarn';
+        }else if (targetConfig.id === 'ladybug') {
+            bgmName = 'ladybug';
+        }else if (targetConfig.id === 'laser') {
+            bgmName = 'laser';
         }
         this.audioManager.playBGM(bgmName, { volume: AUDIO_CONFIG.BGM_VOLUME.game }); 
 
@@ -641,6 +885,15 @@ export class Game {
      * 开始无尽模式
      */
     async startEndlessMode(targetConfig) {
+        // 检查体力是否足够
+        if (!this.staminaManager.hasEnoughStamina()) {
+            this.showStaminaDialog = true;
+            return;  // 体力不足，不开始游戏
+        }
+
+        // 消耗体力
+        this.staminaManager.consumeStamina();
+
         // 增加游戏次数统计
         this.settingsManager.incrementPlayCount();
         this.adManager.incrementConsecutivePlays();
@@ -675,6 +928,22 @@ export class Game {
             bgmName = 'mouse';
         } else if (targetConfig.id === 'butterfly') {
             bgmName = 'butterfly';
+        }else if (targetConfig.id === 'sparkle') {
+            bgmName = 'sparkle';
+        
+        }else if (targetConfig.id === 'fish') {
+            bgmName = 'fish';
+        
+        }else if (targetConfig.id === 'bird') {
+            bgmName = 'bird';
+        
+        }else if (targetConfig.id === 'yarn') {
+            bgmName = 'yarn';
+        }else if (targetConfig.id === 'ladybug') {
+            bgmName = 'ladybug';
+        
+        }else if (targetConfig.id === 'laser') {
+            bgmName = 'laser';
         }
         this.audioManager.playBGM(bgmName, { volume: AUDIO_CONFIG.BGM_VOLUME.endless }); 
 

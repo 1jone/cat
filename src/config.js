@@ -369,44 +369,49 @@ export const TARGET_TYPES = [
     // ========== 新增广告目标 (48h) ==========
     {
         id: 'ladybug',
-        name: '瓢虫',
+        name: '萤火虫',
         renderType: 'canvas',            // Canvas渲染
         renderer: 'ladybug',             // 指定渲染器类型
-        // image: '/target/ladybug_re.png',  // 改用Canvas绘制
         speed: 60,
-        radius: 22,  // 小体积，难点击
+        radius: 22,
         points: 20,
         movement: 'random',
-        renderConfig: {                 // Canvas渲染配置
-            // 身体颜色（4层渐变，模拟半球形立体感）
-            bodyColorLight: '#FF3333',   // 高光区（亮红）
-            bodyColorMain: '#FF0000',    // 主体区（鲜红）
-            bodyColorMid: '#CC0000',     // 过渡区（深红）
-            bodyColorDark: '#990000',    // 边缘区（暗红）
+        renderConfig: {                 // 萤火虫渲染配置
+            // 发光颜色
+            glowColor: '#B6FF00',        // 黄绿色光晕
+            coreColor: '#FFFF66',        // 淡黄色核心
+            bodyColor: '#222222',        // 深色身体
 
-            // 头部颜色
-            headColorLight: '#1a1a1a',   // 头部渐变亮部
-            headColorMain: '#000000',    // 头部渐变暗部
+            // 发光参数
+            glow: {
+                innerRadius: 1.2,        // 内发光半径
+                outerRadius: 2.0,        // 外发光半径
+                opacity: 0.8             // 发光透明度
+            },
 
-            // 斑点配置
-            spotColor: '#000000',        // 斑点颜色
-            spotEdgeSoftness: 0.85,      // 边缘柔和度
+            // 闪烁参数
+            flicker: {
+                baseIntensity: 0.6,      // 基础亮度
+                sineAmplitude: 0.3,      // 正弦波幅度
+                sineFrequency: 6,        // 正弦波频率
+                randomAmount: 0.2,       // 随机扰动
+                startleMultiplier: 2.5   // 受惊倍率
+            },
 
-            // 其他颜色（保持兼容）
-            wingColor: 'rgba(255, 255, 255, 0.6)',  // 半透明白色翅膀
-            antennaColor: '#000000',     // 触角颜色
+            // 身体尺寸
+            bodyWidth: 0.3,              // 身体宽度
+            bodyLength: 0.5,             // 身体长度
+            headRadius: 0.15,            // 头部半径
 
-            // 尺寸比例
-            headRadius: 0.4,
-            bodyLength: 0.85,
-            bodyWidth: 0.75,
-            wingLength: 0.7,
-            wingWidth: 0.65,
-
-            // 动画参数
-            legMoveSpeed: 8,
-            wingFlapSpeed: 25,
-            wingOpenDuration: 0.15
+            // 爆炸粒子颜色
+            explosionColors: [
+                '#B6FF00',               // 黄绿色（主发光色）
+                '#FFFF66',               // 淡黄色（核心色）
+                '#88DD00',               // 深绿色
+                '#CCFF00',               // 黄绿色
+                '#99EE44',               // 浅绿色
+                '#DDFF55'                // 淡黄绿色
+            ]
         },
         background: {
             image: null,
@@ -571,6 +576,21 @@ export const CONFIG = {
         GRASS: '#90EE90',
         TEXT: '#333333',
         SCORE: '#FFD700'
+    }
+};
+export const STAMINA_CONFIG = {
+    MAX_STAMINA: 10,              // 体力上限
+    RECOVERY_INTERVAL: 180,       // 恢复间隔（秒）= 3分钟
+    AD_REWARD: 1,                 // 广告奖励体力
+    SHARE_REWARD: 2,              // 分享奖励体力
+    DAILY_AD_LIMIT: 5,            // 每日广告次数限制
+
+    // 分享内容配置
+    SHARE: {
+        title: '我正在玩猫咪追追追，快来一起玩吧！',  // 分享标题
+        imageUrl: 'target/play.png',                                       // 分享图片URL（可选，空字符串使用默认）
+        path: 'src/screens/SelectionScreen.js',                         // 分享路径（点击分享卡片进入的页面）
+        query: "type=stamina"                                 // 分享参数（可选）
     }
 };
 export const ENDLESS_CONFIG = {
