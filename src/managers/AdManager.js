@@ -18,6 +18,13 @@ export class AdManager {
         // 预加载广告实例
         this.rewardedAd = null;
         this.interstitialAd = null;
+
+        // 新增：Banner广告和游戏推荐面板
+        this.bannerAd = null;
+        this.gridGamePanel = null;
+        this.isBannerVisible = false;
+        this.isGridPanelVisible = false;
+
         this.initAds();
     }
 
@@ -459,5 +466,194 @@ export class AdManager {
                     });
             });
         });
+    }
+
+    /**
+     * 初始化Banner广告
+     */
+    initBannerAd() {
+        if (typeof tt === 'undefined') {
+            console.log('[AdManager] 非抖音环境，Banner广告功能禁用');
+            return;
+        }
+
+        if (!tt.createBannerAd) {
+            console.log('[AdManager] Banner广告API不可用');
+            return;
+        }
+
+        try {
+            // 获取系统信息动态计算Banner位置
+            const systemInfo = tt.getSystemInfoSync();
+            const screenWidth = systemInfo.windowWidth || systemInfo.screenWidth;
+            const screenHeight = systemInfo.windowHeight || systemInfo.screenHeight;
+            const bannerHeight = 150; // Banner标准高度
+
+            // 动态计算Banner样式（固定在屏幕底部）
+            const bannerStyle = {
+                left: 0,
+                top: screenHeight - bannerHeight,  // 屏幕底部
+                width: screenWidth,                 // 全屏宽度
+                height: bannerHeight
+            };
+
+            console.log('[AdManager] Banner样式配置:', bannerStyle);
+
+            this.bannerAd = tt.createBannerAd({
+                adUnitId: AD_CONFIG.adUnitIds.banner,
+                style: bannerStyle
+            });
+
+            // 监听广告事件
+            this.bannerAd.onLoad(() => {
+                console.log('[AdManager] ✅ Banner广告加载成功');
+            });
+
+            this.bannerAd.onError((err) => {
+                console.error('[AdManager] ❌ Banner广告错误:', err);
+            });
+
+            console.log('[AdManager] Banner广告初始化成功');
+        } catch (err) {
+            console.error('[AdManager] Banner广告初始化失败:', err);
+        }
+    }
+
+    /**
+     * 显示Banner广告
+     */
+    showBannerAd() {
+        console.log('[AdManager] 🎯 请求显示Banner广告');
+
+        if (typeof tt === 'undefined' || !this.bannerAd) {
+            console.log('[AdManager] Banner广告不可用，跳过显示');
+            return;
+        }
+
+        this.bannerAd.show().then(() => {
+            this.isBannerVisible = true;
+            console.log('[AdManager] ✅ Banner广告显示成功');
+        }).catch((err) => {
+            console.error('[AdManager] ❌ Banner广告显示失败:', err);
+        });
+    }
+
+    /**
+     * 隐藏Banner广告
+     */
+    hideBannerAd() {
+        console.log('[AdManager] 🎯 请求隐藏Banner广告');
+
+        if (!this.bannerAd || !this.isBannerVisible) {
+            return;
+        }
+
+        this.bannerAd.hide().then(() => {
+            this.isBannerVisible = false;
+            console.log('[AdManager] ✅ Banner广告隐藏成功');
+        }).catch((err) => {
+            console.error('[AdManager] ❌ Banner广告隐藏失败:', err);
+        });
+    }
+
+    /**
+     * 创建游戏推荐面板
+     */
+    createGameRecommendation() {
+        console.log('[AdManager] 🎯 请求创建游戏推荐面板');
+
+        if (typeof tt === 'undefined') {
+            console.log('[AdManager] 非抖音环境，游戏推荐面板功能禁用');
+            return;
+        }
+
+        if (!tt.createGridGamePanel) {
+            console.log('[AdManager] 游戏推荐面板API不可用');
+            return;
+        }
+
+        try {
+            // 获取当前游戏appId
+            const accountInfo = tt.getAccountManagerSync ? tt.getAccountManagerSync() : null;
+            const currentAppId = accountInfo?.appId || '';
+
+            // 传入游戏ID列表（至少需要一个游戏ID）
+            this.gridGamePanel = tt.createGridGamePanel({
+                gameIdList: [currentAppId], // 至少需要一个游戏ID
+                gridCount: "four"
+            });
+
+            this.gridGamePanel.onShow(() => {
+                this.isGridPanelVisible = true;
+                console.log('[AdManager] ✅ 游戏推荐面板显示成功');
+            });
+
+            this.gridGamePanel.onHide(() => {
+                this.isGridPanelVisible = false;
+                console.log('[AdManager] ✅ 游戏推荐面板隐藏');
+            });
+
+            console.log('[AdManager] 游戏推荐面板创建成功');
+        } catch (err) {
+            console.error('[AdManager] 游戏推荐面板创建失败:', err);
+        }
+    }
+
+    /**
+     * 显示游戏推荐面板
+     */
+    showGameRecommendation() {
+        console.log('[AdManager] 🎯 请求显示游戏推荐面板');
+
+        if (!this.gridGamePanel) {
+            this.createGameRecommendation();
+        }
+
+        if (this.gridGamePanel) {
+            this.gridGamePanel.show();
+        }
+    }
+
+    /**
+     * 隐藏游戏推荐面板
+     */
+    hideGameRecommendation() {
+        console.log('[AdManager] 🎯 请求隐藏游戏推荐面板');
+
+        // 强制隐藏面板，不依赖状态标记
+        if (this.gridGamePanel) {
+            try {
+                this.gridGamePanel.hide();
+                console.log('[AdManager] ✅ 已调用 hide() 方法');
+            } catch (err) {
+                console.error('[AdManager] ❌ 面板隐藏失败:', err);
+                this.isGridPanelVisible = false;  // 确保状态更新
+            }
+        } else {
+            console.log('[AdManager] ⚠️  游戏推荐面板不存在');
+        }
+
+        // 无论调用是否成功，都标记为已隐藏
+        this.isGridPanelVisible = false;
+    }
+
+    /**
+     * 销毁广告资源（游戏退出时调用）
+     */
+    destroyAds() {
+        console.log('[AdManager] 🎯 销毁广告资源');
+
+        if (this.bannerAd) {
+            this.bannerAd.destroy();
+            this.bannerAd = null;
+        }
+
+        if (this.gridGamePanel) {
+            this.gridGamePanel.destroy();
+            this.gridGamePanel = null;
+        }
+
+        this.isBannerVisible = false;
+        this.isGridPanelVisible = false;
     }
 }

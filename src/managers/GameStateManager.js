@@ -29,6 +29,9 @@ export class GameStateManager {
         this.timeLeft = CONFIG.GAME_DURATION;
         this.gameTimer = 0;
 
+        // 命中目标计数
+        this.hitCount = 0;
+
         // 无尽模式相关
         this.isEndlessMode = false;
         this.currentMultipliers = {
@@ -119,6 +122,7 @@ export class GameStateManager {
     startGame(target, isEndless = false) {
         this.state = GameState.PLAYING;
         this.score = 0;
+        this.hitCount = 0;  // 重置命中计数
         this.gameTimer = 0;
         this.isEndlessMode = isEndless;
         this.timeLeft = isEndless ? Infinity : CONFIG.GAME_DURATION;
@@ -158,7 +162,46 @@ export class GameStateManager {
         this.score = 0;
         this.isEndlessMode = false;
         this.unlockedTargetIndices = [];
+        this.selectedTarget = null;  // 确保清空选中的目标
+        this.currentTargetId = null;
+        this.catchEffect = null;
+        this.fireworkEffect = null;
+        this.lastCountdownSecond = -1;
+    }
+
+    /**
+     * 完全重置游戏状态
+     * 用于游戏重新开始或返回首页时彻底清理状态
+     */
+    reset() {
+        // 重置状态到 START（不在任何游戏中）
+        this.state = GameState.START;
+
+        // 重置分数和计时
+        this.score = 0;
+        this.hitCount = 0;
+        this.timeLeft = CONFIG.GAME_DURATION;
+        this.gameTimer = 0;
+
+        // 重置无尽模式
+        this.isEndlessMode = false;
+        this.currentMultipliers = {
+            speed: 1,
+            radius: 1,
+            points: 1
+        };
+        this.attributeChangeTimer = 0;
+
+        // 清除选中的目标
         this.selectedTarget = null;
+        this.currentTargetId = null;
+
+        // 清除特效
+        this.catchEffect = null;
+        this.fireworkEffect = null;
+
+        // 重置倒计时音效状态
+        this.lastCountdownSecond = -1;
     }
 
     /**
@@ -167,6 +210,15 @@ export class GameStateManager {
      */
     addScore(points) {
         this.score += points;
+        this.hitCount++;  // 每次得分时增加命中计数
+    }
+
+    /**
+     * 获取命中目标数
+     * @returns {number} 命中目标数
+     */
+    getHitCount() {
+        return this.hitCount;
     }
 
     /**

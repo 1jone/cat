@@ -501,7 +501,7 @@ export const TARGET_TYPES = [
     },
 ];
 export const CONFIG = {
-    GAME_DURATION: 60,
+    GAME_DURATION: 5,
     // 运动轨迹参数配置
     MOVEMENT_PARAMS: {
         // 圆周运动
@@ -767,7 +767,13 @@ export const AD_CONFIG = {
     // 广告位ID（需要替换为实际ID）
     adUnitIds: {
         rewarded: 'YOUR_REWARDED_AD_UNIT_ID',
-        interstitial: 'YOUR_INTERSTITIAL_AD_UNIT_ID'
+        interstitial: 'YOUR_INTERSTITIAL_AD_UNIT_ID',
+        banner: 'YOUR_BANNER_AD_UNIT_ID'  // Banner广告ID
+    },
+
+    // 游戏推荐面板配置
+    gridGamePanel: {
+        enabled: true
     }
 };
 

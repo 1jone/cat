@@ -22,7 +22,7 @@ export class SidebarManager {
         // 绑定 onShow 事件监听
         this.setupEventListeners();
     }
-
+ 
     /**
      * 设置事件监听
      */

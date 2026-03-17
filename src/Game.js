@@ -116,6 +116,10 @@ export class Game {
         // 初始化广告管理器
         this.adManager = new AdManager(this.settingsManager);
 
+        // 初始化Banner广告和游戏推荐面板
+        this.adManager.initBannerAd();
+        this.adManager.createGameRecommendation();
+
         // 初始化设置界面
         this.settingsUI = new SettingsUI(canvas, ctx, this.settingsManager, this.audioManager, this.emojiManager);
 
@@ -309,14 +313,26 @@ export class Game {
         const currentTime = performance.now();
         const state = this.stateManager.getState();
 
-        // 渲染背景
-        const currentConfig = this.stateManager.selectedTarget;
-        const hasBackgroundImage = currentConfig && currentConfig.background && currentConfig.background.image;
-        const backgroundImage = hasBackgroundImage
-            ? this.resourceManager.getBackground(currentConfig.id)
-            : null;
-        const showGrass = currentConfig && currentConfig.background && currentConfig.background.showGrass !== false;
-        const targetId = currentConfig ? currentConfig.id : null;  // 获取目标ID
+        // === 背景渲染逻辑改进 ===
+        let backgroundImage = null;
+        let showGrass = true;
+        let targetId = null;
+
+        if (state === GameState.SELECT || state === GameState.START) {
+            // SELECT/START 状态: 始终使用选择界面背景（纯色 + 草地）
+            backgroundImage = null;
+            showGrass = true;
+            targetId = null;
+        } else {
+            // PLAYING/OVER/SETTINGS 状态: 使用游戏背景
+            const currentConfig = this.stateManager.selectedTarget;
+            const hasBackgroundImage = currentConfig && currentConfig.background && currentConfig.background.image;
+            backgroundImage = hasBackgroundImage
+                ? this.resourceManager.getBackground(currentConfig.id)
+                : null;
+            showGrass = currentConfig && currentConfig.background && currentConfig.background.showGrass !== false;
+            targetId = currentConfig ? currentConfig.id : null;
+        }
 
         this.bgRenderer.render(backgroundImage, showGrass, targetId, currentTime / 1000);  // 传递目标ID和时间（秒）
 
@@ -370,7 +386,8 @@ export class Game {
                     isEndlessMode: this._lastGameResult && this._lastGameResult.wasEndlessMode || false,
                     gameTimer: this.stateManager.gameTimer,
                     highScore: this._lastGameResult && this._lastGameResult.highScore || 0,
-                    isNewRecord: this._lastGameResult && this._lastGameResult.isNewRecord || false
+                    isNewRecord: this._lastGameResult && this._lastGameResult.isNewRecord || false,
+                    hitCount: this._lastGameResult && this._lastGameResult.hitCount || 0  // 新增：命中目标数
                 });
                 break;
 
@@ -550,11 +567,13 @@ export class Game {
         if (state === GameState.START) {
             this.stateManager.setState(GameState.SELECT);
             this.selectionScreen.reset();
+            this.adManager.showBannerAd();  // 显示Banner广告
         } else if (state === GameState.PLAYING) {
             this.tryToCatch(pos);
         } else if (state === GameState.OVER) {
             this.stateManager.setState(GameState.SELECT);
             this.selectionScreen.reset();
+            this.adManager.showBannerAd();  // 显示Banner广告
         }
     }
 
@@ -625,8 +644,24 @@ export class Game {
         }
 
         if (state === GameState.OVER) {
+            // 检测按钮点击
+            const buttonAction = this.gameOverScreen.handleButtonClick(pos.x, pos.y);
+
+            if (buttonAction === 'restart') {
+                // 再玩一次：使用当前配置重新开始
+                this.restartGame();
+                return;
+            } else if (buttonAction === 'home') {
+                // 返回首页：清理广告并返回选择界面
+                this.returnToHome();
+                return;
+            }
+
+            // 点击其他区域: 完整清理后返回选择界面
+            this.cleanupGameSession();  // 新增: 完整清理
             this.stateManager.setState(GameState.SELECT);
             this.selectionScreen.reset();
+            this.adManager.showBannerAd();  // 显示Banner广告
             this.skipNextTouchEnd = true;
             this.stateChangeTime = Date.now();
             this.audioManager.playBGM('menu', { volume: AUDIO_CONFIG.BGM_VOLUME.select });
@@ -813,6 +848,9 @@ export class Game {
      * @param {boolean} skipAdCheck - 是否跳过广告检查（广告后调用时为true）
      */
     async startGame(targetConfig, skipAdCheck = false) {
+        // 隐藏Banner广告（游戏开始时）
+        this.adManager.hideBannerAd();
+
         // 检查体力是否足够
         if (!this.staminaManager.hasEnoughStamina()) {
             this.showStaminaDialog = true;
@@ -885,6 +923,9 @@ export class Game {
      * 开始无尽模式
      */
     async startEndlessMode(targetConfig) {
+        // 隐藏Banner广告（游戏开始时）
+        this.adManager.hideBannerAd();
+
         // 检查体力是否足够
         if (!this.staminaManager.hasEnoughStamina()) {
             this.showStaminaDialog = true;
@@ -971,6 +1012,7 @@ export class Game {
         const finalScore = this.stateManager.score;
         const gameTimer = this.stateManager.gameTimer;
         const targetId = this.stateManager.getCurrentTargetId();
+        const hitCount = this.stateManager.getHitCount();  // 新增：获取命中目标数
 
         this.stateManager.endGame();
 
@@ -996,6 +1038,7 @@ export class Game {
             isNewRecord,
             wasEndlessMode,
             targetId,
+            hitCount,  // 新增：命中目标数
             highScore: wasEndlessMode
                 ? this.settingsManager.getEndlessStats().highScore
                 : this.settingsManager.getTargetHighScore(targetId)
@@ -1011,9 +1054,121 @@ export class Game {
             }
         }
 
-        // 重置无尽模式标志
-        this.stateManager.isEndlessMode = false;
-        this.stateManager.unlockedTargetIndices = [];
+        // 显示游戏推荐面板
+        this.adManager.showGameRecommendation();
+
+        // 注意：不在这里重置无尽模式标志，因为 restartGame() 需要使用
+        // isEndlessMode 应该只在真正需要重置时才重置（如返回首页）
+    }
+
+    /**
+     * 清理游戏会话状态
+     * 用于从 PLAYING/OVER 状态返回到 SELECT 状态时的完整清理
+     */
+    cleanupGameSession() {
+        console.log('[Game] 清理游戏会话');
+
+        // 1. 清理游戏目标
+        this.targets = [];
+
+        // 2. 重置生成管理器
+        this.spawnManager.reset();
+
+        // 3. 隐藏游戏推荐面板
+        this.adManager.hideGameRecommendation();
+
+        // 4. 清理特效状态
+        this.stateManager.catchEffect = null;
+        this.stateManager.fireworkEffect = null;
+        this.stateManager.unlockNotification = null;
+
+        console.log('[Game] 游戏会话清理完成');
+    }
+
+    /**
+     * 再玩一次
+     */
+    restartGame() {
+        console.log('[Game] 再玩一次');
+
+        // 检查体力是否足够
+        if (!this.staminaManager.hasEnoughStamina()) {
+            this.showStaminaDialog = true;
+            return;  // 体力不足，不重新开始
+        }
+
+        // 消耗体力
+        this.staminaManager.consumeStamina();
+
+        // 1. 隐藏结算页面的广告
+        this.adManager.hideGameRecommendation();
+        this.adManager.hideBannerAd();
+
+        // 2. 保存当前配置
+        const wasEndlessMode = this.stateManager.isEndlessMode;
+        const currentTarget = this.stateManager.selectedTarget;
+
+        // 3. 清理旧会话
+        this.targets = [];
+        this.spawnManager.reset();
+        this.stateManager.catchEffect = null;
+        this.stateManager.fireworkEffect = null;
+
+        // 4. 重置并重新开始
+        this.stateManager.reset();
+        if (wasEndlessMode) {
+            this.stateManager.startEndlessMode(currentTarget);
+        } else {
+            this.stateManager.startGame(currentTarget);
+        }
+
+        // 5. 设置状态
+        this.stateManager.setState(GameState.PLAYING);
+        this.stateChangeTime = Date.now();
+
+        // 6. 音效和音乐
+        this.audioManager.playButtonClick();
+        this.audioManager.playBGM(wasEndlessMode ? 'endless' : 'game');
+
+        // 7. 屏幕常亮
+        if (tt && tt.setKeepScreenOn) {
+            tt.setKeepScreenOn({ keepScreenOn: true });
+        }
+
+        // 8. 生成初始目标
+        this.targets = this.spawnManager.spawnInitialTargets({
+            canvasWidth: this.logicalWidth,
+            canvasHeight: this.logicalHeight,
+            selectedTarget: currentTarget,
+            isEndlessMode: wasEndlessMode,
+            multipliers: wasEndlessMode ? this.stateManager.currentMultipliers : { speed: 1, radius: 1, points: 1 }
+        });
+    }
+
+    /**
+     * 返回首页
+     */
+    returnToHome() {
+        console.log('[Game] 返回首页');
+
+        // 1. 完整清理游戏会话
+        this.cleanupGameSession();
+
+        // 2. 显示Banner广告
+        this.adManager.showBannerAd();
+
+        // 3. 重置游戏状态
+        this.stateManager.reset();
+
+        // 4. 切换到选择界面
+        this.stateManager.setState(GameState.SELECT);
+        this.selectionScreen.reset();
+        this.skipNextTouchEnd = true;
+        this.stateChangeTime = Date.now();
+
+        // 5. 音效和音乐
+        this.audioManager.playButtonClick();
+        this.audioManager.playBGM('menu', { volume: AUDIO_CONFIG.BGM_VOLUME.select });
     }
 
     /**
@@ -1052,18 +1207,25 @@ export class Game {
     /**
      * 退出游戏回到选择界面
      */
-    exitToSelect() {
-        // 如果正在游戏中，先保存当前分数
+    async exitToSelect() {
+        console.log('[Game] 退出到结算页面');
+
+        // 如果正在游戏中，先触发游戏结束流程
         if (this.stateManager.previousState === GameState.PLAYING) {
+            // 保存当前分数（endGame 之前保存）
             this.saveCurrentGameScore();
+
+            // 调用 endGame() 进入结算页面
+            await this.endGame();
+        } else {
+            // 如果不在游戏中，直接返回选择界面
+            this.stateManager.resetToSelect();
+            this.targets = [];
+            this.selectionScreen.reset();
+
+            // 切换回菜单 BGM
+            this.audioManager.playBGM('menu', { volume: AUDIO_CONFIG.BGM_VOLUME.select });
         }
-
-        this.stateManager.resetToSelect();
-        this.targets = [];
-        this.selectionScreen.reset();
-
-        // 切换回菜单 BGM
-        this.audioManager.playBGM('menu', { volume: AUDIO_CONFIG.BGM_VOLUME.select });
     }
 
     /**
