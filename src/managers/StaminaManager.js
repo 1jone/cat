@@ -28,18 +28,37 @@ export class StaminaManager {
         // 直接访问 settings 属性
         const settings = this.settingsManager.settings;
 
+        // 始终使用配置文件中的最大体力值
+        const configuredMax = STAMINA_CONFIG.MAX_STAMINA;
+
         // 如果没有体力数据，初始化默认值
         if (!settings.stamina) {
             return {
-                current: STAMINA_CONFIG.MAX_STAMINA,
-                max: STAMINA_CONFIG.MAX_STAMINA,
+                current: configuredMax,
+                max: configuredMax,
                 lastRestoreTime: Date.now(),
                 dailyAdCount: 0,
                 lastAdDate: this.getTodayDate()
             };
         }
 
-        return settings.stamina;
+        // 如果已有体力数据，确保使用最新的配置值作为最大体力上限
+        const savedData = settings.stamina;
+
+        // 如果保存的最大体力与配置不符，更新最大体力值
+        // 并确保当前体力不超过新的最大值
+        if (savedData.max !== configuredMax) {
+            savedData.max = configuredMax;
+            // 如果当前体力超过新的最大值，限制在最大值
+            if (savedData.current > configuredMax) {
+                savedData.current = configuredMax;
+            }
+            // 保存更新后的数据
+            this.settingsManager.set('stamina', savedData);
+            this.settingsManager.save();
+        }
+
+        return savedData;
     }
 
     /**
@@ -197,11 +216,21 @@ export class StaminaManager {
      * @returns {Promise<Object>} 恢复结果 {success: boolean, message: string}
      */
     async restoreByAd() {
+        console.log('[StaminaManager] restoreByAd 被调用');
+
         // 检查并重置每日次数
         this.checkAndResetDailyCount();
+        console.log('[StaminaManager] 当前状态:', {
+            dailyAdCount: this.data.dailyAdCount,
+            limit: STAMINA_CONFIG.DAILY_AD_LIMIT,
+            currentStamina: this.data.current,
+            maxStamina: this.data.max,
+            hasAdManager: !!this.adManager
+        });
 
         // 检查次数限制
         if (this.data.dailyAdCount >= STAMINA_CONFIG.DAILY_AD_LIMIT) {
+            console.warn('[StaminaManager] 今日广告次数已用完');
             return {
                 success: false,
                 message: '今日广告次数已用完，请明天再试'
@@ -210,6 +239,7 @@ export class StaminaManager {
 
         // 检查体力是否已满
         if (this.data.current >= this.data.max) {
+            console.warn('[StaminaManager] 体力已满');
             return {
                 success: false,
                 message: '体力已满'
@@ -218,14 +248,17 @@ export class StaminaManager {
 
         // 调用广告（需要 AdManager）
         if (!this.adManager) {
+            console.error('[StaminaManager] adManager 未初始化!');
             return {
                 success: false,
                 message: '广告系统未初始化'
             };
         }
 
+        console.log('[StaminaManager] 开始调用 adManager.showStaminaAd()...');
         try {
             const result = await this.adManager.showStaminaAd();
+            console.log('[StaminaManager] showStaminaAd 返回:', result);
 
             if (result.success) {
                 // 增加体力
@@ -234,18 +267,21 @@ export class StaminaManager {
                 this.data.dailyAdCount++;
                 this.save();
 
+                console.log('[StaminaManager] 广告恢复成功，获得体力:', actualAdded);
                 return {
                     success: true,
                     message: `获得${actualAdded}点体力`,
                     amount: actualAdded
                 };
             } else {
+                console.warn('[StaminaManager] showStaminaAd 返回失败:', result.message);
                 return {
                     success: false,
                     message: result.message || '广告播放失败'
                 };
             }
         } catch (error) {
+            console.error('[StaminaManager] restoreByAd 异常:', error);
             return {
                 success: false,
                 message: '广告播放出错: ' + error.message

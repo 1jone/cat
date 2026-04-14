@@ -25,6 +25,10 @@ export class AdManager {
         this.isBannerVisible = false;
         this.isGridPanelVisible = false;
 
+        // 新增：插屏广告频控追踪
+        this.gameStartTime = Date.now();  // 游戏启动时间
+        this.lastInterstitialAdTime = 0;  // 上次插屏广告展示时间
+
         this.initAds();
     }
 
@@ -39,22 +43,32 @@ export class AdManager {
 
         // 初始化激励视频广告
         if (tt.createRewardedVideoAd) {
+            const rewardedAdUnitId = AD_CONFIG.adUnitIds.rewarded;
+            console.log('[AdManager] 初始化激励视频广告');
+            console.log('[AdManager] 广告ID:', rewardedAdUnitId);
+            console.log('[AdManager] 是否为占位符:', rewardedAdUnitId.includes('YOUR_'));
+
             try {
                 this.rewardedAd = tt.createRewardedVideoAd({
-                    adUnitId: AD_CONFIG.adUnitIds.rewarded
+                    adUnitId: rewardedAdUnitId
                 });
                 this.rewardedAd.load();
                 console.log('[AdManager] 激励视频广告初始化成功');
             } catch (err) {
                 console.error('[AdManager] 激励视频广告初始化失败:', err);
+                console.error('[AdManager] 请检查广告ID是否正确配置');
             }
         }
 
         // 初始化插屏广告
         if (tt.createInterstitialAd) {
+            const interstitialAdUnitId = AD_CONFIG.adUnitIds.interstitial;
+            console.log('[AdManager] 初始化插屏广告');
+            console.log('[AdManager] 广告ID:', interstitialAdUnitId);
+
             try {
                 this.interstitialAd = tt.createInterstitialAd({
-                    adUnitId: AD_CONFIG.adUnitIds.interstitial
+                    adUnitId: interstitialAdUnitId
                 });
                 this.interstitialAd.load();
                 console.log('[AdManager] 插屏广告初始化成功');
@@ -170,25 +184,41 @@ export class AdManager {
      * @returns {boolean} 是否应该触发广告
      */
     shouldTriggerSelectionAd(targetConfig) {
-        if (!AD_CONFIG.globalEnabled) return false;
-        if (!targetConfig.adTrigger || !targetConfig.adTrigger.enabled) return false;
+        if (!AD_CONFIG.globalEnabled) {
+            console.log(`[AdManager] ❌ 选择广告: ${targetConfig.id} - 全局广告开关未开启`);
+            return false;
+        }
+        if (!targetConfig.adTrigger || !targetConfig.adTrigger.enabled) {
+            console.log(`[AdManager] ❌ 选择广告: ${targetConfig.id} - 该目标未启用广告触发`);
+            return false;
+        }
 
         // 检查会话限制
-        if (this.sessionAdCount >= AD_CONFIG.maxAdsPerSession) return false;
+        if (this.sessionAdCount >= AD_CONFIG.maxAdsPerSession) {
+            console.log(`[AdManager] ❌ 选择广告: ${targetConfig.id} - 已达到会话上限 (${this.sessionAdCount}/${AD_CONFIG.maxAdsPerSession})`);
+            return false;
+        }
 
         const targetCount = this.targetSessionAdCount[targetConfig.id] || 0;
-        if (targetCount >= targetConfig.adTrigger.maxPerSession) return false;
+        if (targetCount >= targetConfig.adTrigger.maxPerSession) {
+            console.log(`[AdManager] ❌ 选择广告: ${targetConfig.id} - 该目标已达会话上限 (${targetCount}/${targetConfig.adTrigger.maxPerSession})`);
+            return false;
+        }
 
         // 检查冷却
         const timeSinceLastAd = (Date.now() - this.lastAdTime) / 1000;
-        if (timeSinceLastAd < AD_CONFIG.minIntervalSeconds) return false;
-        if (timeSinceLastAd < targetConfig.adTrigger.cooldown) return false;
+        if (timeSinceLastAd < AD_CONFIG.minIntervalSeconds) {
+            console.log(`[AdManager] ❌ 选择广告: ${targetConfig.id} - 全局冷却中 (${timeSinceLastAd.toFixed(1)}s < ${AD_CONFIG.minIntervalSeconds}s)`);
+            return false;
+        }
+        if (timeSinceLastAd < targetConfig.adTrigger.cooldown) {
+            console.log(`[AdManager] ❌ 选择广告: ${targetConfig.id} - 该目标冷却中 (${timeSinceLastAd.toFixed(1)}s < ${targetConfig.adTrigger.cooldown}s)`);
+            return false;
+        }
 
-        // 计算最终概率
-        const finalProbability = this.calculateFinalProbability(targetConfig);
-
-        const shouldTrigger = Math.random() < finalProbability;
-        console.log(`[AdManager] 选择广告检查: ${targetConfig.id}, 概率=${finalProbability.toFixed(2)}, 触发=${shouldTrigger}`);
+        // 强制100%触发（测试模式）
+        const shouldTrigger = true;
+        console.log(`[AdManager] ✅ 选择广告: ${targetConfig.id} - 概率=100%(测试模式), 触发广告!`);
         return shouldTrigger;
     }
 
@@ -309,12 +339,30 @@ export class AdManager {
      * @returns {Promise<boolean>} 是否显示成功
      */
     async showInterstitialAd(placement) {
-        console.log(`[AdManager] 请求显示插屏广告: ${placement}`);
+        console.log(`[AdManager] 🎬 开始显示插屏广告: ${placement}`);
+
+        // 检查冷启动保护（游戏启动后30秒内禁止展示）
+        const timeSinceGameStart = Date.now() - this.gameStartTime;
+        const COLD_START_PROTECTION = 30000;  // 30秒
+
+        if (timeSinceGameStart < COLD_START_PROTECTION) {
+            console.log(`[AdManager] ❌ 冷启动保护: 游戏启动未满${COLD_START_PROTECTION/1000}秒`);
+            return false;
+        }
+
+        // 检查插屏广告间隔（两次插屏广告之间至少60秒）
+        const timeSinceLastInterstitial = Date.now() - this.lastInterstitialAdTime;
+        const MIN_INTERSTITIAL_INTERVAL = 60000;  // 60秒
+
+        if (timeSinceLastInterstitial < MIN_INTERSTITIAL_INTERVAL && this.lastInterstitialAdTime > 0) {
+            console.log(`[AdManager] ❌ 插屏广告间隔限制: 距离上次仅${timeSinceLastInterstitial/1000}s，需要至少${MIN_INTERSTITIAL_INTERVAL/1000}s`);
+            return false;
+        }
 
         return new Promise((resolve) => {
             // 非抖音环境模拟
             if (typeof tt === 'undefined' || !this.interstitialAd) {
-                console.log('[AdManager] 插屏广告API不可用');
+                console.log('[AdManager] ⚠️ 插屏广告API不可用，模拟成功');
                 resolve(false);
                 return;
             }
@@ -322,7 +370,11 @@ export class AdManager {
             const onClose = () => {
                 this.interstitialAd.offClose(onClose);
                 this.interstitialAd.offError(onError);
-                console.log('[AdManager] 插屏广告关闭');
+                console.log(`[AdManager] ✅ 插屏广告关闭: ${placement}`);
+
+                // 更新插屏广告展示时间
+                this.lastInterstitialAdTime = Date.now();
+
                 resolve(true);
 
                 // 重新加载下一个广告
@@ -332,7 +384,7 @@ export class AdManager {
             const onError = (err) => {
                 this.interstitialAd.offClose(onClose);
                 this.interstitialAd.offError(onError);
-                console.error('[AdManager] 插屏广告错误:', err);
+                console.error(`[AdManager] ❌ 插屏广告错误: ${placement}`, err);
                 resolve(false);
             };
 
@@ -340,7 +392,18 @@ export class AdManager {
             this.interstitialAd.onError(onError);
 
             this.interstitialAd.show().catch((err) => {
-                console.log('[AdManager] 插屏广告显示失败，尝试重新加载');
+                console.log(`[AdManager] ⚠️ 插屏广告显示失败: ${placement}，尝试重新加载`);
+                console.error(`[AdManager] 错误详情:`, {
+                    errCode: err.errCode,
+                    errMsg: err.errMsg
+                });
+
+                // 抖音频控错误处理
+                if (err.errCode === 2002) {
+                    console.log(`[AdManager] ❌ 触发抖音频控限制 (errCode: ${err.errCode})`);
+                    console.log(`[AdManager] 原因: 游戏启动时间=${timeSinceGameStart/1000}s, 距上次插屏=${timeSinceLastInterstitial/1000}s`);
+                }
+
                 this.interstitialAd.load()
                     .then(() => this.interstitialAd.show())
                     .catch(() => {
@@ -418,13 +481,26 @@ export class AdManager {
     async showStaminaAd() {
         console.log('[AdManager] 请求显示体力恢复激励视频广告');
 
+        // 添加调试日志：显示当前使用的广告ID
+        const adUnitId = AD_CONFIG.adUnitIds.rewarded;
+        console.log('[AdManager] 当前激励视频广告ID:', adUnitId);
+        console.log('[AdManager] 广告ID是否为占位符:', adUnitId.includes('YOUR_'));
+
         return new Promise((resolve) => {
             // 非抖音环境模拟
-            if (typeof tt === 'undefined' || !this.rewardedAd) {
-                console.log('[AdManager] 广告API不可用，模拟观看完成');
+            if (typeof tt === 'undefined') {
+                console.log('[AdManager] 非抖音环境，模拟观看完成');
                 setTimeout(() => {
                     resolve({ success: true, message: '广告观看完成（模拟）' });
                 }, 500);
+                return;
+            }
+
+            // 检查广告对象
+            if (!this.rewardedAd) {
+                console.error('[AdManager] 激励视频广告对象未初始化');
+                console.error('[AdManager] 可能原因：广告ID配置错误或抖音API初始化失败');
+                resolve({ success: false, message: '广告系统未正确初始化' });
                 return;
             }
 
@@ -449,7 +525,26 @@ export class AdManager {
                 this.rewardedAd.offClose(onClose);
                 this.rewardedAd.offError(onError);
                 console.error('[AdManager] 体力恢复广告错误:', err);
-                resolve({ success: false, message: '广告加载失败' });
+                console.error('[AdManager] 错误详情:', {
+                    errCode: err.errCode,
+                    errMsg: err.errMsg,
+                    adUnitId: adUnitId
+                });
+
+                // 提供具体的错误提示
+                let errorMessage = '广告加载失败';
+                if (err.errCode) {
+                    if (err.errCode === 20001) {
+                        errorMessage = '广告ID未配置或错误，请检查config.js中的adUnitIds';
+                    } else if (err.errCode === 20002) {
+                        errorMessage = '广告加载失败，请检查网络连接';
+                    } else if (err.errCode === 20003) {
+                        errorMessage = '广告视频加载超时';
+                    } else {
+                        errorMessage = `广告错误(${err.errCode}): ${err.errMsg}`;
+                    }
+                }
+                resolve({ success: false, message: errorMessage });
             };
 
             this.rewardedAd.onClose(onClose);
@@ -487,7 +582,7 @@ export class AdManager {
             const systemInfo = tt.getSystemInfoSync();
             const screenWidth = systemInfo.windowWidth || systemInfo.screenWidth;
             const screenHeight = systemInfo.windowHeight || systemInfo.screenHeight;
-            const bannerHeight = 150; // Banner标准高度
+            const bannerHeight = 100; // Banner高度（100px，避免遮挡按钮）
 
             // 动态计算Banner样式（固定在屏幕底部）
             const bannerStyle = {
@@ -575,7 +670,7 @@ export class AdManager {
         try {
             // 获取当前游戏appId
             const accountInfo = tt.getAccountManagerSync ? tt.getAccountManagerSync() : null;
-            const currentAppId = accountInfo?.appId || '';
+            const currentAppId = (accountInfo && accountInfo.appId) || '';
 
             // 传入游戏ID列表（至少需要一个游戏ID）
             this.gridGamePanel = tt.createGridGamePanel({
@@ -583,19 +678,50 @@ export class AdManager {
                 gridCount: "four"
             });
 
-            this.gridGamePanel.onShow(() => {
-                this.isGridPanelVisible = true;
-                console.log('[AdManager] ✅ 游戏推荐面板显示成功');
-            });
+            // 验证返回对象是否有效
+            if (!this.gridGamePanel) {
+                console.error('[AdManager] ❌ 游戏推荐面板创建失败：API返回空值');
+                return;
+            }
 
-            this.gridGamePanel.onHide(() => {
-                this.isGridPanelVisible = false;
-                console.log('[AdManager] ✅ 游戏推荐面板隐藏');
-            });
+            // 检查 onShow 方法是否存在
+            if (typeof this.gridGamePanel.onShow === 'function') {
+                this.gridGamePanel.onShow(() => {
+                    this.isGridPanelVisible = true;
+                    console.log('[AdManager] ✅ 游戏推荐面板显示成功');
+                });
+            } else {
+                console.warn('[AdManager] ⚠️  gridGamePanel.onShow 方法不可用，跳过事件监听器注册');
+            }
 
-            console.log('[AdManager] 游戏推荐面板创建成功');
+            // 检查 onHide 方法是否存在
+            if (typeof this.gridGamePanel.onHide === 'function') {
+                this.gridGamePanel.onHide(() => {
+                    this.isGridPanelVisible = false;
+                    console.log('[AdManager] ✅ 游戏推荐面板隐藏');
+                });
+            } else {
+                console.warn('[AdManager] ⚠️  gridGamePanel.onHide 方法不可用，跳过事件监听器注册');
+            }
+
+            // 检查 show 方法是否存在
+            if (typeof this.gridGamePanel.show !== 'function') {
+                console.error('[AdManager] ❌ 游戏推荐面板创建失败：show 方法不可用');
+                this.gridGamePanel = null; // 清除无效对象
+                return;
+            }
+
+            // 检查 hide 方法是否存在
+            if (typeof this.gridGamePanel.hide !== 'function') {
+                console.error('[AdManager] ❌ 游戏推荐面板创建失败：hide 方法不可用');
+                this.gridGamePanel = null; // 清除无效对象
+                return;
+            }
+
+            console.log('[AdManager] ✅ 游戏推荐面板创建成功');
         } catch (err) {
-            console.error('[AdManager] 游戏推荐面板创建失败:', err);
+            console.error('[AdManager] ❌ 游戏推荐面板创建失败:', err);
+            this.gridGamePanel = null; // 确保失败时清空引用
         }
     }
 

@@ -1,121 +1,6 @@
 export const TARGET_TYPES = [
-    {
-        id: 'captain',
-        name: '船长',
-        image: '/target/captain_re.png',
-        speed: 100,
-        radius: 40,
-        points: 15,
-        movement: 'bounce',
-        background: {
-            image: '/backgrounds/captain_bg.jpg',
-            showGrass: false
-        },
-        // 广告配置 - 免费目标
-        unlock: {
-            type: 'free',
-            adRequired: false,
-            unlockDuration: 10 * 60 * 60 * 1000
-        },
-        adTrigger: {
-            enabled: false,
-            probability: 0,
-            cooldown: 0,
-            maxPerSession: 0
-        },
-        // 侧边栏奖励配置 - 免费关卡不参与奖励
-        sidebarReward: {
-            canBeRewarded: false
-        }
-    },
-    {
-        id: 'octopus',
-        name: '章鱼',
-        image: '/target/octopus_re.png',
-        speed: 70,
-        radius: 45,
-        points: 20,
-        movement: 'wave',
-        background: {
-            image: '/backgrounds/octopus_bg.jpg',
-            showGrass: false
-        },
-        // 广告配置 - 需要广告解锁（48小时）
-        unlock: {
-            type: 'free',
-            adRequired: true,
-            unlockDuration: 48 * 60 * 60 * 1000  // 48小时
-        },
-        adTrigger: {
-            enabled: true,
-            probability: 0.3,
-            cooldown: 90,
-            maxPerSession: 3
-        },
-        // 侧边栏奖励配置 - 可作为奖励
-        sidebarReward: {
-            canBeRewarded: true
-        }
-    },
-    {
-        id: 'bear',
-        name: '小熊',
-        image: '/target/bear_re.png',
-        speed: 50,
-        radius: 35,
-        points: 25,
-        movement: 'random',
-        background: {
-            image: '/backgrounds/bear_bg.jpg',
-            showGrass: false
-        },
-        // 广告配置 - 需要广告解锁（48小时）
-        unlock: {
-            type: 'free',
-            adRequired: true,
-            unlockDuration: 48 * 60 * 60 * 1000  // 48小时
-        },
-        adTrigger: {
-            enabled: true,
-            probability: 0.4,
-            cooldown: 90,
-            maxPerSession: 3
-        },
-        // 侧边栏奖励配置 - 可作为奖励
-        sidebarReward: {
-            canBeRewarded: true
-        }
-    },
-    {
-        id: 'seagull',
-        name: '海鸥',
-        image: '/target/seagull_re.png',
-        speed: 200,
-        radius: 30,
-        points: 10,
-        movement: 'random',
-        background: {
-            image: '/backgrounds/seagull_bg.jpg',
-            showGrass: false
-        },
-        // 广告配置 - 需要广告解锁（48小时）
-        unlock: {
-            type: 'free',
-            adRequired: true,
-            unlockDuration: 48 * 60 * 60 * 1000  // 48小时
-        },
-        adTrigger: {
-            enabled: true,
-            probability: 0.2,
-            cooldown: 120,
-            maxPerSession: 2
-        },
-        // 侧边栏奖励配置 - 免费关卡不参与奖励
-        sidebarReward: {
-            canBeRewarded: false
-        }
-    },
-    // ========== 新增免费目标 ==========
+    // ========== 重新排列后的目标顺序 ==========
+    // 1. 光点
     {
         id: 'sparkle',
         name: '光点',
@@ -138,10 +23,10 @@ export const TARGET_TYPES = [
             unlockDuration: 0
         },
         adTrigger: {
-            enabled: false,
-            probability: 0,
+            enabled: true,
+            probability: 1.0,
             cooldown: 0,
-            maxPerSession: 0
+            maxPerSession: 10
         },
         sidebarReward: {
             canBeRewarded: false
@@ -149,6 +34,85 @@ export const TARGET_TYPES = [
         // 特殊渲染标记
         renderType: 'particle'
     },
+    // 2. 激光点
+    {
+        id: 'laser',
+        name: '激光点',
+        image: '/target/laser_re.png',
+        speed: 180,
+        radius: 20,  // 最小体积
+        points: 25,
+        movement: 'random',
+        movementConfig: {
+            chaseSpeed: 120,
+            targetRadius: 80,
+            targetSpeed: 1.5
+        },
+        background: {
+            image: null,
+            showGrass: false
+        },
+        unlock: {
+            type: 'free',
+            adRequired: false,
+            unlockDuration: -1  // -1 表示永久解锁
+        },
+        adTrigger: {
+            enabled: true,
+            probability: 1.0,
+            cooldown: 0,
+            maxPerSession: 10
+        },
+        sidebarReward: {
+            canBeRewarded: true
+        },
+        // 特殊渲染标记
+        renderType: 'particle'
+    },
+    // 3. 老鼠
+    {
+        id: 'mouse',
+        name: '老鼠',
+        type: 'mouse',
+        image: null,              // 改为 Canvas 渲染
+        renderer: 'mouse',        // 指定渲染器类型
+        speed: 150,
+        radius: 25,               // 稍微减小碰撞半径
+        points: 15,
+        movement: 'dash',
+        movementConfig: {
+            dashSpeed: 250,
+            dashDuration: 0.3,
+            pauseDuration: 0.6
+        },
+        background: {
+            image: null,
+            showGrass: true
+        },
+        unlock: {
+            type: 'free',
+            adRequired: false,
+            unlockDuration: 0
+        },
+        adTrigger: {
+            enabled: true,
+            probability: 1.0,
+            cooldown: 0,
+            maxPerSession: 10
+        },
+        sidebarReward: {
+            canBeRewarded: false
+        },
+        // 老鼠特有配置
+        mouseConfig: {
+            jitterAmplitude: 2.0,      // 抖动幅度
+            jitterFrequency: 15,       // 抖动频率
+            dashSpeedMultiplier: 1.5,  // 冲刺速度倍数
+            tailSwingSpeed: 8,         // 尾巴摆动速度
+            tailSwingAmplitude: 0.15   // 尾巴摆动幅度
+        }
+    },
+    // 4. 蝴蝶
     {
         id: 'butterfly',
         type: 'butterfly',
@@ -188,97 +152,16 @@ export const TARGET_TYPES = [
             unlockDuration: 0
         },
         adTrigger: {
-            enabled: false,
-            probability: 0,
-            cooldown: 0,
-            maxPerSession: 0
-        },
-        sidebarReward: {
-            canBeRewarded: false
-        }
-    },
-    {
-        id: 'mouse',
-        name: '老鼠',
-        type: 'mouse',
-        image: null,              // 改为 Canvas 渲染
-        renderer: 'mouse',        // 指定渲染器类型
-        speed: 150,
-        radius: 25,               // 稍微减小碰撞半径
-        points: 15,
-        movement: 'dash',
-        movementConfig: {
-            dashSpeed: 250,
-            dashDuration: 0.3,
-            pauseDuration: 0.6
-        },
-        background: {
-            image: null,
-            showGrass: true
-        },
-        unlock: {
-            type: 'free',
-            adRequired: false,
-            unlockDuration: 0
-        },
-        adTrigger: {
-            enabled: false,
-            probability: 0,
-            cooldown: 0,
-            maxPerSession: 0
-        },
-        sidebarReward: {
-            canBeRewarded: false
-        },
-        // 老鼠特有配置
-        mouseConfig: {
-            jitterAmplitude: 2.0,      // 抖动幅度
-            jitterFrequency: 15,       // 抖动频率
-            dashSpeedMultiplier: 1.5,  // 冲刺速度倍数
-            tailSwingSpeed: 8,         // 尾巴摆动速度
-            tailSwingAmplitude: 0.15   // 尾巴摆动幅度
-        }
-    },
-    // ========== 新增广告目标 (24h) ==========
-    {
-        id: 'fish',
-        name: '小鱼',
-        icon: '🐠',
-        image: null,              // 改为 Canvas 渲染
-        renderer: 'fish',         // 指定渲染器类型
-        speed: 120,
-        radius: 32,
-        points: 12,
-        movement: 'zigzag',       // 改为锯齿运动
-        movementConfig: {
-            amplitude: 50,        // Z字幅度
-            frequency: 1.5        // Z字频率
-        },
-        background: {
-            image: null,
-            showGrass: false      // 不显示草地，使用水体背景
-        },
-        unlock: {
-            type: 'free',
-            adRequired: false,
-            unlockDuration: 24 * 60 * 60 * 1000  // 24小时
-        },
-        adTrigger: {
             enabled: true,
-            probability: 0.25,
-            cooldown: 120,
-            maxPerSession: 2
+            probability: 1.0,
+            cooldown: 0,
+            maxPerSession: 10
         },
         sidebarReward: {
-            canBeRewarded: true
-        },
-        // 小鱼特有配置
-        fishConfig: {
-            shimmerSpeed: 3,      // 闪烁速度
-            scaleShimmerSpeed: 2, // 鳞片闪烁速度
-            tailFlutterSpeed: 12  // 尾巴抖动速度
+            canBeRewarded: false
         }
     },
+    // 5. 小鸟
     {
         id: 'bird',
         name: '小鸟',
@@ -316,57 +199,15 @@ export const TARGET_TYPES = [
         },
         adTrigger: {
             enabled: true,
-            probability: 0.25,
-            cooldown: 120,
-            maxPerSession: 2
+            probability: 1.0,
+            cooldown: 0,
+            maxPerSession: 10
         },
         sidebarReward: {
             canBeRewarded: true
         }
     },
-    {
-        id: 'yarn',
-        name: '多彩线群',
-        renderType: 'multiline',      // 多线渲染类型
-        speed: 30,                   // 较慢的游走速度
-        radius: 40,                  // 点击判定半径
-        points: 15,
-        movement: 'free',            // 自由移动模式
-        renderConfig: {
-            lineCount: 5,             // 线的数量
-            segmentCount: 60,         // 每条线的段数（增加到30，线更长）
-            segmentLength: 12,        // 每段长度（增加到12）
-            baseSpeed: 30,            // 基础速度
-            wiggleAmplitude: 15,      // 扭动幅度
-            wiggleFrequency: 2,       // 扭动频率
-            colors: [                 // 配色方案
-                '#FF6B6B', // 红
-                '#4ECDC4', // 蓝
-                '#95E1D3', // 青
-                '#F38181', // 粉
-                '#AA96DA'  // 紫
-            ]
-        },
-        background: {
-            image: null,
-            showGrass: false          // 不显示草地，使用深蓝背景
-        },
-        unlock: {
-            type: 'free',
-            adRequired: false,
-            unlockDuration: 24 * 60 * 60 * 1000  // 24小时
-        },
-        adTrigger: {
-            enabled: true,
-            probability: 0.2,
-            cooldown: 120,
-            maxPerSession: 2
-        },
-        sidebarReward: {
-            canBeRewarded: true
-        }
-    },
-    // ========== 新增广告目标 (48h) ==========
+    // 6. 萤火虫
     {
         id: 'ladybug',
         name: '萤火虫',
@@ -424,14 +265,98 @@ export const TARGET_TYPES = [
         },
         adTrigger: {
             enabled: true,
-            probability: 0.3,
-            cooldown: 150,
-            maxPerSession: 2
+            probability: 1.0,
+            cooldown: 0,
+            maxPerSession: 10
         },
         sidebarReward: {
             canBeRewarded: true
         }
     },
+    // 7. 小鱼
+    {
+        id: 'fish',
+        name: '小鱼',
+        icon: '🐠',
+        image: null,              // 改为 Canvas 渲染
+        renderer: 'fish',         // 指定渲染器类型
+        speed: 120,
+        radius: 32,
+        points: 12,
+        movement: 'zigzag',       // 改为锯齿运动
+        movementConfig: {
+            amplitude: 50,        // Z字幅度
+            frequency: 1.5        // Z字频率
+        },
+        background: {
+            image: null,
+            showGrass: false      // 不显示草地，使用水体背景
+        },
+        unlock: {
+            type: 'free',
+            adRequired: false,
+            unlockDuration: 24 * 60 * 60 * 1000  // 24小时
+        },
+        adTrigger: {
+            enabled: true,
+            probability: 1.0,
+            cooldown: 0,
+            maxPerSession: 10
+        },
+        sidebarReward: {
+            canBeRewarded: true
+        },
+        // 小鱼特有配置
+        fishConfig: {
+            shimmerSpeed: 3,      // 闪烁速度
+            scaleShimmerSpeed: 2, // 鳞片闪烁速度
+            tailFlutterSpeed: 12  // 尾巴抖动速度
+        }
+    },
+    // 8. 多彩线群
+    {
+        id: 'yarn',
+        name: '多彩线群',
+        renderType: 'multiline',      // 多线渲染类型
+        speed: 30,                   // 较慢的游走速度
+        radius: 40,                  // 点击判定半径
+        points: 15,
+        movement: 'free',            // 自由移动模式
+        renderConfig: {
+            lineCount: 5,             // 线的数量
+            segmentCount: 60,         // 每条线的段数（增加到30，线更长）
+            segmentLength: 12,        // 每段长度（增加到12）
+            baseSpeed: 30,            // 基础速度
+            wiggleAmplitude: 15,      // 扭动幅度
+            wiggleFrequency: 2,       // 扭动频率
+            colors: [                 // 配色方案
+                '#FF6B6B', // 红
+                '#4ECDC4', // 蓝
+                '#95E1D3', // 青
+                '#F38181', // 粉
+                '#AA96DA'  // 紫
+            ]
+        },
+        background: {
+            image: null,
+            showGrass: false          // 不显示草地，使用深蓝背景
+        },
+        unlock: {
+            type: 'free',
+            adRequired: false,
+            unlockDuration: 24 * 60 * 60 * 1000  // 24小时
+        },
+        adTrigger: {
+            enabled: true,
+            probability: 1.0,
+            cooldown: 0,
+            maxPerSession: 10
+        },
+        sidebarReward: {
+            canBeRewarded: true
+        }
+    },
+    // 9. 羽毛
     {
         id: 'feather',
         name: '羽毛',
@@ -456,52 +381,137 @@ export const TARGET_TYPES = [
         },
         adTrigger: {
             enabled: true,
-            probability: 0.3,
-            cooldown: 150,
-            maxPerSession: 2
+            probability: 1.0,
+            cooldown: 0,
+            maxPerSession: 10
         },
         sidebarReward: {
             canBeRewarded: true
         }
     },
-    // ========== 新增广告目标 (永久) ==========
+    // 10. 船长
     {
-        id: 'laser',
-        name: '激光点',
-        image: '/target/laser_re.png',
-        speed: 180,
-        radius: 20,  // 最小体积
-        points: 25,
-        movement: 'random',
-        movementConfig: {
-            chaseSpeed: 120,
-            targetRadius: 80,
-            targetSpeed: 1.5
-        },
+        id: 'captain',
+        name: '船长',
+        image: '/target/captain_re.png',
+        speed: 100,
+        radius: 40,
+        points: 15,
+        movement: 'bounce',
         background: {
-            image: null,
+            image: '/backgrounds/captain_bg.jpg',
             showGrass: false
         },
+        // 广告配置 - 免费目标
         unlock: {
             type: 'free',
             adRequired: false,
-            unlockDuration: -1  // -1 表示永久解锁
+            unlockDuration: 10 * 60 * 60 * 1000
         },
         adTrigger: {
             enabled: true,
-            probability: 0.35,
-            cooldown: 180,
-            maxPerSession: 2
+            probability: 1.0,
+            cooldown: 0,
+            maxPerSession: 10
         },
+        // 侧边栏奖励配置 - 免费关卡不参与奖励
+        sidebarReward: {
+            canBeRewarded: false
+        }
+    },
+    // 11. 章鱼
+    {
+        id: 'octopus',
+        name: '章鱼',
+        image: '/target/octopus_re.png',
+        speed: 70,
+        radius: 45,
+        points: 20,
+        movement: 'wave',
+        background: {
+            image: '/backgrounds/octopus_bg.jpg',
+            showGrass: false
+        },
+        // 广告配置 - 需要广告解锁（48小时）
+        unlock: {
+            type: 'free',
+            adRequired: true,
+            unlockDuration: 48 * 60 * 60 * 1000  // 48小时
+        },
+        adTrigger: {
+            enabled: true,
+            probability: 1.0,
+            cooldown: 0,
+            maxPerSession: 10
+        },
+        // 侧边栏奖励配置 - 可作为奖励
         sidebarReward: {
             canBeRewarded: true
+        }
+    },
+    // 12. 小熊
+    {
+        id: 'bear',
+        name: '小熊',
+        image: '/target/bear_re.png',
+        speed: 50,
+        radius: 35,
+        points: 25,
+        movement: 'random',
+        background: {
+            image: '/backgrounds/bear_bg.jpg',
+            showGrass: false
         },
-        // 特殊渲染标记
-        renderType: 'particle'
+        // 广告配置 - 需要广告解锁（48小时）
+        unlock: {
+            type: 'free',
+            adRequired: true,
+            unlockDuration: 48 * 60 * 60 * 1000  // 48小时
+        },
+        adTrigger: {
+            enabled: true,
+            probability: 1.0,
+            cooldown: 0,
+            maxPerSession: 10
+        },
+        // 侧边栏奖励配置 - 可作为奖励
+        sidebarReward: {
+            canBeRewarded: true
+        }
+    },
+    // 13. 海鸥
+    {
+        id: 'seagull',
+        name: '海鸥',
+        image: '/target/seagull_re.png',
+        speed: 200,
+        radius: 30,
+        points: 10,
+        movement: 'random',
+        background: {
+            image: '/backgrounds/seagull_bg.jpg',
+            showGrass: false
+        },
+        // 广告配置 - 需要广告解锁（48小时）
+        unlock: {
+            type: 'free',
+            adRequired: true,
+            unlockDuration: 48 * 60 * 60 * 1000  // 48小时
+        },
+        adTrigger: {
+            enabled: true,
+            probability: 1.0,
+            cooldown: 0,
+            maxPerSession: 10
+        },
+        // 侧边栏奖励配置 - 免费关卡不参与奖励
+        sidebarReward: {
+            canBeRewarded: false
+        }
     },
 ];
 export const CONFIG = {
-    GAME_DURATION: 5,
+    GAME_DURATION: 60,  // 游戏时长60秒（1分钟）
     // 运动轨迹参数配置
     MOVEMENT_PARAMS: {
         // 圆周运动
@@ -579,8 +589,8 @@ export const CONFIG = {
     }
 };
 export const STAMINA_CONFIG = {
-    MAX_STAMINA: 10,              // 体力上限
-    RECOVERY_INTERVAL: 180,       // 恢复间隔（秒）= 3分钟
+    MAX_STAMINA: 3,               // 体力上限（共3个体力）
+    RECOVERY_INTERVAL: 10,       // 恢复间隔（秒）= 3分钟
     AD_REWARD: 1,                 // 广告奖励体力
     SHARE_REWARD: 2,              // 分享奖励体力
     DAILY_AD_LIMIT: 5,            // 每日广告次数限制
@@ -736,8 +746,8 @@ export const SETTINGS_CONFIG = {
 export const AD_CONFIG = {
     // 全局控制
     globalEnabled: true,
-    minIntervalSeconds: 60,        // 两次广告最小间隔（秒）
-    maxAdsPerSession: 5,           // 单次会话最大广告数
+    minIntervalSeconds: 0,         // 两次广告最小间隔（秒）- 测试模式：无冷却
+    maxAdsPerSession: 999,         // 单次会话最大广告数 - 测试模式：无限制
 
     // 解锁配置
     unlock: {
@@ -766,9 +776,9 @@ export const AD_CONFIG = {
 
     // 广告位ID（需要替换为实际ID）
     adUnitIds: {
-        rewarded: 'YOUR_REWARDED_AD_UNIT_ID',
-        interstitial: 'YOUR_INTERSTITIAL_AD_UNIT_ID',
-        banner: 'YOUR_BANNER_AD_UNIT_ID'  // Banner广告ID
+        rewarded: '32i3h0uii6g23k2ug1',
+        interstitial: 'c1k9dg8l2bb15i76df',
+        banner: '7oo0pojj8h31jdi3dd'  // Banner广告ID
     },
 
     // 游戏推荐面板配置
@@ -812,6 +822,14 @@ export const SIDEBAR_REWARD_CONFIG = {
         rewardTitle: '恭喜获得',
         rewardButton: '立即体验',
     }
+};
+
+// 快捷方式配置
+export const SHORTCUT_CONFIG = {
+    enabled: true,                    // 是否启用快捷方式功能
+    reward: 1,                        // 添加快捷方式的体力奖励
+    maxPromptTimes: 1,                // 最多提示次数
+    promptInterval: 7 * 24 * 60 * 60 * 1000  // 提示间隔（毫秒，默认7天）
 };
 
 // ============ 音频分层配置 ============

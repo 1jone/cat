@@ -55,6 +55,13 @@ export class SettingsManager {
                 lastRewardTime: 0,         // 上次领取奖励时间戳
                 totalRewardsReceived: 0,   // 累计领取奖励次数
                 guideShown: false          // 是否已显示过引导
+            },
+            // 快捷方式相关数据
+            shortcut: {
+                hasAddedShortcut: false,   // 是否已添加桌面快捷方式
+                hasSeenPrompt: false,      // 是否已看过快捷方式提示
+                lastPromptTime: 0,         // 上次提示时间戳
+                addShortcutReward: 1       // 添加快捷方式的体力奖励
             }
         };
 
@@ -625,6 +632,48 @@ export class SettingsManager {
             settings[targetId].speedMultiplier = clampedMultiplier;
             this.set('game.targetGameSettings', settings);
         }
+    }
+
+    // ==================== 快捷方式相关方法 ====================
+
+    /**
+     * 检查是否已添加桌面快捷方式
+     * @returns {boolean}
+     */
+    hasAddedShortcut() {
+        return this.get('shortcut.hasAddedShortcut') || false;
+    }
+
+    /**
+     * 设置快捷方式添加状态
+     * @param {boolean} added
+     */
+    setAddedShortcut(added) {
+        this.set('shortcut.hasAddedShortcut', added);
+    }
+
+    /**
+     * 检查是否已看过快捷方式提示
+     * @returns {boolean}
+     */
+    hasSeenShortcutPrompt() {
+        return this.get('shortcut.hasSeenPrompt') || false;
+    }
+
+    /**
+     * 设置快捷方式提示已查看状态
+     * @param {boolean} seen
+     */
+    setSeenShortcutPrompt(seen) {
+        this.set('shortcut.hasSeenPrompt', seen);
+    }
+
+    /**
+     * 获取快捷方式的体力奖励
+     * @returns {number}
+     */
+    getShortcutReward() {
+        return this.get('shortcut.addShortcutReward') || 1;
     }
 }
 

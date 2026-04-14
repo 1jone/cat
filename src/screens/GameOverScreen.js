@@ -20,7 +20,7 @@ export class GameOverScreen {
         this.recommendationTop = 0;  // 动态计算
 
         // 新增：Banner广告区域
-        this.bannerHeight = 150;
+        this.bannerHeight = 100;  // Banner高度（100px，避免遮挡按钮）
         this.bannerBottom = 0;  // 动态计算
     }
 

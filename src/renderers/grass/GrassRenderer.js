@@ -24,17 +24,16 @@ export class GrassRenderer {
 
         // 核心系统
         this.windSystem = new WindSystem({
-            baseAngle: config.wind?.baseAngle || 0,
-            gustDuration: config.wind?.gustDuration || 3000,
-            gustIntensity: config.wind?.gustIntensity || 0.8
+            baseAngle: (config.wind && config.wind.baseAngle) || 0,
+            gustDuration: (config.wind && config.wind.gustDuration) || 3000,
+            gustIntensity: (config.wind && config.wind.gustIntensity) || 0.8
         });
 
         this.touchSystem = new TouchInfluenceSystem({
-            influenceRadius: config.touch?.influenceRadius || 60,
-            decay: config.touch?.decay || 0.95,
-            maxInfluences: config.touch?.maxInfluences || 5
+            influenceRadius: (config.touch && config.touch.influenceRadius) || 60,
+            decay: (config.touch && config.touch.decay) || 0.95,
+            maxInfluences: (config.touch && config.touch.maxInfluences) || 5
         });
-
         // 草叶集合（三层）
         this.layers = {
             foreground: [], // 前景（大草）

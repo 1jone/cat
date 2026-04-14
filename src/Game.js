@@ -38,6 +38,7 @@ import { StaticLineRenderer } from './entities/StaticLineRenderer';
 import { BirdRenderer } from './entities/BirdRenderer';
 import { LadybugRenderer } from './entities/LadybugRenderer';
 import { StaminaManager } from './managers/StaminaManager';
+import { ShortcutManager } from './managers/ShortcutManager';
 
 export class Game {
     constructor(canvas) {
@@ -81,20 +82,14 @@ export class Game {
             TARGET_TYPES.find(t => t.id === 'yarn') || {}
         );
         this.multilineRenderer = new MultiLineRenderer(
-            TARGET_TYPES.find(t => t.id === 'yarn')?.renderConfig || {}
+            (TARGET_TYPES.find(t => t.id === 'yarn') || {}).renderConfig || {}
         );
         // 创建静态线渲染器用于选择界面预览
         this.staticLineRenderer = new StaticLineRenderer(
-            TARGET_TYPES.find(t => t.id === 'yarn')?.renderConfig || {}
+            (TARGET_TYPES.find(t => t.id === 'yarn') || {}).renderConfig || {}
         );
         this.birdRenderer = new BirdRenderer();
         this.ladybugRenderer = new LadybugRenderer();
-
-        // 初始化体力管理器
-        this.staminaManager = new StaminaManager(this.settingsManager);
-        // 设置广告管理器（用于体力恢复广告）
-        this.staminaManager.adManager = this.adManager;
-        this.showStaminaDialog = false; // 体力不足弹窗状态
 
         // 全局访问（供 ImageTarget 使用）
         // window.MouseRenderer = this.mouseRenderer;
@@ -119,6 +114,16 @@ export class Game {
         // 初始化Banner广告和游戏推荐面板
         this.adManager.initBannerAd();
         this.adManager.createGameRecommendation();
+
+        // 初始化体力管理器（必须在 adManager 之后初始化）
+        this.staminaManager = new StaminaManager(this.settingsManager);
+        this.staminaManager.adManager = this.adManager;
+        this.showStaminaDialog = false; // 体力不足弹窗状态
+
+        // 初始化快捷方式管理器
+        this.shortcutManager = new ShortcutManager(this.settingsManager, this.staminaManager);
+        this.showShortcutDialog = false; // 快捷方式提示弹窗状态
+        this.shortcutDialogButtons = null; // 快捷方式弹窗按钮区域
 
         // 初始化设置界面
         this.settingsUI = new SettingsUI(canvas, ctx, this.settingsManager, this.audioManager, this.emojiManager);
@@ -340,13 +345,43 @@ export class Game {
         switch (state) {
             case GameState.START:
                 this.startScreen.render();
-                // 渲染侧边栏入口按钮（在"点击开始"下方）
+
+                // 整体向上偏移，让布局更居中
+                const offsetY = -50;
+
+                // 渲染侧边栏入口按钮（在"点击开始"下方，增加间距）
                 if (this.sidebarRewardUI) {
-                    const buttonY = this.logicalHeight / 2 + 160;
+                    const buttonY = this.logicalHeight / 2 + 130 + offsetY;
                     this.sidebarRewardUI.renderEntryButton(this.logicalWidth / 2, buttonY);
                     // 如果有弹窗，渲染弹窗
                     this.sidebarRewardUI.render();
                 }
+
+                // 渲染健康游戏忠告（在侧边栏入口按钮下方，增加间距）
+                const ctx = this.ctx;
+                const healthAdviceY = this.logicalHeight / 2 + 180 + offsetY;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+
+                // 标题 - 降低不透明度，更柔和
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+                ctx.font = 'bold 15px Arial';
+                ctx.fillText('《健康游戏忠告》', this.logicalWidth / 2, healthAdviceY);
+
+                // 内容 - 降低不透明度，缩小字体
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+                ctx.font = '13px Arial';
+                const line1 = '抵制不良游戏，拒绝盗版游戏。';
+                const line2 = '注意自我保护，谨防受骗上当。';
+                const line3 = '适度游戏益脑，沉迷游戏伤身。';
+                const line4 = '合理安排时间，享受健康生活。';
+
+                const lineHeight = 19;
+                const contentStartY = healthAdviceY + 22;
+                ctx.fillText(line1, this.logicalWidth / 2, contentStartY);
+                ctx.fillText(line2, this.logicalWidth / 2, contentStartY + lineHeight);
+                ctx.fillText(line3, this.logicalWidth / 2, contentStartY + lineHeight * 2);
+                ctx.fillText(line4, this.logicalWidth / 2, contentStartY + lineHeight * 3);
                 break;
 
             case GameState.SELECT:
@@ -419,6 +454,11 @@ export class Game {
         // 渲染体力不足弹窗（所有状态下都可能显示）
         if (this.showStaminaDialog) {
             this.renderStaminaDialog();
+        }
+
+        // 渲染快捷方式提示弹窗（所有状态下都可能显示）
+        if (this.showShortcutDialog) {
+            this.renderShortcutDialog();
         }
     }
 
@@ -536,6 +576,7 @@ export class Game {
             share: { x: dialogX + 30, y: buttonY2, width: buttonWidth, height: buttonHeight },
             close: { x: closeX, y: closeY, width: closeSize, height: closeSize }
         };
+        // console.log('[StaminaDialog] 按钮区域已保存:', this.staminaDialogButtons);
     }
 
     /**
@@ -556,6 +597,111 @@ export class Game {
     }
 
     /**
+     * 渲染快捷方式提示弹窗
+     */
+    renderShortcutDialog() {
+        const ctx = this.ctx;
+        const canvasWidth = this.logicalWidth;
+        const canvasHeight = this.logicalHeight;
+
+        // 半透明遮罩
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+        // 弹窗参数
+        const panelWidth = Math.min(320, canvasWidth - 40);
+        const panelHeight = 260;
+        const panelX = (canvasWidth - panelWidth) / 2;
+        const panelY = (canvasHeight - panelHeight) / 2;
+        const borderRadius = 16;
+
+        // 弹窗背景（毛玻璃效果）
+        ctx.save();
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+        this.roundRect(ctx, panelX, panelY, panelWidth, panelHeight, borderRadius);
+        ctx.fill();
+
+        // 边框
+        ctx.strokeStyle = 'rgba(100, 200, 255, 0.3)';
+        ctx.lineWidth = 2;
+        this.roundRect(ctx, panelX, panelY, panelWidth, panelHeight, borderRadius);
+        ctx.stroke();
+
+        // 标题
+        ctx.fillStyle = '#333';
+        ctx.font = 'bold 22px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        ctx.fillText('💡 添加桌面快捷方式', canvasWidth / 2, panelY + 25);
+
+        // 描述文字
+        ctx.fillStyle = '#666';
+        ctx.font = '15px Arial';
+        ctx.textBaseline = 'top';
+
+        const descriptions = [
+            '将游戏添加到桌面，下次即可直接进入',
+            '立即获得 1 点体力奖励！'
+        ];
+
+        let descY = panelY + 70;
+        for (const desc of descriptions) {
+            ctx.fillText(desc, canvasWidth / 2, descY);
+            descY += 24;
+        }
+
+        // 按钮配置
+        const buttonWidth = 120;
+        const buttonHeight = 44;
+        const buttonGap = 15;
+        const buttonY = panelY + panelHeight - 60;
+
+        const addButtonX = (canvasWidth - buttonWidth * 2 - buttonGap) / 2;
+        const skipButtonX = addButtonX + buttonWidth + buttonGap;
+
+        // 保存按钮区域供点击检测
+        this.shortcutDialogButtons = {
+            add: {
+                x: addButtonX,
+                y: buttonY,
+                width: buttonWidth,
+                height: buttonHeight
+            },
+            skip: {
+                x: skipButtonX,
+                y: buttonY,
+                width: buttonWidth,
+                height: buttonHeight
+            }
+        };
+
+        // "添加快捷方式" 按钮
+        ctx.fillStyle = '#4CAF50';
+        this.roundRect(ctx, addButtonX, buttonY, buttonWidth, buttonHeight, 10);
+        ctx.fill();
+
+        ctx.fillStyle = '#FFF';
+        ctx.font = 'bold 16px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('添加并奖励', addButtonX + buttonWidth / 2, buttonY + buttonHeight / 2);
+
+        // "跳过" 按钮
+        ctx.fillStyle = '#999';
+        this.roundRect(ctx, skipButtonX, buttonY, buttonWidth, buttonHeight, 10);
+        ctx.fill();
+
+        ctx.fillStyle = '#FFF';
+        ctx.fillText('跳过', skipButtonX + buttonWidth / 2, buttonY + buttonHeight / 2);
+
+        // 图标装饰
+        ctx.font = '40px Arial';
+        ctx.fillText('🎮', canvasWidth / 2, panelY + 165);
+
+        ctx.restore();
+    }
+
+    /**
      * 处理触摸（兼容旧代码）
      */
     handleTouch(pos) {
@@ -568,13 +714,13 @@ export class Game {
             this.stateManager.setState(GameState.SELECT);
             this.selectionScreen.reset();
             this.adManager.showBannerAd();  // 显示Banner广告
-        } else if (state === GameState.PLAYING) {
+                    } else if (state === GameState.PLAYING) {
             this.tryToCatch(pos);
         } else if (state === GameState.OVER) {
             this.stateManager.setState(GameState.SELECT);
             this.selectionScreen.reset();
             this.adManager.showBannerAd();  // 显示Banner广告
-        }
+                    }
     }
 
     /**
@@ -627,6 +773,7 @@ export class Game {
             // 如果没有点击弹窗或按钮，则进入选择界面
             this.stateManager.setState(GameState.SELECT);
             this.selectionScreen.reset();
+            this.adManager.showBannerAd();  // 显示Banner广告
             this.skipNextTouchEnd = true;
             this.stateChangeTime = Date.now();
             this.audioManager.playBGM('menu', { volume: AUDIO_CONFIG.BGM_VOLUME.select });
@@ -658,6 +805,9 @@ export class Game {
             }
 
             // 点击其他区域: 完整清理后返回选择界面
+            // 注意：这里也尝试展示插屏广告（不阻塞返回流程）
+            this.showGameOverHomeAd();  // fire-and-forget，不等待
+
             this.cleanupGameSession();  // 新增: 完整清理
             this.stateManager.setState(GameState.SELECT);
             this.selectionScreen.reset();
@@ -696,8 +846,21 @@ export class Game {
     handleTouchEnd(pos) {
         const state = this.stateManager.getState();
 
+        // 调试日志
+        console.log('[TouchEnd] 位置:', pos);
+        console.log('[TouchEnd] 游戏状态:', state);
+        console.log('[TouchEnd] showStaminaDialog:', this.showStaminaDialog);
+
+        // 快捷方式弹窗按钮处理（优先级最高）
+        if (this.showShortcutDialog) {
+            console.log('[TouchEnd] 进入快捷方式对话框处理');
+            this.handleShortcutDialogClick(pos);
+            return;
+        }
+
         // 体力弹窗按钮处理
         if (this.showStaminaDialog) {
+            console.log('[TouchEnd] 进入体力对话框处理');
             this.handleStaminaDialogClick(pos);
             return;
         }
@@ -772,22 +935,22 @@ export class Game {
 
                 // 如果是多彩线群，触发烟花特效
                 if (target.config.id === 'yarn' && target.config.renderType === 'multiline') {
-                    const colors = target.config.renderConfig?.colors || ['#FF6B6B', '#4ECDC4', '#95E1D3', '#F38181', '#AA96DA'];
+                    const colors = target.config.renderConfig && target.config.renderConfig.colors || ['#FF6B6B', '#4ECDC4', '#95E1D3', '#F38181', '#AA96DA'];
                     this.stateManager.setFireworkEffect(target.position.x, target.position.y, colors);
                 }
                 // 如果是萤火虫，触发爆炸粒子特效
                 else if (target.config.id === 'ladybug') {
-                    const colors = target.config.renderConfig?.explosionColors || ['#B6FF00', '#FFFF66', '#88DD00'];
+                    const colors = target.config.renderConfig && target.config.renderConfig.explosionColors || ['#B6FF00', '#FFFF66', '#88DD00'];
                     this.stateManager.setFireworkEffect(target.position.x, target.position.y, colors);
                 }    else if (target.config.id === 'sparkle') {
-                    const colors = target.config.renderConfig?.explosionColors || ['#FFF176', '#FFD54F', '#FFEE58','#FFF9C4'];
+                    const colors = target.config.renderConfig && target.config.renderConfig.explosionColors || ['#FFF176', '#FFD54F', '#FFEE58','#FFF9C4'];
                     this.stateManager.setFireworkEffect(target.position.x, target.position.y, colors);
                 } else if (target.config.id === 'fish') {
-                    const colors = target.config.renderConfig?.explosionColors || ['#FFFFFF', '#E6F7FF', '#B3ECFF','#80DFFF','rgba(200,240,255,0.3)'];
+                    const colors = target.config.renderConfig && target.config.renderConfig.explosionColors || ['#FFFFFF', '#E6F7FF', '#B3ECFF','#80DFFF','rgba(200,240,255,0.3)'];
                     this.stateManager.setFireworkEffect(target.position.x, target.position.y, colors);
                 
                 } else if (target.config.id === 'butterfly') {
-                    const colors = target.config.renderConfig?.explosionColors || ['#FFF176', '#FFD54F', '#FFD54F'];
+                    const colors = target.config.renderConfig && target.config.renderConfig.explosionColors || ['#FFF176', '#FFD54F', '#FFD54F'];
                     this.stateManager.setFireworkEffect(target.position.x, target.position.y, colors);
                 }
 
@@ -801,13 +964,32 @@ export class Game {
      * @param {Vector2} pos - 点击位置
      */
     async handleStaminaDialogClick(pos) {
-        if (!this.staminaDialogButtons) return;
+        console.log('[StaminaDialog] 按钮点击处理');
+        console.log('[StaminaDialog] staminaDialogButtons:', this.staminaDialogButtons);
+
+        if (!this.staminaDialogButtons) {
+            console.error('[StaminaDialog] staminaDialogButtons 为 null!');
+            return;
+        }
 
         const { ad, share, close } = this.staminaDialogButtons;
+        console.log('[StaminaDialog] 按钮区域:', { ad, share, close });
+        console.log('[StaminaDialog] 点击位置:', pos);
 
         // 检查是否点击看广告按钮
-        if (pos.x >= ad.x && pos.x <= ad.x + ad.width &&
-            pos.y >= ad.y && pos.y <= ad.y + ad.height) {
+        const hitAd = pos.x >= ad.x && pos.x <= ad.x + ad.width &&
+                      pos.y >= ad.y && pos.y <= ad.y + ad.height;
+        console.log('[StaminaDialog] 是否点击广告按钮:', hitAd);
+
+        if (hitAd) {
+            console.log('[StaminaDialog] 调用广告恢复体力...');
+
+            // ============ 新增诊断日志 ============
+            console.log('[StaminaDialog] staminaManager 存在?', !!this.staminaManager);
+            console.log('[StaminaDialog] staminaManager 类型:', typeof this.staminaManager);
+            console.log('[StaminaDialog] restoreByAd 方法存在?', this.staminaManager && typeof this.staminaManager.restoreByAd === 'function');
+            // =====================================
+
             // 调用广告恢复体力
             const result = await this.staminaManager.restoreByAd();
             if (result.success) {
@@ -843,6 +1025,75 @@ export class Game {
     }
 
     /**
+     * 处理快捷方式弹窗按钮点击
+     * @param {Vector2} pos - 点击位置
+     */
+    async handleShortcutDialogClick(pos) {
+        console.log('[ShortcutDialog] 按钮点击处理');
+
+        if (!this.shortcutDialogButtons) {
+            console.error('[ShortcutDialog] shortcutDialogButtons 为 null!');
+            return;
+        }
+
+        const { add, skip } = this.shortcutDialogButtons;
+        const x = pos.x;
+        const y = pos.y;
+
+        // 检查"添加快捷方式"按钮
+        if (x >= add.x && x <= add.x + add.width &&
+            y >= add.y && y <= add.y + add.height) {
+
+            // 播放点击音效
+            this.audioManager.playButtonClick();
+
+            // 显示加载提示
+            console.log('[Game] 正在添加快捷方式...');
+
+            // 调用 ShortcutManager 添加快捷方式
+            const result = await this.shortcutManager.addShortcut();
+
+            if (result.success) {
+                console.log('[Game] ✅ ' + result.message);
+
+                // 关闭弹窗
+                this.showShortcutDialog = false;
+                this.shortcutDialogButtons = null;
+
+                // 继续开始游戏
+                this.continueAfterShortcut();
+            } else {
+                console.log('[Game] ❌ ' + result.message);
+
+                // 显示错误提示，但不关闭弹窗
+                // 用户可以重试或选择跳过
+            }
+
+            return;
+        }
+
+        // 检查"跳过"按钮
+        if (x >= skip.x && x <= skip.x + skip.width &&
+            y >= skip.y && y <= skip.y + skip.height) {
+
+            // 播放点击音效
+            this.audioManager.playButtonClick();
+
+            // 标记用户已看过提示
+            this.shortcutManager.skipPrompt();
+
+            // 关闭弹窗
+            this.showShortcutDialog = false;
+            this.shortcutDialogButtons = null;
+
+            // 继续开始游戏
+            this.continueAfterShortcut();
+
+            return;
+        }
+    }
+
+    /**
      * 开始游戏（计时模式）
      * @param {Object} targetConfig - 目标配置
      * @param {boolean} skipAdCheck - 是否跳过广告检查（广告后调用时为true）
@@ -864,15 +1115,7 @@ export class Game {
         this.settingsManager.incrementPlayCount();
         this.adManager.incrementConsecutivePlays();
 
-        // 检查是否应该触发选择广告
-        if (!skipAdCheck && this.adManager.shouldTriggerSelectionAd(targetConfig)) {
-            console.log('[Game] 触发选择广告');
-            const adShown = await this.adManager.showInterstitialAd('selection_' + targetConfig.id);
-            if (adShown) {
-                this.adManager.recordAdShown(targetConfig.id);
-            }
-            // 广告结束后继续开始游戏
-        }
+        // 移除选择后的插屏广告，改为在选择页面停留时随机展示
 
         this.stateManager.startGame(targetConfig, false);
         this.targets = [];
@@ -1091,6 +1334,25 @@ export class Game {
     restartGame() {
         console.log('[Game] 再玩一次');
 
+        // 检查是否应该显示快捷方式弹窗
+        if (this.shortcutManager && this.shortcutManager.shouldShowPrompt()) {
+            console.log('[Game] 显示快捷方式提示弹窗');
+            // 显示快捷方式弹窗
+            this.showShortcutDialog = true;
+            this.shortcutDialogButtons = null;
+            return;
+        }
+
+        // 执行重新游戏的实际逻辑
+        this.doRestartGame();
+    }
+
+    /**
+     * 执行重新游戏的实际逻辑
+     */
+    doRestartGame() {
+        console.log('[Game] 执行重新游戏');
+
         // 检查体力是否足够
         if (!this.staminaManager.hasEnoughStamina()) {
             this.showStaminaDialog = true;
@@ -1146,10 +1408,22 @@ export class Game {
     }
 
     /**
+     * 快捷方式弹窗处理完成后继续游戏
+     */
+    continueAfterShortcut() {
+        console.log('[Game] 快捷方式弹窗处理完成，继续游戏');
+        // 继续执行重新游戏的逻辑
+        this.doRestartGame();
+    }
+
+    /**
      * 返回首页
      */
-    returnToHome() {
+    async returnToHome() {
         console.log('[Game] 返回首页');
+
+        // 展示游戏结束返回首页的插屏广告（80%概率）
+        await this.showGameOverHomeAd();
 
         // 1. 完整清理游戏会话
         this.cleanupGameSession();
@@ -1169,6 +1443,26 @@ export class Game {
         // 5. 音效和音乐
         this.audioManager.playButtonClick();
         this.audioManager.playBGM('menu', { volume: AUDIO_CONFIG.BGM_VOLUME.select });
+    }
+
+    /**
+     * 展示游戏结束返回首页的插屏广告
+     * 概率：80%
+     */
+    async showGameOverHomeAd() {
+        const AD_PROBABILITY = 0.8;  // 80%概率
+
+        if (Math.random() < AD_PROBABILITY) {
+            console.log('[Game] 🎬 触发游戏结束返回首页插屏广告 (80%概率)');
+            const adShown = await this.adManager.showInterstitialAd('game_over_home');
+            if (adShown) {
+                console.log('[Game] ✅ 插屏广告展示成功');
+            } else {
+                console.log('[Game] ❌ 插屏广告展示失败（频控限制或其他原因）');
+            }
+        } else {
+            console.log('[Game] 🎲 本次不展示插屏广告');
+        }
     }
 
     /**
@@ -1301,6 +1595,7 @@ export class Game {
                     this.stateManager.setState(GameState.SELECT);
                     this.selectionScreen.reset();
                     this.selectionScreen.selectTargetById(reward.targetId);
+                    this.adManager.showBannerAd();  // 显示Banner广告
                     this.audioManager.playBGM('menu', { volume: AUDIO_CONFIG.BGM_VOLUME.select });
                 }
                 break;

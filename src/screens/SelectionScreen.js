@@ -58,6 +58,12 @@ export class SelectionScreen {
         // 粒子动画时间
         this.particleTime = 0;
 
+        // 新增：插屏广告相关
+        this.selectionEnterTime = Date.now();  // 进入选择页面的时间
+        this.interstitialAdTimer = 0;  // 插屏广告计时器
+        this.interstitialAdInterval = 20000;  // 每20秒检查一次是否展示插屏广告
+        this.interstitialAdProbability = 0.4;  // 40%概率展示插屏广告
+
         // 初始化粒子状态
         this.initParticleStates();
     }
@@ -155,6 +161,10 @@ export class SelectionScreen {
         this.unlockDialogTarget = null;
         this.showModeDialog = false;
         this.selectedTarget = null;
+
+        // 重置插屏广告计时器
+        this.selectionEnterTime = Date.now();
+        this.interstitialAdTimer = 0;
     }
 
     /**
@@ -430,6 +440,9 @@ export class SelectionScreen {
     update(dt) {
         // 更新粒子动画时间
         this.particleTime += dt;
+
+        // 检查是否应该展示插屏广告
+        this.checkAndShowInterstitialAd(dt);
 
         const cardStep = SELECTION_CONFIG.CARD_WIDTH + SELECTION_CONFIG.CARD_SPACING;
         const maxOffset = (this.resourceManager.selectionItems.length - 1) * cardStep;
@@ -1247,6 +1260,56 @@ export class SelectionScreen {
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText('Canvas', x, imgCenterY);
+        }
+    }
+
+    /**
+     * 检查并展示插屏广告（在选择页面停留时随机触发）
+     * @param {number} dt - 时间增量（秒）
+     */
+    checkAndShowInterstitialAd(dt) {
+        // 如果没有广告管理器，不执行
+        if (!this.adManager) return;
+
+        // 如果有弹窗显示，不触发广告
+        if (this.showUnlockDialog || this.showModeDialog) {
+            return;
+        }
+
+        // 累积计时器
+        this.interstitialAdTimer += dt * 1000;  // 转换为毫秒
+
+        // 检查是否达到检查间隔
+        if (this.interstitialAdTimer >= this.interstitialAdInterval) {
+            this.interstitialAdTimer = 0;  // 重置计时器
+
+            // 检查游戏启动时间是否超过30秒（抖音冷启动保护）
+            const timeSinceGameStart = Date.now() - this.selectionEnterTime;
+            const COLD_START_PROTECTION = 30000;  // 30秒冷启动保护
+
+            if (timeSinceGameStart < COLD_START_PROTECTION) {
+                console.log(`[SelectionScreen] ⏰ 冷启动保护中，暂不展示插屏广告 (${timeSinceGameStart/1000}s < ${COLD_START_PROTECTION/1000}s)`);
+                return;
+            }
+
+            // 检查距离上次插屏广告是否超过60秒
+            const timeSinceLastAd = Date.now() - this.adManager.lastInterstitialAdTime;
+            const MIN_INTERSTITIAL_INTERVAL = 60000;  // 60秒最小间隔
+
+            if (timeSinceLastAd < MIN_INTERSTITIAL_INTERVAL) {
+                console.log(`[SelectionScreen] ⏰ 插屏广告冷却中，暂不展示 (${timeSinceLastAd/1000}s < ${MIN_INTERSTITIAL_INTERVAL/1000}s)`);
+                return;
+            }
+
+            // 随机决定是否展示广告
+            const shouldShow = Math.random() < this.interstitialAdProbability;
+
+            if (shouldShow) {
+                console.log('[SelectionScreen] 🎬 触发停留插屏广告');
+                this.adManager.showInterstitialAd('selection_stay');
+            } else {
+                console.log('[SelectionScreen] 🎲 本次不展示插屏广告');
+            }
         }
     }
 }

@@ -57,6 +57,12 @@ export class InputManager {
         this.canvas.addEventListener('mousedown', this.handleMouseDown.bind(this));
         this.canvas.addEventListener('mousemove', this.handleMouseMove.bind(this));
         this.canvas.addEventListener('mouseup', this.handleMouseUp.bind(this));
+
+        console.log('[InputManager] 事件监听器已绑定到 canvas:', {
+            canvas: this.canvas,
+            width: this.canvas.width,
+            height: this.canvas.height
+        });
     }
     handleTouchStart(e) {
         e.preventDefault();
@@ -74,11 +80,21 @@ export class InputManager {
         this.onTouchMove && this.onTouchMove(pos);
     }
     handleTouchEnd(e) {
+        console.log('[InputManager] touchend 事件触发!');
+        console.log('[InputManager] 事件对象:', {
+            type: e.type,
+            changedTouches: e.changedTouches ? e.changedTouches.length : 0,
+            timeStamp: e.timeStamp
+        });
+
         e.preventDefault();
         // touchend 事件中 touches 为空，使用 changedTouches
         const touch = e.changedTouches[0];
         const pos = this.getCanvasPosition(touch.clientX, touch.clientY);
+        console.log('[InputManager] 计算的坐标:', pos);
+
         this.currentTouchPosition = null;
+        console.log('[InputManager] 即将调用 onTouchEnd 回调...');
         this.onTouchEnd && this.onTouchEnd(pos);
     }
     handleMouseDown(e) {

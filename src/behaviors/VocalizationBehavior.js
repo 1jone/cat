@@ -91,7 +91,7 @@ export class VocalizationBehavior {
         const targetId = entity.config.id;
 
         // 获取该目标类型的音效列表
-        const sfxPaths = entity.audioManager?.getTargetSFXPath?.(targetId, '');
+        const sfxPaths = entity.audioManager && entity.audioManager.getTargetSFXPath ? entity.audioManager.getTargetSFXPath(targetId, '') : null;
         if (!sfxPaths) {
             console.warn(`No vocalization sounds for target: ${targetId}`);
             return;
