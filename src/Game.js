@@ -3,7 +3,7 @@
  * 负责协调各个模块，处理游戏主循环
  */
 
-import { CONFIG, AUDIO_CONFIG, TARGET_TYPES } from './config';
+import { CONFIG, AUDIO_CONFIG, TARGET_TYPES, STAMINA_CONFIG } from './config';
 import { InputManager } from './InputManager';
 import { getAudioManager } from './AudioManager';
 import { getSettingsManager } from './SettingsManager';
@@ -543,12 +543,13 @@ export class Game {
         ctx.font = '16px Arial';
         ctx.fillText('+2 体力', dialogX + dialogWidth / 2, buttonY2 + 45);
 
-        // 提示文字
+        // 提示文字 - 使用配置值动态显示恢复时间
+        const recoveryMinutes = STAMINA_CONFIG.RECOVERY_INTERVAL / 60;
         ctx.fillStyle = '#999999';
         ctx.font = '16px Arial';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'top';
-        ctx.fillText('或等待3分钟自动恢复', dialogX + dialogWidth / 2, dialogY + 340);
+        ctx.fillText(`或等待${recoveryMinutes}分钟自动恢复`, dialogX + dialogWidth / 2, dialogY + 340);
 
         // 关闭按钮
         const closeSize = 40;
@@ -924,12 +925,6 @@ export class Game {
                     tt.vibrateShort();
                 }
 
-                // 检查是否解锁新目标
-                const unlockedTarget = this.stateManager.checkUnlock();
-                if (unlockedTarget) {
-                    this.audioManager.playUnlock();
-                }
-
                 // 设置抓取特效（包含目标类型）
                 this.stateManager.setCatchEffect(target.position.x, target.position.y, target.points, target.config.type || 'default');
 
@@ -1104,12 +1099,20 @@ export class Game {
 
         // 检查体力是否足够
         if (!this.staminaManager.hasEnoughStamina()) {
+            console.log('[Game] 体力不足，显示体力不足弹窗');
             this.showStaminaDialog = true;
             return;  // 体力不足，不开始游戏
         }
 
-        // 消耗体力
-        this.staminaManager.consumeStamina();
+        // 消耗体力 - 每次游戏都消耗，包括第一次游戏
+        const consumed = this.staminaManager.consumeStamina();
+        if (!consumed) {
+            console.log('[Game] 体力消耗失败，显示体力不足弹窗');
+            this.showStaminaDialog = true;
+            return;
+        }
+
+        console.log('[Game] 体力消耗成功，开始游戏');
 
         // 增加游戏次数统计（用于广告概率计算）
         this.settingsManager.incrementPlayCount();
@@ -1171,12 +1174,20 @@ export class Game {
 
         // 检查体力是否足够
         if (!this.staminaManager.hasEnoughStamina()) {
+            console.log('[Game] 无尽模式 - 体力不足，显示体力不足弹窗');
             this.showStaminaDialog = true;
             return;  // 体力不足，不开始游戏
         }
 
-        // 消耗体力
-        this.staminaManager.consumeStamina();
+        // 消耗体力 - 每次游戏都消耗，包括第一次游戏
+        const consumed = this.staminaManager.consumeStamina();
+        if (!consumed) {
+            console.log('[Game] 无尽模式 - 体力消耗失败，显示体力不足弹窗');
+            this.showStaminaDialog = true;
+            return;
+        }
+
+        console.log('[Game] 无尽模式 - 体力消耗成功，开始无尽模式');
 
         // 增加游戏次数统计
         this.settingsManager.incrementPlayCount();
@@ -1355,12 +1366,20 @@ export class Game {
 
         // 检查体力是否足够
         if (!this.staminaManager.hasEnoughStamina()) {
+            console.log('[Game] 重新游戏 - 体力不足，显示体力不足弹窗');
             this.showStaminaDialog = true;
             return;  // 体力不足，不重新开始
         }
 
-        // 消耗体力
-        this.staminaManager.consumeStamina();
+        // 消耗体力 - 每次游戏都消耗，包括第一次游戏
+        const consumed = this.staminaManager.consumeStamina();
+        if (!consumed) {
+            console.log('[Game] 重新游戏 - 体力消耗失败，显示体力不足弹窗');
+            this.showStaminaDialog = true;
+            return;
+        }
+
+        console.log('[Game] 重新游戏 - 体力消耗成功，开始重新游戏');
 
         // 1. 隐藏结算页面的广告
         this.adManager.hideGameRecommendation();

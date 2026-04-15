@@ -161,7 +161,6 @@ export class GameStateManager {
         this.state = GameState.SELECT;
         this.score = 0;
         this.isEndlessMode = false;
-        this.unlockedTargetIndices = [];
         this.selectedTarget = null;  // 确保清空选中的目标
         this.currentTargetId = null;
         this.catchEffect = null;
@@ -307,15 +306,6 @@ export class GameStateManager {
                 this.fireworkEffect = null;
             }
         }
-    }
-
-    /**
-     * 检查是否解锁新目标（无尽模式）
-     * @returns {object|null} 解锁的目标配置或 null
-     */
-    checkUnlock() {
-        // 无尽模式不再有解锁系统，直接返回 null
-        return null;
     }
 
     /**

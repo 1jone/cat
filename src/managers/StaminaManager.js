@@ -30,6 +30,7 @@ export class StaminaManager {
 
         // 始终使用配置文件中的最大体力值
         const configuredMax = STAMINA_CONFIG.MAX_STAMINA;
+        const configuredInterval = STAMINA_CONFIG.RECOVERY_INTERVAL;
 
         // 如果没有体力数据，初始化默认值
         if (!settings.stamina) {
@@ -37,23 +38,44 @@ export class StaminaManager {
                 current: configuredMax,
                 max: configuredMax,
                 lastRestoreTime: Date.now(),
+                recoveryInterval: configuredInterval,  // 保存配置值
                 dailyAdCount: 0,
                 lastAdDate: this.getTodayDate()
             };
         }
 
-        // 如果已有体力数据，确保使用最新的配置值作为最大体力上限
+        // 如果已有体力数据，确保使用最新的配置值
         const savedData = settings.stamina;
+        let needsSave = false;
 
         // 如果保存的最大体力与配置不符，更新最大体力值
-        // 并确保当前体力不超过新的最大值
         if (savedData.max !== configuredMax) {
+            console.log(`[StaminaManager] 最大体力配置变更: ${savedData.max} → ${configuredMax}`);
             savedData.max = configuredMax;
-            // 如果当前体力超过新的最大值，限制在最大值
             if (savedData.current > configuredMax) {
                 savedData.current = configuredMax;
             }
-            // 保存更新后的数据
+            needsSave = true;
+        }
+
+        // 检查恢复间隔配置是否变更（通过对比保存的配置值）
+        if (savedData.recoveryInterval !== undefined &&
+            savedData.recoveryInterval !== configuredInterval) {
+            console.log(`[StaminaManager] 恢复间隔配置变更: ${savedData.recoveryInterval}秒 → ${configuredInterval}秒`);
+            // 重置lastRestoreTime为当前时间
+            savedData.lastRestoreTime = Date.now();
+            savedData.recoveryInterval = configuredInterval;
+            needsSave = true;
+        }
+
+        // 如果是旧数据（没有recoveryInterval字段），添加该字段
+        if (savedData.recoveryInterval === undefined) {
+            console.log(`[StaminaManager] 旧数据升级，添加recoveryInterval字段: ${configuredInterval}秒`);
+            savedData.recoveryInterval = configuredInterval;
+            needsSave = true;
+        }
+
+        if (needsSave) {
             this.settingsManager.set('stamina', savedData);
             this.settingsManager.save();
         }
@@ -102,11 +124,17 @@ export class StaminaManager {
      * @returns {boolean} 是否成功消耗
      */
     consumeStamina(amount = 1) {
+        const playCount = this.settingsManager.settings.stats?.totalPlayCount || 0;
+        console.log(`[StaminaManager] 消耗体力 - 当前体力: ${this.data.current}, 游戏次数: ${playCount}`);
+
         if (!this.hasEnoughStamina(amount)) {
+            console.warn('[StaminaManager] 体力不足，无法消耗');
             return false;
         }
 
         this.data.current = Math.max(0, this.data.current - amount);
+        console.log(`[StaminaManager] 体力已消耗 - 剩余体力: ${this.data.current}`);
+
         this.save();
         return true;
     }
@@ -131,28 +159,31 @@ export class StaminaManager {
     update() {
 
         if (this.data.current >= this.data.max) return;
-    
+
         const now = Date.now();
         const lastRestore = this.data.lastRestoreTime || now;
-    
+
         const interval = STAMINA_CONFIG.RECOVERY_INTERVAL * 1000;
-    
+
         const elapsed = now - lastRestore;
-    
+
         const recoveryCount = Math.floor(elapsed / interval);
-    
+
         if (recoveryCount > 0) {
-    
+
             const actualRecovery = Math.min(
                 recoveryCount,
                 this.data.max - this.data.current
             );
-    
+
             this.data.current += actualRecovery;
-    
-            // 保留剩余时间
-            this.data.lastRestoreTime += recoveryCount * interval;
-    
+
+            // 重置lastRestoreTime为当前时间
+            // 这样每次恢复后，倒计时重新从3分钟开始
+            this.data.lastRestoreTime = now;
+
+            console.log(`[StaminaManager] 体力恢复 +${actualRecovery}, 当前体力: ${this.data.current}/${this.data.max}`);
+
             this.save();
         }
     }
@@ -169,8 +200,11 @@ export class StaminaManager {
 
         const now = Date.now();
         const lastRestore = this.data.lastRestoreTime || now;
-        const nextRestore = lastRestore + STAMINA_CONFIG.RECOVERY_INTERVAL * 1000;
+        const interval = STAMINA_CONFIG.RECOVERY_INTERVAL * 1000;
+        const nextRestore = lastRestore + interval;
         const remaining = Math.max(0, nextRestore - now);
+
+
         return remaining;
     }
 

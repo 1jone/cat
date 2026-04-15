@@ -590,7 +590,7 @@ export const CONFIG = {
 };
 export const STAMINA_CONFIG = {
     MAX_STAMINA: 3,               // 体力上限（共3个体力）
-    RECOVERY_INTERVAL: 10,       // 恢复间隔（秒）= 3分钟
+    RECOVERY_INTERVAL: 180,      // 恢复间隔（秒）= 3分钟
     AD_REWARD: 1,                 // 广告奖励体力
     SHARE_REWARD: 2,              // 分享奖励体力
     DAILY_AD_LIMIT: 5,            // 每日广告次数限制
