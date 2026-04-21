@@ -124,6 +124,54 @@ export class MultiLineRenderer {
         }
     }
 
+    /**
+     * 线段碰撞检测：计算点击坐标到所有线段的最短距离
+     * @param {number} x - 点击X坐标
+     * @param {number} y - 点击Y坐标
+     * @param {number} hitRadius - 命中半径容差
+     * @returns {{x: number, y: number}|null} 命中则返回最近命中点坐标，否则返回null
+     */
+    hitTest(x, y, hitRadius) {
+        let closestDist = Infinity;
+        let closestPoint = null;
+
+        for (const line of this.lines) {
+            if (!line.active || line.segments.length < 2) continue;
+
+            for (let i = 1; i < line.segments.length; i++) {
+                const p1 = line.segments[i - 1];
+                const p2 = line.segments[i];
+
+                const dist = this.pointToSegmentDist(x, y, p1.x, p1.y, p2.x, p2.y);
+                if (dist < closestDist) {
+                    closestDist = dist;
+                    // 计算命中点（线段上距离点击位置最近的点）
+                    closestPoint = this.closestPointOnSegment(x, y, p1.x, p1.y, p2.x, p2.y);
+                }
+            }
+        }
+
+        return closestDist <= hitRadius ? closestPoint : null;
+    }
+
+    pointToSegmentDist(px, py, ax, ay, bx, by) {
+        const dx = bx - ax;
+        const dy = by - ay;
+        const lenSq = dx * dx + dy * dy;
+        if (lenSq === 0) return Math.hypot(px - ax, py - ay);
+        const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lenSq));
+        return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+    }
+
+    closestPointOnSegment(px, py, ax, ay, bx, by) {
+        const dx = bx - ax;
+        const dy = by - ay;
+        const lenSq = dx * dx + dy * dy;
+        if (lenSq === 0) return { x: ax, y: ay };
+        const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lenSq));
+        return { x: ax + t * dx, y: ay + t * dy };
+    }
+
     render(ctx) {
         for (const line of this.lines) {
             if (!line.active) continue;

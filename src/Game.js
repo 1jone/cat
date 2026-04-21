@@ -3,7 +3,7 @@
  * 负责协调各个模块，处理游戏主循环
  */
 
-import { CONFIG, AUDIO_CONFIG, TARGET_TYPES, STAMINA_CONFIG } from './config';
+import { CONFIG, AUDIO_CONFIG, TARGET_TYPES, STAMINA_CONFIG, CHECKIN_CONFIG, RANK_CONFIG, FEATURE_FLAGS } from './config';
 import { InputManager } from './InputManager';
 import { getAudioManager } from './AudioManager';
 import { getSettingsManager } from './SettingsManager';
@@ -39,6 +39,8 @@ import { BirdRenderer } from './entities/BirdRenderer';
 import { LadybugRenderer } from './entities/LadybugRenderer';
 import { StaminaManager } from './managers/StaminaManager';
 import { ShortcutManager } from './managers/ShortcutManager';
+import { ChatGroupManager } from './managers/ChatGroupManager';
+import { RankManager } from './managers/RankManager';
 
 export class Game {
     constructor(canvas) {
@@ -120,10 +122,32 @@ export class Game {
         this.staminaManager.adManager = this.adManager;
         this.showStaminaDialog = false; // 体力不足弹窗状态
 
+        // 初始化群聊管理器
+        this.chatGroupManager = new ChatGroupManager(this.settingsManager);
+
+        // 初始化排行榜管理器
+        if (FEATURE_FLAGS.friendRank) {
+            this.rankManager = new RankManager(this.settingsManager);
+            this.rankManager.login().then(code => {
+                if (code) console.log('[Game] 排行榜预登录成功');
+            });
+        } else {
+            this.rankManager = null;
+        }
+
         // 初始化快捷方式管理器
         this.shortcutManager = new ShortcutManager(this.settingsManager, this.staminaManager);
         this.showShortcutDialog = false; // 快捷方式提示弹窗状态
         this.shortcutDialogButtons = null; // 快捷方式弹窗按钮区域
+
+        // 签到系统
+        this.showCheckinDialog = false; // 签到弹窗状态
+        this.checkinDialogButtons = null; // 签到弹窗按钮区域
+        this.isCheckinAdPlaying = false; // 补签广告播放中标记
+        this.initCheckinData(); // 初始化签到数据
+
+        // 试玩模式标记
+        this.isTrialMode = false;  // 当前游戏是否是试玩模式
 
         // 初始化设置界面
         this.settingsUI = new SettingsUI(canvas, ctx, this.settingsManager, this.audioManager, this.emojiManager);
@@ -158,6 +182,11 @@ export class Game {
         // 调整大小并应用设置
         this.resize();
         this.applySettings();
+
+        // 🔥 注册抖音原生触摸事件（必须在第一帧直接调用 tt.joinGroup）
+        if (typeof tt !== 'undefined' && tt.onTouchStart) {
+            this.registerNativeTouchHandler();
+        }
     }
 
     /**
@@ -184,6 +213,86 @@ export class Game {
         if (this.settingsManager.isMuted()) {
             this.audioManager.mute();
         }
+    }
+
+    /**
+     * 🔥 注册抖音原生触摸事件处理器
+     * 用于 tt.joinGroup 等必须在用户手势同步回调中调用的 API
+     * 完全绕过 canvas 和 tmg-core 框架
+     */
+    registerNativeTouchHandler() {
+        if (typeof tt === 'undefined' || !tt.onTouchStart) {
+            console.log('[Game] 非抖音环境或 tt.onTouchStart 不可用');
+            return;
+        }
+
+        console.log('[Game] 🔥 注册 tt.onTouchStart 全局监听器');
+
+        tt.onTouchStart((res) => {
+            const touch = res.touches[0];
+            if (!touch) return;
+
+            const touchX = touch.clientX;
+            const touchY = touch.clientY;
+
+            console.log('[tt.onTouchStart] 触发:', { touchX, touchY });
+
+            // 🔥 关键：只在 SELECT 状态下响应（功能按钮在选择页面）
+            const currentState = this.stateManager.getState();
+            if (currentState !== GameState.SELECT) {
+                return;
+            }
+
+            // 获取按钮区域（从 SelectionScreen）
+            const groupButtonArea = this.selectionScreen.getGroupButtonArea();
+            const checkinButtonArea = this.selectionScreen.getCheckinButtonArea();
+            const rankButtonArea = this.selectionScreen.getRankButtonArea();
+
+            // 🔥 关键：使用屏幕坐标（不除以 DPR）
+            // Canvas 满屏，所以 clientX/Y 直接对应绘制坐标
+
+            // 检测加群按钮点击
+            if (groupButtonArea &&
+                touchX >= groupButtonArea.left && touchX <= groupButtonArea.right &&
+                touchY >= groupButtonArea.top && touchY <= groupButtonArea.bottom) {
+
+                console.log('[tt.onTouchStart] 🔥 检测到加群按钮点击');
+
+                // ✅ 在第一帧直接调用，不做任何逻辑判断
+                tt.joinGroup({
+                    groupid: '4F9U1aXLC8g0ay7zMNpoEKD51WeGOv6AM5F2rg+kK1ERavH81nDifmIujgn96zUF4et6ZbFrLr/Vbf4GfcPnJw==',
+                    success: () => {
+                        console.log('[tt.onTouchStart] ✅ 成功加入官方群');
+                    },
+                    fail: (err) => {
+                        console.error('[tt.onTouchStart] ❌ 加入官方群失败:', err);
+                    }
+                });
+                return;
+            }
+
+            // 检测签到按钮点击
+            if (checkinButtonArea &&
+                touchX >= checkinButtonArea.left && touchX <= checkinButtonArea.right &&
+                touchY >= checkinButtonArea.top && touchY <= checkinButtonArea.bottom) {
+
+                console.log('[tt.onTouchStart] 🔥 检测到签到按钮点击');
+                this.handleCheckin();
+                return;
+            }
+
+            // 检测排行榜按钮点击
+            if (rankButtonArea &&
+                touchX >= rankButtonArea.left && touchX <= rankButtonArea.right &&
+                touchY >= rankButtonArea.top && touchY <= rankButtonArea.bottom) {
+
+                console.log('[tt.onTouchStart] 检测到排行榜按钮点击');
+                if (this.rankManager) {
+                    this.rankManager.openRankList(false);
+                }
+                return;
+            }
+        });
     }
 
     /**
@@ -456,6 +565,11 @@ export class Game {
             this.renderStaminaDialog();
         }
 
+        // 渲染签到弹窗（所有状态下都可能显示）
+        if (this.showCheckinDialog) {
+            this.renderCheckinDialog();
+        }
+
         // 渲染快捷方式提示弹窗（所有状态下都可能显示）
         if (this.showShortcutDialog) {
             this.renderShortcutDialog();
@@ -596,6 +710,286 @@ export class Game {
         ctx.quadraticCurveTo(x, y, x + radius, y);
         ctx.closePath();
     }
+
+    /**
+     * 渲染签到弹窗
+     */
+renderCheckinDialog() {
+    const ctx = this.ctx;
+    const canvasWidth = this.logicalWidth;
+    const canvasHeight = this.logicalHeight;
+
+    // 半透明遮罩
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+    // 弹窗参数
+    const dialogWidth = Math.min(380, canvasWidth * 0.9);
+    const dialogHeight = 520;
+    const dialogX = (canvasWidth - dialogWidth) / 2;
+    const dialogY = (canvasHeight - dialogHeight) / 2;
+
+    // 弹窗背景
+    ctx.save();
+    ctx.fillStyle = '#FFFFFF';
+    this.roundRect(ctx, dialogX, dialogY, dialogWidth, dialogHeight, 16);
+    ctx.fill();
+
+    // 标题
+    ctx.fillStyle = '#FF6B6B';
+    ctx.font = 'bold 28px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText('✨ 每日签到', dialogX + dialogWidth / 2, dialogY + 20);
+
+    // 副标题 - 显示连续签到天数和漏签状态
+    const consecutiveDays = this.getConsecutiveDays();
+    const missedDays = this.getMissedDays();
+    ctx.fillStyle = '#666666';
+    ctx.font = '14px Arial';
+    ctx.textAlign = 'center';
+
+    if (consecutiveDays >= CHECKIN_CONFIG.CYCLE_DAYS) {
+        ctx.fillText('🎉 已完成7天签到！', dialogX + dialogWidth / 2, dialogY + 58);
+    } else if (missedDays.length > 0) {
+        ctx.fillText(`连续签到 ${consecutiveDays}/7 天 · ${missedDays.length}天未签到`, dialogX + dialogWidth / 2, dialogY + 58);
+    } else {
+        ctx.fillText(`连续签到 ${consecutiveDays}/7 天`, dialogX + dialogWidth / 2, dialogY + 58);
+    }
+
+    // 签到天数网格
+    const CIRCLE_RADIUS = 24;
+    const ROW1_CENTER_Y = dialogY + 110;
+    const ROW2_CENTER_Y = dialogY + 200;
+    const H_PADDING = 30;
+    const LABEL_Y_OFFSET = CIRCLE_RADIUS + 16;
+
+    // 第一行：第1-4天
+    const row1Count = 4;
+    const row1Spacing = (dialogWidth - H_PADDING * 2) / row1Count;
+
+    for (let i = 0; i < row1Count; i++) {
+        const dayNumber = i + 1;
+        const centerX = dialogX + H_PADDING + row1Spacing * i + row1Spacing / 2;
+        const centerY = ROW1_CENTER_Y;
+        const status = this.getDayStatus(dayNumber);
+
+        this.drawCheckinDayCircle(ctx, centerX, centerY, dayNumber, status, CIRCLE_RADIUS, LABEL_Y_OFFSET);
+    }
+
+    // 第二行：第5-7天（居中对齐）
+    const row2Count = 3;
+    const row2Spacing = (dialogWidth - H_PADDING * 2) / row1Count;
+    const row2OffsetX = (dialogWidth - row2Spacing * row2Count) / 2;
+
+    for (let i = 0; i < row2Count; i++) {
+        const dayNumber = i + 5;
+        const centerX = dialogX + row2OffsetX + row2Spacing * i + row2Spacing / 2;
+        const centerY = ROW2_CENTER_Y;
+        const status = this.getDayStatus(dayNumber);
+
+        this.drawCheckinDayCircle(ctx, centerX, centerY, dayNumber, status, CIRCLE_RADIUS, LABEL_Y_OFFSET);
+    }
+
+    // 奖励说明
+    ctx.fillStyle = '#999999';
+    ctx.font = '12px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText('前6天每天+1体力，第7天获24小时无限体力', dialogX + dialogWidth / 2, ROW2_CENTER_Y + CIRCLE_RADIUS + 50);
+
+    // 按钮区域
+    const todayDate = this.dateToYYYYMMDD(new Date());
+    const todayStatus = this.getDayStatus(this.dateDiffDays(this.checkinData.weekStartDate, todayDate) + 1);
+    const canCheckin = todayStatus === 'today';
+    const hasMissed = missedDays.length > 0;
+    const isCompleted = consecutiveDays >= CHECKIN_CONFIG.CYCLE_DAYS;
+
+    // 关闭按钮
+    const closeButtonWidth = 100;
+    const closeButtonHeight = 40;
+    const closeButtonX = dialogX + (dialogWidth - closeButtonWidth) / 2;
+    const closeButtonY = dialogY + dialogHeight - 60;
+
+    ctx.fillStyle = '#2196F3';
+    this.roundRect(ctx, closeButtonX, closeButtonY, closeButtonWidth, closeButtonHeight, 20);
+    ctx.fill();
+
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 16px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('关闭', closeButtonX + closeButtonWidth / 2, closeButtonY + closeButtonHeight / 2);
+
+    this.checkinDialogButtons = {
+        close: {
+            x: closeButtonX,
+            y: closeButtonY,
+            width: closeButtonWidth,
+            height: closeButtonHeight
+        }
+    };
+
+    // 补签按钮（有漏签天数时显示）
+    if (hasMissed) {
+        const makeupButtonWidth = 200;
+        const makeupButtonHeight = 44;
+        const makeupButtonX = dialogX + (dialogWidth - makeupButtonWidth) / 2;
+        const makeupButtonY = dialogY + dialogHeight - 170;
+
+        ctx.fillStyle = CHECKIN_CONFIG.COLORS.makeup_button;
+        this.roundRect(ctx, makeupButtonX, makeupButtonY, makeupButtonWidth, makeupButtonHeight, 22);
+        ctx.fill();
+
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = 'bold 16px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(`补签 (${missedDays.length}天)`, makeupButtonX + makeupButtonWidth / 2, makeupButtonY + makeupButtonHeight / 2);
+
+        this.checkinDialogButtons.makeup = {
+            x: makeupButtonX,
+            y: makeupButtonY,
+            width: makeupButtonWidth,
+            height: makeupButtonHeight
+        };
+    }
+
+    // 签到按钮（今天未签到且未完成7天）
+    if (canCheckin && !isCompleted) {
+        const checkinButtonWidth = 200;
+        const checkinButtonHeight = 44;
+        const checkinButtonX = dialogX + (dialogWidth - checkinButtonWidth) / 2;
+        const checkinButtonY = dialogY + dialogHeight - 115;
+
+        ctx.fillStyle = '#FF6B6B';
+        this.roundRect(ctx, checkinButtonX, checkinButtonY, checkinButtonWidth, checkinButtonHeight, 22);
+        ctx.fill();
+
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = 'bold 18px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(hasMissed ? '重新开始签到' : '立即签到', checkinButtonX + checkinButtonWidth / 2, checkinButtonY + checkinButtonHeight / 2);
+
+        this.checkinDialogButtons.checkin = {
+            x: checkinButtonX,
+            y: checkinButtonY,
+            width: checkinButtonWidth,
+            height: checkinButtonHeight
+        };
+    }
+
+    // 开始新周期按钮（完成7天后显示）
+    if (isCompleted) {
+        const newCycleButtonWidth = 200;
+        const newCycleButtonHeight = 44;
+        const newCycleButtonX = dialogX + (dialogWidth - newCycleButtonWidth) / 2;
+        const newCycleButtonY = dialogY + dialogHeight - 115;
+
+        ctx.fillStyle = '#4CAF50';
+        this.roundRect(ctx, newCycleButtonX, newCycleButtonY, newCycleButtonWidth, newCycleButtonHeight, 22);
+        ctx.fill();
+
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = 'bold 18px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('开始新周期', newCycleButtonX + newCycleButtonWidth / 2, newCycleButtonY + newCycleButtonHeight / 2);
+
+        this.checkinDialogButtons.newCycle = {
+            x: newCycleButtonX,
+            y: newCycleButtonY,
+            width: newCycleButtonWidth,
+            height: newCycleButtonHeight
+        };
+    }
+
+    ctx.restore();
+}
+
+/**
+ * 绘制单个签到天数圆形
+ * @param {string} status - 'checked' | 'makeup' | 'missed' | 'today' | 'future'
+ */
+drawCheckinDayCircle(ctx, centerX, centerY, dayNumber, status, radius, labelYOffset) {
+    const colors = CHECKIN_CONFIG.COLORS;
+
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+
+    switch (status) {
+        case 'checked':
+            ctx.fillStyle = colors.checked;
+            ctx.fill();
+            ctx.fillStyle = '#FFFFFF';
+            ctx.font = 'bold 20px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('✓', centerX, centerY);
+            break;
+
+        case 'makeup':
+            ctx.fillStyle = colors.makeup;
+            ctx.fill();
+            ctx.fillStyle = '#FFFFFF';
+            ctx.font = 'bold 20px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('✓', centerX, centerY);
+            break;
+
+        case 'missed':
+            ctx.fillStyle = colors.missed_bg;
+            ctx.fill();
+            ctx.strokeStyle = colors.missed_border;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.fillStyle = colors.missed_text;
+            ctx.font = 'bold 16px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('补', centerX, centerY);
+            break;
+
+        case 'today':
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fill();
+            ctx.strokeStyle = colors.today_border;
+            ctx.lineWidth = 3;
+            ctx.stroke();
+            ctx.fillStyle = colors.today_border;
+            ctx.font = 'bold 20px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(dayNumber.toString(), centerX, centerY);
+            break;
+
+        case 'future':
+            ctx.fillStyle = colors.future;
+            ctx.fill();
+            ctx.fillStyle = colors.future_text;
+            ctx.font = 'bold 20px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(dayNumber.toString(), centerX, centerY);
+            break;
+    }
+
+    // 下方标签
+    ctx.textBaseline = 'top';
+    ctx.font = '11px Arial';
+
+    const labelY = centerY + labelYOffset;
+    const isClaimed = status === 'checked' || status === 'makeup';
+    if (dayNumber < 7) {
+        ctx.fillStyle = isClaimed ? colors.reward_checked : colors.reward_normal;
+        ctx.fillText(`${dayNumber}天 ⚡+1`, centerX, labelY);
+    } else {
+        ctx.fillStyle = isClaimed ? colors.reward_checked : colors.reward_normal;
+        ctx.fillText(`${dayNumber}天 ♾️无限`, centerX, labelY);
+    }
+}
 
     /**
      * 渲染快捷方式提示弹窗
@@ -792,7 +1186,9 @@ export class Game {
         }
 
         if (state === GameState.OVER) {
-            // 检测按钮点击
+            // 注意：加群按钮由 tt.onTouchStart 原生事件处理，不在这里检测
+
+            // 检测其他按钮点击
             const buttonAction = this.gameOverScreen.handleButtonClick(pos.x, pos.y);
 
             if (buttonAction === 'restart') {
@@ -804,6 +1200,8 @@ export class Game {
                 this.returnToHome();
                 return;
             }
+
+            // 注意：加群按钮由 tt.onTouchStart 原生事件处理，不在这里处理
 
             // 点击其他区域: 完整清理后返回选择界面
             // 注意：这里也尝试展示插屏广告（不阻塞返回流程）
@@ -851,6 +1249,14 @@ export class Game {
         console.log('[TouchEnd] 位置:', pos);
         console.log('[TouchEnd] 游戏状态:', state);
         console.log('[TouchEnd] showStaminaDialog:', this.showStaminaDialog);
+        console.log('[TouchEnd] showCheckinDialog:', this.showCheckinDialog);
+
+        // 签到弹窗按钮处理（优先级最高）
+        if (this.showCheckinDialog) {
+            console.log('[TouchEnd] 进入签到对话框处理');
+            this.handleCheckinDialogClick(pos);
+            return;
+        }
 
         // 快捷方式弹窗按钮处理（优先级最高）
         if (this.showShortcutDialog) {
@@ -890,7 +1296,9 @@ export class Game {
 
             const selectionResult = this.selectionScreen.handleTouchEnd(pos);
             if (selectionResult) {
-                const { config, mode } = selectionResult;
+                const { config, mode, isTrial } = selectionResult;
+                // 保存试玩模式标记
+                this.isTrialMode = isTrial || false;
                 if (mode === 'endless') {
                     this.startEndlessMode(config);
                 } else {
@@ -906,6 +1314,35 @@ export class Game {
     tryToCatch(pos) {
         for (const target of this.targets) {
             if (!target.isActive) continue;
+
+            // multiline 类型使用线段碰撞检测
+            if (target.config.renderType === 'multiline' && target.multilineRenderer) {
+                const hitPoint = target.multilineRenderer.hitTest(pos.x, pos.y, 20);
+                if (hitPoint) {
+                    target.isActive = false;
+                    this.stateManager.addScore(target.points);
+
+                    target.isClicked = true;
+                    target.clickTime = Date.now();
+                    target.clickIntensity = 1.0;
+
+                    this.audioManager.playCatch(target.points);
+
+                    if (tt && this.settingsManager.isVibrationEnabled()) {
+                        tt.vibrateShort();
+                    }
+
+                    this.stateManager.setCatchEffect(hitPoint.x, hitPoint.y, target.points, target.config.type || 'default');
+
+                    if (target.config.id === 'yarn' && target.config.renderType === 'multiline') {
+                        const colors = target.config.renderConfig && target.config.renderConfig.colors || ['#FF6B6B', '#4ECDC4', '#95E1D3', '#F38181', '#AA96DA'];
+                        this.stateManager.setFireworkEffect(hitPoint.x, hitPoint.y, colors);
+                    }
+
+                    return;
+                }
+                continue;
+            }
 
             const distance = pos.distanceTo(target.position);
             if (distance < target.radius + 25) {
@@ -943,7 +1380,7 @@ export class Game {
                 } else if (target.config.id === 'fish') {
                     const colors = target.config.renderConfig && target.config.renderConfig.explosionColors || ['#FFFFFF', '#E6F7FF', '#B3ECFF','#80DFFF','rgba(200,240,255,0.3)'];
                     this.stateManager.setFireworkEffect(target.position.x, target.position.y, colors);
-                
+
                 } else if (target.config.id === 'butterfly') {
                     const colors = target.config.renderConfig && target.config.renderConfig.explosionColors || ['#FFF176', '#FFD54F', '#FFD54F'];
                     this.stateManager.setFireworkEffect(target.position.x, target.position.y, colors);
@@ -1016,6 +1453,91 @@ export class Game {
             // 关闭弹窗
             this.showStaminaDialog = false;
             this.staminaDialogButtons = null;
+        }
+    }
+
+    /**
+     * 处理签到弹窗按钮点击
+     * @param {Vector2} pos - 点击位置
+     */
+    async handleCheckinDialogClick(pos) {
+        console.log('[CheckinDialog] 按钮点击处理');
+        console.log('[CheckinDialog] checkinDialogButtons:', this.checkinDialogButtons);
+        console.log('[CheckinDialog] 点击位置:', pos);
+
+        if (!this.checkinDialogButtons) {
+            console.error('[CheckinDialog] checkinDialogButtons 为 null!');
+            return;
+        }
+
+        // 防止广告播放期间重复点击
+        if (this.isCheckinAdPlaying) {
+            console.log('[CheckinDialog] 广告播放中，忽略点击');
+            return;
+        }
+
+        const { checkin, close, makeup, newCycle } = this.checkinDialogButtons;
+
+        // 检查是否点击开始新周期按钮
+        if (newCycle && pos.x >= newCycle.x && pos.x <= newCycle.x + newCycle.width &&
+            pos.y >= newCycle.y && pos.y <= newCycle.y + newCycle.height) {
+            console.log('[CheckinDialog] 点击开始新周期按钮');
+            const todayDate = this.dateToYYYYMMDD(new Date());
+            this._resetCycleForNewStart(todayDate);
+            this.audioManager.playButtonClick();
+            return;
+        }
+
+        // 检查是否点击补签按钮
+        if (makeup && pos.x >= makeup.x && pos.x <= makeup.x + makeup.width &&
+            pos.y >= makeup.y && pos.y <= makeup.y + makeup.height) {
+            console.log('[CheckinDialog] 点击补签按钮');
+
+            const missedDays = this.getMissedDays();
+            if (missedDays.length === 0) return;
+
+            const targetDay = missedDays[0];
+
+            this.isCheckinAdPlaying = true;
+            const result = await this.performMakeupCheckin(targetDay);
+            this.isCheckinAdPlaying = false;
+
+            if (result.success) {
+                console.log('[CheckinDialog] ✅ 补签成功:', result);
+                this.audioManager.playButtonClick();
+                // 不关闭弹窗，让用户继续补签或签到
+            } else {
+                console.log('[CheckinDialog] 补签失败:', result.message);
+            }
+            return;
+        }
+
+        // 检查是否点击签到按钮
+        if (checkin && pos.x >= checkin.x && pos.x <= checkin.x + checkin.width &&
+            pos.y >= checkin.y && pos.y <= checkin.y + checkin.height) {
+            console.log('[CheckinDialog] 点击签到按钮');
+
+            const result = this.performCheckin();
+
+            if (result.success) {
+                console.log('[CheckinDialog] ✅ 签到成功:', result);
+                this.audioManager.playButtonClick();
+                this.showCheckinDialog = false;
+                this.checkinDialogButtons = null;
+            } else {
+                console.log('[CheckinDialog] 签到失败:', result.message);
+            }
+            return;
+        }
+
+        // 检查是否点击关闭按钮
+        if (pos.x >= close.x && pos.x <= close.x + close.width &&
+            pos.y >= close.y && pos.y <= close.y + close.height) {
+            console.log('[CheckinDialog] 点击关闭按钮');
+            this.audioManager.playButtonClick();
+            this.showCheckinDialog = false;
+            this.checkinDialogButtons = null;
+            return;
         }
     }
 
@@ -1268,6 +1790,13 @@ export class Game {
         const targetId = this.stateManager.getCurrentTargetId();
         const hitCount = this.stateManager.getHitCount();  // 新增：获取命中目标数
 
+        // 检查是否是试玩模式，如果是，则标记试玩已完成
+        if (this.isTrialMode && targetId) {
+            console.log('[Game] 试玩模式结束，标记目标已试玩:', targetId);
+            this.adManager.markTrialPlayed(targetId);
+            this.isTrialMode = false;  // 清除试玩标记
+        }
+
         this.stateManager.endGame();
 
         // 播放游戏结束音效
@@ -1297,6 +1826,11 @@ export class Game {
                 ? this.settingsManager.getEndlessStats().highScore
                 : this.settingsManager.getTargetHighScore(targetId)
         };
+
+        // 提交分数到排行榜（fire-and-forget，不阻塞流程）
+        if (this.rankManager) {
+            this.rankManager.submitScore(finalScore, wasEndlessMode);
+        }
 
         // 检查是否应该触发游戏结束广告（无尽模式且分数达到要求）
         if (wasEndlessMode &&
@@ -1462,6 +1996,372 @@ export class Game {
         // 5. 音效和音乐
         this.audioManager.playButtonClick();
         this.audioManager.playBGM('menu', { volume: AUDIO_CONFIG.BGM_VOLUME.select });
+    }
+
+    /**
+     * 加入官方群
+     */
+joinOfficialGroup() {
+    console.log('[Game] 加入官方群');
+
+    // 播放按钮点击音效
+    this.audioManager.playButtonClick();
+
+    // 检查是否有群聊管理器
+    if (!this.chatGroupManager) {
+        console.warn('[Game] ❌ 群聊管理器未初始化');
+        return;
+    }
+
+    // 🔥 关键：不能 await！直接调用！
+    this.chatGroupManager.openOfficialGroup();
+}
+
+    /**
+     * 处理签到按钮点击
+     */
+handleCheckin() {
+    console.log('[Game] 签到按钮点击');
+
+    // 播放按钮点击音效
+    this.audioManager.playButtonClick();
+
+    // 显示签到弹窗
+    this.showCheckinDialog = true;
+    this.checkinDialogButtons = null;
+
+    // 渲染弹窗按钮（需要在下一帧渲染时计算）
+    console.log('[Game] 显示签到弹窗');
+}
+
+    /**
+     * 初始化签到数据
+     */
+initCheckinData() {
+    const savedData = tt.getStorageSync('checkinData');
+    if (savedData) {
+        try {
+            this.checkinData = JSON.parse(savedData);
+            console.log('[Game] 签到数据已加载:', this.checkinData);
+
+            if (!this.checkinData.version || this.checkinData.version < CHECKIN_CONFIG.DATA_VERSION) {
+                this.migrateCheckinDataV1ToV2(this.checkinData);
+            }
+        } catch (e) {
+            console.warn('[Game] 签到数据解析失败:', e);
+            this.initNewCheckinWeek();
+        }
+    } else {
+        this.initNewCheckinWeek();
+    }
+}
+
+    /**
+     * 迁移旧版签到数据到 v2 格式
+     */
+migrateCheckinDataV1ToV2(oldData) {
+    const todayDate = this.dateToYYYYMMDD(new Date());
+    const daysAgo = oldData.lastCheckinDate > 0 ? this.dateDiffDays(oldData.lastCheckinDate, todayDate) : 999;
+
+    if (oldData.consecutiveDays > 0 && daysAgo <= 1) {
+        const weekStart = this.addDaysToDate(oldData.lastCheckinDate, -(oldData.consecutiveDays - 1));
+        const checkedDays = [];
+        for (let i = 0; i < oldData.consecutiveDays; i++) {
+            checkedDays.push({
+                date: this.addDaysToDate(weekStart, i),
+                day: i + 1,
+                type: 'normal'
+            });
+        }
+        this.checkinData = {
+            version: CHECKIN_CONFIG.DATA_VERSION,
+            weekStartDate: weekStart,
+            checkedDays,
+            makeupDays: [],
+            lastCheckinTime: oldData.lastCheckinTime,
+            lastCheckinDate: oldData.lastCheckinDate,
+            totalCheckinDays: oldData.totalCheckinDays || 0,
+            consecutiveDays: oldData.consecutiveDays
+        };
+    } else {
+        this.checkinData = {
+            version: CHECKIN_CONFIG.DATA_VERSION,
+            weekStartDate: todayDate,
+            checkedDays: [],
+            makeupDays: [],
+            lastCheckinTime: 0,
+            lastCheckinDate: 0,
+            totalCheckinDays: oldData.totalCheckinDays || 0,
+            consecutiveDays: 0
+        };
+    }
+    this.saveCheckinData();
+    console.log('[Game] 签到数据已迁移到 v2');
+}
+
+    /**
+     * 初始化新的签到周期
+     */
+initNewCheckinWeek() {
+    const todayDate = this.dateToYYYYMMDD(new Date());
+    const preservedTotal = this.checkinData ? this.checkinData.totalCheckinDays || 0 : 0;
+
+    this.checkinData = {
+        version: CHECKIN_CONFIG.DATA_VERSION,
+        weekStartDate: todayDate,
+        checkedDays: [],
+        makeupDays: [],
+        lastCheckinTime: 0,
+        lastCheckinDate: 0,
+        totalCheckinDays: preservedTotal,
+        consecutiveDays: 0
+    };
+    this.saveCheckinData();
+    console.log('[Game] 初始化签到数据');
+}
+
+    /**
+     * 保存签到数据到本地存储
+     */
+saveCheckinData() {
+    try {
+        tt.setStorageSync('checkinData', JSON.stringify(this.checkinData));
+        console.log('[Game] 签到数据已保存');
+    } catch (e) {
+        console.warn('[Game] 签到数据保存失败:', e);
+    }
+}
+
+    /**
+     * 从 checkedDays 计算连续签到天数（从第 1 天起连续）
+     */
+getConsecutiveDays() {
+    let count = 0;
+    for (let day = 1; day <= CHECKIN_CONFIG.CYCLE_DAYS; day++) {
+        if (this.checkinData.checkedDays.some(d => d.day === day)) {
+            count++;
+        } else {
+            break;
+        }
+    }
+    return count;
+}
+
+    /**
+     * 获取指定天数的状态: 'checked' | 'makeup' | 'missed' | 'today' | 'future'
+     */
+getDayStatus(dayNumber) {
+    const todayDate = this.dateToYYYYMMDD(new Date());
+    const dayDate = this.getCycleDayDate(dayNumber);
+
+    const checkedEntry = this.checkinData.checkedDays.find(d => d.day === dayNumber);
+    const isMakeup = this.checkinData.makeupDays.some(d => d.day === dayNumber);
+
+    if (checkedEntry) {
+        return isMakeup ? 'makeup' : 'checked';
+    }
+    if (dayDate < todayDate) {
+        return 'missed';
+    }
+    if (dayDate === todayDate) {
+        return 'today';
+    }
+    return 'future';
+}
+
+    /**
+     * 获取所有漏签的天数
+     */
+getMissedDays() {
+    const missed = [];
+    for (let day = 1; day <= CHECKIN_CONFIG.CYCLE_DAYS; day++) {
+        if (this.getDayStatus(day) === 'missed') {
+            missed.push(day);
+        }
+    }
+    return missed;
+}
+
+    /**
+     * 是否有漏签天数
+     */
+hasMissedDays() {
+    return this.getMissedDays().length > 0;
+}
+
+    /**
+     * 内部方法：执行签到写入
+     */
+_doCheckin(date, dayNumber, type) {
+    if (this.checkinData.checkedDays.some(d => d.day === dayNumber)) {
+        return { success: false, message: '该天已签到' };
+    }
+
+    this.checkinData.checkedDays.push({ date, day: dayNumber, type });
+    this.checkinData.lastCheckinTime = Date.now();
+    this.checkinData.lastCheckinDate = date;
+    this.checkinData.totalCheckinDays++;
+    this.checkinData.consecutiveDays = this.getConsecutiveDays();
+
+    const reward = this.grantCheckinReward(dayNumber);
+
+    if (this.checkinData.consecutiveDays >= CHECKIN_CONFIG.CYCLE_DAYS) {
+        console.log('[Game] 🎉 已完成7天签到！');
+    }
+
+    this.saveCheckinData();
+    return { success: true, day: dayNumber, reward, type };
+}
+
+    /**
+     * 内部方法：重置周期（断签后重新开始）
+     */
+_resetCycleForNewStart(todayDate) {
+    const preservedTotal = this.checkinData.totalCheckinDays || 0;
+    this.checkinData = {
+        version: CHECKIN_CONFIG.DATA_VERSION,
+        weekStartDate: todayDate,
+        checkedDays: [],
+        makeupDays: [],
+        lastCheckinTime: 0,
+        lastCheckinDate: 0,
+        totalCheckinDays: preservedTotal,
+        consecutiveDays: 0
+    };
+    this.saveCheckinData();
+    console.log('[Game] 签到周期已重置，今天为 Day 1');
+}
+
+    /**
+     * 执行签到（严格日级判断）
+     */
+performCheckin() {
+    const todayDate = this.dateToYYYYMMDD(new Date());
+    console.log('[Game] 执行签到，当前连续天数:', this.getConsecutiveDays());
+
+    // 检查是否已经签到过
+    if (this.checkinData.checkedDays.some(d => d.date === todayDate)) {
+        console.log('[Game] 今天已经签到过了');
+        return { success: false, message: '今天已经签到过了' };
+    }
+
+    const daysSinceWeekStart = this.dateDiffDays(this.checkinData.weekStartDate, todayDate);
+
+    // 周期内（0~6天偏移）
+    if (daysSinceWeekStart >= 0 && daysSinceWeekStart < CHECKIN_CONFIG.CYCLE_DAYS) {
+        const dayNumber = daysSinceWeekStart + 1;
+        const allPreviousChecked = this.checkinData.checkedDays
+            .filter(d => d.day < dayNumber).length === dayNumber - 1;
+
+        if (allPreviousChecked) {
+            return this._doCheckin(todayDate, dayNumber, 'normal');
+        }
+        // 有漏签 → 重置周期
+        console.log('[Game] 检测到漏签，重置签到周期');
+        this._resetCycleForNewStart(todayDate);
+        return this._doCheckin(todayDate, 1, 'normal');
+    }
+
+    // 周期已过期或异常
+    console.log('[Game] 签到周期已过期，重新开始');
+    this._resetCycleForNewStart(todayDate);
+    return this._doCheckin(todayDate, 1, 'normal');
+}
+
+    /**
+     * 看广告补签
+     */
+async performMakeupCheckin(dayNumber) {
+    const status = this.getDayStatus(dayNumber);
+    if (status !== 'missed') {
+        return { success: false, message: '该日期无法补签' };
+    }
+
+    const adWatched = await this.adManager.showRewardedAd(CHECKIN_CONFIG.MAKEUP_AD_PLACEMENT);
+    if (!adWatched) {
+        return { success: false, message: '广告未完整观看，补签失败' };
+    }
+
+    const dayDate = this.getCycleDayDate(dayNumber);
+    const result = this._doCheckin(dayDate, dayNumber, 'makeup');
+
+    if (result.success) {
+        this.checkinData.makeupDays.push({ date: dayDate, day: dayNumber });
+        this.saveCheckinData();
+        console.log('[Game] ✅ 补签成功，第', dayNumber, '天');
+    }
+    return result;
+}
+
+    /**
+     * 计算连续签到天数（兼容旧调用）
+     */
+calculateConsecutiveDays() {
+    return this.getConsecutiveDays();
+}
+
+    /**
+     * 发放签到奖励
+     * 第1-6天：每天1体力
+     * 第7天：24小时无限体力
+     */
+grantCheckinReward(consecutiveDay) {
+    if (consecutiveDay < 7) {
+        // 前6天：每天1体力（不受上限限制）
+        if (this.staminaManager) {
+            this.staminaManager.data.current += 1;
+            this.staminaManager.save();
+            console.log('[Game] ✅ 签到奖励：+1体力，当前:', this.staminaManager.data.current);
+        }
+        return { type: 'stamina', amount: 1 };
+    } else {
+        // 第7天：24小时无限体力
+        if (this.staminaManager) {
+            this.staminaManager.enableUnlimitedStamina(24 * 60 * 60 * 1000); // 24小时
+            console.log('[Game] ✅ 签到奖励：24小时无限体力');
+        }
+        return { type: 'unlimited', duration: 24 };
+    }
+}
+
+    // ========== 签到日期工具方法 ==========
+
+    dateToYYYYMMDD(date) {
+        return date.getFullYear() * 10000 + (date.getMonth() + 1) * 100 + date.getDate();
+    }
+
+    dateFromYYYYMMDD(yyyymmdd) {
+        const year = Math.floor(yyyymmdd / 10000);
+        const month = Math.floor((yyyymmdd % 10000) / 100);
+        const day = yyyymmdd % 100;
+        return new Date(year, month - 1, day);
+    }
+
+    addDaysToDate(yyyymmdd, days) {
+        const date = this.dateFromYYYYMMDD(yyyymmdd);
+        date.setDate(date.getDate() + days);
+        return this.dateToYYYYMMDD(date);
+    }
+
+    dateDiffDays(dateA, dateB) {
+        const a = this.dateFromYYYYMMDD(dateA);
+        const b = this.dateFromYYYYMMDD(dateB);
+        const msPerDay = 24 * 60 * 60 * 1000;
+        return Math.round((b - a) / msPerDay);
+    }
+
+    getCycleDayDate(dayNumber) {
+        return this.addDaysToDate(this.checkinData.weekStartDate, dayNumber - 1);
+    }
+
+    /**
+     * 获取目标名称
+     * @param {string} targetId - 目标ID
+     * @returns {string} 目标名称
+     */
+    getTargetName(targetId) {
+        const target = TARGET_TYPES.find(t => t.id === targetId);
+        return target ? target.name : '猫咪';
     }
 
     /**

@@ -46,8 +46,9 @@ export class SettingsManager {
             },
             // 广告相关数据
             ad: {
-                unlockData: {},      // 目标解锁时间记录 { targetId: timestamp }
-                adWatchCount: 0      // 累计观看广告次数
+                unlockData: {},           // 目标解锁时间记录 { targetId: timestamp }
+                adWatchCount: 0,          // 累计观看广告次数
+                trialPlayedData: {}       // 目标试玩记录 { targetId: boolean }
             },
             // 侧边栏奖励相关数据
             sidebar: {
@@ -405,6 +406,42 @@ export class SettingsManager {
      */
     saveUnlockData(unlockData) {
         this.set('ad.unlockData', unlockData);
+    }
+
+    /**
+     * 获取目标试玩数据
+     * @returns {Object} 试玩数据 { targetId: boolean }
+     */
+    getTrialPlayedData() {
+        return this.get('ad.trialPlayedData') || {};
+    }
+
+    /**
+     * 保存目标试玩数据
+     * @param {Object} trialPlayedData - 试玩数据
+     */
+    saveTrialPlayedData(trialPlayedData) {
+        this.set('ad.trialPlayedData', trialPlayedData);
+    }
+
+    /**
+     * 检查目标是否已试玩
+     * @param {string} targetId - 目标ID
+     * @returns {boolean} 是否已试玩
+     */
+    hasTrialPlayed(targetId) {
+        const trialData = this.getTrialPlayedData();
+        return trialData[targetId] === true;
+    }
+
+    /**
+     * 标记目标已试玩
+     * @param {string} targetId - 目标ID
+     */
+    markTrialPlayed(targetId) {
+        const trialData = this.getTrialPlayedData();
+        trialData[targetId] = true;
+        this.saveTrialPlayedData(trialData);
     }
 
     /**

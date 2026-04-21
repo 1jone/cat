@@ -90,9 +90,9 @@ export const TARGET_TYPES = [
             showGrass: true
         },
         unlock: {
-            type: 'free',
-            adRequired: false,
-            unlockDuration: 0
+            type: 'ad',
+            adRequired: true,
+            unlockDuration: 24 * 60 * 60 * 1000  // 24小时
         },
         adTrigger: {
             enabled: true,
@@ -147,9 +147,9 @@ export const TARGET_TYPES = [
             speedVariation: 0.4
         },
         unlock: {
-            type: 'free',
-            adRequired: false,
-            unlockDuration: 0
+            type: 'ad',
+            adRequired: true,
+            unlockDuration: 24 * 60 * 60 * 1000  // 24小时
         },
         adTrigger: {
             enabled: true,
@@ -193,8 +193,8 @@ export const TARGET_TYPES = [
             showGrass: true
         },
         unlock: {
-            type: 'free',
-            adRequired: false,
+            type: 'ad',
+            adRequired: true,
             unlockDuration: 24 * 60 * 60 * 1000  // 24小时
         },
         adTrigger: {
@@ -259,9 +259,9 @@ export const TARGET_TYPES = [
             showGrass: true
         },
         unlock: {
-            type: 'free',
-            adRequired: false,
-            unlockDuration: 48 * 60 * 60 * 1000  // 48小时
+            type: 'ad',
+            adRequired: true,
+            unlockDuration: 24 * 60 * 60 * 1000  // 24小时
         },
         adTrigger: {
             enabled: true,
@@ -293,8 +293,8 @@ export const TARGET_TYPES = [
             showGrass: false      // 不显示草地，使用水体背景
         },
         unlock: {
-            type: 'free',
-            adRequired: false,
+            type: 'ad',
+            adRequired: true,
             unlockDuration: 24 * 60 * 60 * 1000  // 24小时
         },
         adTrigger: {
@@ -342,8 +342,8 @@ export const TARGET_TYPES = [
             showGrass: false          // 不显示草地，使用深蓝背景
         },
         unlock: {
-            type: 'free',
-            adRequired: false,
+            type: 'ad',
+            adRequired: true,
             unlockDuration: 24 * 60 * 60 * 1000  // 24小时
         },
         adTrigger: {
@@ -375,9 +375,9 @@ export const TARGET_TYPES = [
             showGrass: true
         },
         unlock: {
-            type: 'free',
-            adRequired: false,
-            unlockDuration: 48 * 60 * 60 * 1000  // 48小时
+            type: 'ad',
+            adRequired: true,
+            unlockDuration: 24 * 60 * 60 * 1000  // 24小时
         },
         adTrigger: {
             enabled: true,
@@ -402,11 +402,11 @@ export const TARGET_TYPES = [
             image: '/backgrounds/captain_bg.jpg',
             showGrass: false
         },
-        // 广告配置 - 免费目标
+        // 广告配置 - 需要广告解锁（24小时）
         unlock: {
-            type: 'free',
-            adRequired: false,
-            unlockDuration: 10 * 60 * 60 * 1000
+            type: 'ad',
+            adRequired: true,
+            unlockDuration: 24 * 60 * 60 * 1000  // 24小时
         },
         adTrigger: {
             enabled: true,
@@ -432,11 +432,11 @@ export const TARGET_TYPES = [
             image: '/backgrounds/octopus_bg.jpg',
             showGrass: false
         },
-        // 广告配置 - 需要广告解锁（48小时）
+        // 广告配置 - 需要广告解锁（24小时）
         unlock: {
-            type: 'free',
+            type: 'ad',
             adRequired: true,
-            unlockDuration: 48 * 60 * 60 * 1000  // 48小时
+            unlockDuration: 24 * 60 * 60 * 1000  // 24小时
         },
         adTrigger: {
             enabled: true,
@@ -462,11 +462,11 @@ export const TARGET_TYPES = [
             image: '/backgrounds/bear_bg.jpg',
             showGrass: false
         },
-        // 广告配置 - 需要广告解锁（48小时）
+        // 广告配置 - 需要广告解锁（24小时）
         unlock: {
-            type: 'free',
+            type: 'ad',
             adRequired: true,
-            unlockDuration: 48 * 60 * 60 * 1000  // 48小时
+            unlockDuration: 24 * 60 * 60 * 1000  // 24小时
         },
         adTrigger: {
             enabled: true,
@@ -492,11 +492,11 @@ export const TARGET_TYPES = [
             image: '/backgrounds/seagull_bg.jpg',
             showGrass: false
         },
-        // 广告配置 - 需要广告解锁（48小时）
+        // 广告配置 - 需要广告解锁（24小时）
         unlock: {
-            type: 'free',
+            type: 'ad',
             adRequired: true,
-            unlockDuration: 48 * 60 * 60 * 1000  // 48小时
+            unlockDuration: 24 * 60 * 60 * 1000  // 24小时
         },
         adTrigger: {
             enabled: true,
@@ -1031,7 +1031,10 @@ export const FEATURE_FLAGS = {
     vocalization: true,
 
     // 音频分层
-    audioLayering: true
+    audioLayering: true,
+
+    // 好友排行榜
+    friendRank: true
 };
 
 // ============ 窜出动画配置 ============
@@ -1073,4 +1076,48 @@ export const POPIN_CONFIG = {
             flickerProbability: 0.4
         }
     }
+};
+
+export const CHECKIN_CONFIG = {
+    CYCLE_DAYS: 7,
+    MAKEUP_AD_PLACEMENT: 'checkin_makeup',
+    DATA_VERSION: 2,
+    COLORS: {
+        checked: '#FFD700',
+        makeup: '#26A69A',
+        missed_bg: '#FFF3E0',
+        missed_border: '#FF9800',
+        missed_text: '#FF9800',
+        today_border: '#FF6B6B',
+        future: '#F0F0F0',
+        future_text: '#999999',
+        reward_checked: '#B8860B',
+        reward_normal: '#666666',
+        makeup_button: '#26A69A',
+    }
+};
+
+// ============ 排行榜配置 ============
+
+/**
+ * 排行榜配置
+ * 控制抖音好友排行榜的API参数
+ */
+export const RANK_CONFIG = {
+  MIN_SDK_VERSION: '2.0.0',
+  MIN_APP_VERSION: '1.0.0',
+  DATA_TYPE: 0, // 0=数字
+  RELATION_TYPE: 'friend', // 好友榜
+  RANK_TYPE: 'day', // 日榜
+  UNIT: '分',
+
+  RANK_TITLE: {
+    NORMAL: '计时模式排行榜',
+    ENDLESS: '无尽模式排行榜'
+  },
+
+  ZONE_IDS: {
+    NORMAL: 'default',
+    ENDLESS: 'default'
+  }
 };

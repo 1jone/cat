@@ -40,7 +40,9 @@ export class StaminaManager {
                 lastRestoreTime: Date.now(),
                 recoveryInterval: configuredInterval,  // 保存配置值
                 dailyAdCount: 0,
-                lastAdDate: this.getTodayDate()
+                lastAdDate: this.getTodayDate(),
+                unlimitedStamina: false,  // 是否无限体力
+                unlimitedStaminaEndTime: 0  // 无限体力结束时间
             };
         }
 
@@ -98,6 +100,10 @@ export class StaminaManager {
      * @returns {number} 当前体力
      */
     getCurrentStamina() {
+        // 如果是无限体力模式，返回最大体力
+        if (this.isUnlimitedStamina()) {
+            return this.data.max;
+        }
         return this.data.current;
     }
 
@@ -382,5 +388,59 @@ export class StaminaManager {
                 message: '分享失败: ' + error.message
             };
         }
+    }
+
+    /**
+     * 启用无限体力模式
+     * @param {number} duration - 持续时间（毫秒）
+     */
+    enableUnlimitedStamina(duration) {
+        const now = Date.now();
+        this.data.unlimitedStamina = true;
+        this.data.unlimitedStaminaEndTime = now + duration;
+        this.save();
+
+        const durationMinutes = Math.floor(duration / (1000 * 60));
+        const durationHours = (durationMinutes / 60).toFixed(1);
+
+        console.log(`[StaminaManager] ✅ 启用无限体力，持续 ${durationHours} 小时`);
+    }
+
+    /**
+     * 检查是否是无限体力模式
+     * @returns {boolean} 是否无限体力
+     */
+    isUnlimitedStamina() {
+        if (!this.data.unlimitedStamina) {
+            return false;
+        }
+
+        // 检查是否已过期
+        const now = Date.now();
+        if (now >= this.data.unlimitedStaminaEndTime) {
+            // 已过期，禁用无限体力
+            this.data.unlimitedStamina = false;
+            this.data.unlimitedStaminaEndTime = 0;
+            this.save();
+            console.log('[StaminaManager] 无限体力已过期');
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * 获取无限体力剩余时间（毫秒）
+     * @returns {number} 剩余时间，如果不是无限体力返回0
+     */
+    getUnlimitedStaminaRemainingTime() {
+        if (!this.data.unlimitedStamina) {
+            return 0;
+        }
+
+        const now = Date.now();
+        const remaining = this.data.unlimitedStaminaEndTime - now;
+
+        return Math.max(0, remaining);
     }
 }

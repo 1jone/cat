@@ -15,6 +15,9 @@ export class AdManager {
         // 从本地存储加载解锁数据
         this.unlockData = this.settings.getUnlockData() || {};
 
+        // 从本地存储加载试玩数据
+        this.trialPlayedData = this.settings.getTrialPlayedData() || {};
+
         // 预加载广告实例
         this.rewardedAd = null;
         this.interstitialAd = null;
@@ -176,6 +179,41 @@ export class AdManager {
             return true;
         }
         return false;
+    }
+
+    /**
+     * 检查目标是否已试玩
+     * @param {string} targetId - 目标ID
+     * @returns {boolean} 是否已试玩
+     */
+    hasTrialPlayed(targetId) {
+        return this.trialPlayedData[targetId] === true;
+    }
+
+    /**
+     * 标记目标已试玩
+     * @param {string} targetId - 目标ID
+     */
+    markTrialPlayed(targetId) {
+        this.trialPlayedData[targetId] = true;
+        this.settings.saveTrialPlayedData(this.trialPlayedData);
+        console.log(`[AdManager] 目标 ${targetId} 已标记为试玩过`);
+    }
+
+    /**
+     * 检查目标是否可以试玩（未试玩且需要广告解锁）
+     * @param {string} targetId - 目标ID
+     * @returns {boolean} 是否可以试玩
+     */
+    canTrialPlay(targetId) {
+        const target = TARGET_TYPES.find(t => t.id === targetId);
+        if (!target) return false;
+
+        // 免费目标不需要试玩机制
+        if (target.unlock.type === 'free') return false;
+
+        // 需要广告解锁的目标，检查是否已试玩
+        return !this.hasTrialPlayed(targetId);
     }
 
     /**

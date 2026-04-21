@@ -22,6 +22,7 @@ export class GameOverScreen {
         // 新增：Banner广告区域
         this.bannerHeight = 100;  // Banner高度（100px，避免遮挡按钮）
         this.bannerBottom = 0;  // 动态计算
+
     }
 
     /**
@@ -95,19 +96,21 @@ export class GameOverScreen {
         yOffset += 50;
 
         // === 按钮区 ===
-        const buttonY = yOffset + 20;
         const centerX = logicalWidth / 2;
 
+        // 再玩一次和返回首页按钮
+        const mainButtonY = yOffset + 20;
+
         // 再玩一次按钮（左）
-        this.drawButton(ctx, centerX - this.buttonWidth - this.buttonGap/2, buttonY,
+        this.drawButton(ctx, centerX - this.buttonWidth - this.buttonGap/2, mainButtonY,
                         this.buttonWidth, this.buttonHeight, '#4CAF50', '再玩一次');
 
         // 返回首页按钮（右）
-        this.drawButton(ctx, centerX + this.buttonGap/2, buttonY,
+        this.drawButton(ctx, centerX + this.buttonGap/2, mainButtonY,
                         this.buttonWidth, this.buttonHeight, '#2196F3', '返回首页');
 
         // === 猜你喜欢标题 ===
-        this.recommendationTop = buttonY + this.buttonHeight + 40;
+        this.recommendationTop = mainButtonY + this.buttonHeight + 40;
         ctx.font = 'bold 20px Arial';
         ctx.fillStyle = '#FFFFFF';
         ctx.fillText('— 猜你喜欢 —', logicalWidth / 2, this.recommendationTop);
@@ -169,14 +172,16 @@ export class GameOverScreen {
 
         // 计算按钮位置（需要与render保持一致）
         let yOffset = logicalHeight / 2 - 120 + 70 + 40 + 50 + 50 + 20;
-        const buttonY = yOffset;
         const centerX = logicalWidth / 2;
+
+        // 计算主按钮位置
+        const mainButtonY = yOffset + 20 + 40 + 15;
 
         // 再玩一次按钮（左）
         const restartLeft = centerX - this.buttonWidth - this.buttonGap/2;
         const restartRight = restartLeft + this.buttonWidth;
-        const restartTop = buttonY;
-        const restartBottom = buttonY + this.buttonHeight;
+        const restartTop = mainButtonY;
+        const restartBottom = mainButtonY + this.buttonHeight;
 
         if (x >= restartLeft && x <= restartRight && y >= restartTop && y <= restartBottom) {
             return 'restart';
@@ -185,8 +190,8 @@ export class GameOverScreen {
         // 返回首页按钮（右）
         const homeLeft = centerX + this.buttonGap/2;
         const homeRight = homeLeft + this.buttonWidth;
-        const homeTop = buttonY;
-        const homeBottom = buttonY + this.buttonHeight;
+        const homeTop = mainButtonY;
+        const homeBottom = mainButtonY + this.buttonHeight;
 
         if (x >= homeLeft && x <= homeRight && y >= homeTop && y <= homeBottom) {
             return 'home';

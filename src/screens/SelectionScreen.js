@@ -54,6 +54,7 @@ export class SelectionScreen {
         // 模式选择弹窗状态
         this.showModeDialog = false;
         this.selectedTarget = null;
+        this.isTrialMode = false;  // 试玩模式标记
 
         // 粒子动画时间
         this.particleTime = 0;
@@ -297,11 +298,19 @@ export class SelectionScreen {
             // 检查是否是需要广告解锁的目标
             if (this.adManager && selectedItem.unlock && selectedItem.unlock.adRequired) {
                 const isUnlocked = this.adManager.isTargetUnlocked(selectedItem.id);
-                if (!isUnlocked) {
-                    // 显示解锁确认弹窗
+                const canTrial = this.adManager.canTrialPlay(selectedItem.id);
+
+                if (!isUnlocked && !canTrial) {
+                    // 既未解锁也不能试玩，显示解锁确认弹窗
                     this.showUnlockDialog = true;
                     this.unlockDialogTarget = selectedItem;
                     return null;
+                }
+
+                if (canTrial) {
+                    // 可以试玩，标记为试玩模式
+                    this.isTrialMode = true;
+                    console.log('[SelectionScreen] 进入试玩模式:', selectedItem.id);
                 }
             }
 
@@ -391,7 +400,7 @@ export class SelectionScreen {
     /**
      * 处理模式选择弹窗点击
      * @param {object} pos - 点击位置 { x, y }
-     * @returns {object|null} 选择结果 { config, mode } 或 null
+     * @returns {object|null} 选择结果 { config, mode, isTrial } 或 null
      */
     handleModeDialogClick(pos) {
         const { width: logicalWidth, height: logicalHeight } = this.getLogicalSize();
@@ -401,13 +410,18 @@ export class SelectionScreen {
         const buttonHeight = 50;
         const buttonY = centerY + 30;
 
+        // 保存试玩模式标记
+        const isTrial = this.isTrialMode || false;
+
         // 无限模式按钮（左侧）
         const endlessX = centerX - 70;
         if (pos.x >= endlessX - buttonWidth / 2 &&
             pos.x <= endlessX + buttonWidth / 2 &&
             pos.y >= buttonY - buttonHeight / 2 &&
             pos.y <= buttonY + buttonHeight / 2) {
-            return { config: this.selectedTarget, mode: 'endless' };
+            // 清除试玩标记
+            this.isTrialMode = false;
+            return { config: this.selectedTarget, mode: 'endless', isTrial };
         }
 
         // 闯关模式按钮（右侧）
@@ -416,7 +430,9 @@ export class SelectionScreen {
             pos.x <= challengeX + buttonWidth / 2 &&
             pos.y >= buttonY - buttonHeight / 2 &&
             pos.y <= buttonY + buttonHeight / 2) {
-            return { config: this.selectedTarget, mode: 'challenge' };
+            // 清除试玩标记
+            this.isTrialMode = false;
+            return { config: this.selectedTarget, mode: 'challenge', isTrial };
         }
 
         // 点击弹窗外部关闭
@@ -548,6 +564,9 @@ export class SelectionScreen {
         this.ctx.strokeText(text, x, y);
         this.ctx.fillText(text, x, y);
 
+        // 计算功能按钮的起始 Y 坐标（在体力文本或恢复时间下方）
+        let buttonsStartY = y + 22;  // 默认在体力文本下方
+
         // 当体力未满时显示恢复时间
         if (current < max) {
             const nextRestoreTime = this.staminaManager.getNextRestoreTime();
@@ -570,8 +589,70 @@ export class SelectionScreen {
                 // 渲染恢复时间
                 this.ctx.strokeText(restoreText, x, restoreY);
                 this.ctx.fillText(restoreText, x, restoreY);
+
+                // 更新按钮起始位置（在恢复时间下方）
+                buttonsStartY = restoreY + 25;  // 恢复时间下方25px
             }
         }
+
+        // === 渲染圆形功能按钮 ===
+        const buttonSize = 44;  // 圆形按钮直径
+        const buttonSpacing = 15;  // 按钮之间的间距
+        const textOffset = buttonSize / 2 + 12;  // 文字距离按钮中心的距离
+
+        // 1. 加群按钮
+        const groupButtonX = x + buttonSize / 2;
+        const groupButtonY = buttonsStartY + buttonSize / 2;
+        this.drawCircleButton(this.ctx, groupButtonX, groupButtonY, buttonSize / 2, '#FF6B6B', '💬');
+        this.ctx.font = '12px Arial';
+        this.ctx.fillStyle = '#FFFFFF';
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'top';
+        this.ctx.fillText('加群', groupButtonX, groupButtonY + textOffset);
+
+        // 保存加群按钮区域
+        this.groupButtonArea = {
+            left: groupButtonX - buttonSize / 2,
+            right: groupButtonX + buttonSize / 2,
+            top: groupButtonY - buttonSize / 2,
+            bottom: groupButtonY + buttonSize / 2 + textOffset + 14  // 包含文字区域
+        };
+
+        // 2. 签到按钮（在加群按钮下方）
+        const checkinButtonX = x + buttonSize / 2;
+        const checkinButtonY = groupButtonY + buttonSize + buttonSpacing + buttonSize / 2;
+        this.drawCircleButton(this.ctx, checkinButtonX, checkinButtonY, buttonSize / 2, '#4CAF50', '✓');
+        this.ctx.font = '12px Arial';
+        this.ctx.fillStyle = '#FFFFFF';
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'top';
+        this.ctx.fillText('签到', checkinButtonX, checkinButtonY + textOffset);
+
+        // 保存签到按钮区域
+        this.checkinButtonArea = {
+            left: checkinButtonX - buttonSize / 2,
+            right: checkinButtonX + buttonSize / 2,
+            top: checkinButtonY - buttonSize / 2,
+            bottom: checkinButtonY + buttonSize / 2 + textOffset + 14  // 包含文字区域
+        };
+
+        // 3. 排行榜按钮（在签到按钮下方）
+        const rankButtonX = x + buttonSize / 2;
+        const rankButtonY = checkinButtonY + buttonSize + buttonSpacing + buttonSize / 2;
+        this.drawCircleButton(this.ctx, rankButtonX, rankButtonY, buttonSize / 2, '#FF9800', '🏆');
+        this.ctx.font = '12px Arial';
+        this.ctx.fillStyle = '#FFFFFF';
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'top';
+        this.ctx.fillText('排行榜', rankButtonX, rankButtonY + textOffset);
+
+        // 保存排行榜按钮区域
+        this.rankButtonArea = {
+            left: rankButtonX - buttonSize / 2,
+            right: rankButtonX + buttonSize / 2,
+            top: rankButtonY - buttonSize / 2,
+            bottom: rankButtonY + buttonSize / 2 + textOffset + 14  // 包含文字区域
+        };
     }
 
     /**
@@ -744,6 +825,12 @@ export class SelectionScreen {
             this.renderUnlockTimer(x, y, scaledHeight, scale, item.config);
         }
 
+        // 检查是否可以试玩（需要广告解锁且未试玩过）
+        const canTrial = this.canTrialPlay(item.config);
+        if (canTrial) {
+            this.renderTrialBadge(x, y, scaledWidth, scaledHeight, scale);
+        }
+
         ctx.restore();
     }
 
@@ -756,6 +843,17 @@ export class SelectionScreen {
         if (!config.unlock || !config.unlock.adRequired) return false;
         if (!this.adManager) return false;
         return !this.adManager.isTargetUnlocked(config.id);
+    }
+
+    /**
+     * 检查是否可以试玩
+     * @param {Object} config - 目标配置
+     * @returns {boolean} 是否可以试玩
+     */
+    canTrialPlay(config) {
+        if (!config.unlock || !config.unlock.adRequired) return false;
+        if (!this.adManager) return false;
+        return this.adManager.canTrialPlay(config.id);
     }
 
     /**
@@ -817,11 +915,44 @@ export class SelectionScreen {
         const ctx = this.ctx;
         const timerText = this.adManager.formatRemainingTime(remaining);
 
-        // 在卡片底部显示剩余时间
-        ctx.font = `${10 * scale}px Arial`;
+        // 在卡片内部显示剩余时间（分数上方）
+        ctx.font = `bolds ${9 * scale}px Arial`;
         ctx.fillStyle = '#4CAF50';  // 绿色表示已解锁
         ctx.textAlign = 'center';
-        ctx.fillText(`剩余 ${timerText}`, x, y + height / 2 + 52);
+
+        ctx.fillText(`剩余 ${timerText}`, x, y + height/3  );
+    }
+
+    /**
+     * 渲染试玩徽章
+     */
+    renderTrialBadge(x, y, width, height, scale) {
+        const ctx = this.ctx;
+
+        // 徽章位置：卡片右上角
+        const badgeSize = 50 * scale;
+        const badgeX = x + width / 2 - 10;
+        const badgeY = y - height / 2 - 10;
+
+        // 绘制徽章背景（圆形）
+        ctx.beginPath();
+        ctx.arc(badgeX, badgeY, badgeSize / 2, 0, Math.PI * 2);
+        ctx.fillStyle = '#FF6B6B';  // 红色背景
+        ctx.fill();
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // 绘制"试"字
+        ctx.font = `bold ${22 * scale}px Arial`;
+        ctx.fillStyle = '#FFFFFF';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('试', badgeX, badgeY - 2 * scale);
+
+        // 绘制小字"玩"
+        ctx.font = `${10 * scale}px Arial`;
+        ctx.fillText('玩', badgeX, badgeY + 12 * scale);
     }
 
     /**
@@ -1311,5 +1442,47 @@ export class SelectionScreen {
                 console.log('[SelectionScreen] 🎲 本次不展示插屏广告');
             }
         }
+    }
+
+    /**
+     * 绘制圆形按钮
+     */
+    drawCircleButton(ctx, centerX, centerY, radius, bgColor, icon) {
+        // 绘制圆形背景
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+        ctx.fillStyle = bgColor;
+        ctx.fill();
+
+        // 绘制图标
+        ctx.font = 'bold 20px Arial';
+        ctx.fillStyle = '#FFFFFF';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(icon, centerX, centerY);
+    }
+
+    /**
+     * 获取加群按钮区域（供 tt.onTouchStart 使用）
+     * @returns {Object|null} 按钮区域 {left, right, top, bottom}
+     */
+    getGroupButtonArea() {
+        return this.groupButtonArea || null;
+    }
+
+    /**
+     * 获取签到按钮区域
+     * @returns {Object|null} 按钮区域 {left, right, top, bottom}
+     */
+    getCheckinButtonArea() {
+        return this.checkinButtonArea || null;
+    }
+
+    /**
+     * 获取排行榜按钮区域
+     * @returns {Object|null} 按钮区域 {left, right, top, bottom}
+     */
+    getRankButtonArea() {
+        return this.rankButtonArea || null;
     }
 }

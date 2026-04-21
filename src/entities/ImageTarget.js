@@ -968,8 +968,17 @@ export class ImageTarget extends Entity {
     checkStartle(touchPosition) {
         if (!touchPosition || this.startleCooldown > 0 || this.isStartled) return;
 
-        const distance = this.position.distanceTo(touchPosition);
-        if (distance < STARTLE_CONFIG.TRIGGER_RADIUS) {
+        let triggered = false;
+
+        // multiline 类型使用线段碰撞检测
+        if (this.config.renderType === 'multiline' && this.multilineRenderer) {
+            triggered = this.multilineRenderer.hitTest(touchPosition.x, touchPosition.y, STARTLE_CONFIG.TRIGGER_RADIUS) !== null;
+        } else {
+            const distance = this.position.distanceTo(touchPosition);
+            triggered = distance < STARTLE_CONFIG.TRIGGER_RADIUS;
+        }
+
+        if (triggered) {
             // 如果正在窜出，提前结束
             if (this.popInState === 'POPPING_OUT') {
                 this.endPopInEarly();
