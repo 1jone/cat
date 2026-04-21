@@ -1827,9 +1827,9 @@ drawCheckinDayCircle(ctx, centerX, centerY, dayNumber, status, radius, labelYOff
                 : this.settingsManager.getTargetHighScore(targetId)
         };
 
-        // 提交分数到排行榜（fire-and-forget，不阻塞流程）
-        if (this.rankManager) {
-            this.rankManager.submitScore(finalScore, wasEndlessMode);
+        // 提交分数到排行榜：仅计时模式且刷新最高分时提交
+        if (this.rankManager && !wasEndlessMode && isNewRecord) {
+            this.rankManager.submitScore(finalScore, false);
         }
 
         // 检查是否应该触发游戏结束广告（无尽模式且分数达到要求）
