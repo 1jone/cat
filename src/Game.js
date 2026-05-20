@@ -37,10 +37,16 @@ import { MultiLineRenderer } from './entities/MultiLineRenderer';
 import { StaticLineRenderer } from './entities/StaticLineRenderer';
 import { BirdRenderer } from './entities/BirdRenderer';
 import { LadybugRenderer } from './entities/LadybugRenderer';
+import { MosquitoRenderer } from './entities/MosquitoRenderer';
+import { JellyfishRenderer } from './entities/JellyfishRenderer';
+import { BouncyBallRenderer } from './entities/BouncyBallRenderer';
+import { BubbleFishRenderer } from './entities/BubbleFishRenderer';
+
 import { StaminaManager } from './managers/StaminaManager';
 import { ShortcutManager } from './managers/ShortcutManager';
 import { ChatGroupManager } from './managers/ChatGroupManager';
 import { RankManager } from './managers/RankManager';
+import { CoinManager } from './managers/CoinManager';
 
 export class Game {
     constructor(canvas) {
@@ -92,6 +98,10 @@ export class Game {
         );
         this.birdRenderer = new BirdRenderer();
         this.ladybugRenderer = new LadybugRenderer();
+        this.mosquitoRenderer = new MosquitoRenderer();
+        this.jellyfishRenderer = new JellyfishRenderer();
+        this.bouncyballRenderer = new BouncyBallRenderer();
+        this.bubblefishRenderer = new BubbleFishRenderer();
 
         // 全局访问（供 ImageTarget 使用）
         // window.MouseRenderer = this.mouseRenderer;
@@ -108,7 +118,7 @@ export class Game {
         this.audioInitialized = false;
 
         // 初始化 SpawnManager（传入设置管理器、音频管理器和渲染器）
-        this.spawnManager = new SpawnManager(this.settingsManager, this.audioManager, this.mouseRenderer, this.butterflyRenderer, this.fishRenderer, this.yarnRenderer, this.multilineRenderer, this.birdRenderer, this.ladybugRenderer);
+        this.spawnManager = new SpawnManager(this.settingsManager, this.audioManager, this.mouseRenderer, this.butterflyRenderer, this.fishRenderer, this.yarnRenderer, this.multilineRenderer, this.birdRenderer, this.ladybugRenderer, this.mosquitoRenderer, this.bubblefishRenderer, this.bouncyballRenderer, this.jellyfishRenderer);
 
         // 初始化广告管理器
         this.adManager = new AdManager(this.settingsManager);
@@ -124,6 +134,9 @@ export class Game {
 
         // 初始化群聊管理器
         this.chatGroupManager = new ChatGroupManager(this.settingsManager);
+
+        // 初始化金币管理器
+        this.coinManager = new CoinManager(this.settingsManager);
 
         // 初始化排行榜管理器
         if (FEATURE_FLAGS.friendRank) {
@@ -162,7 +175,7 @@ export class Game {
         this.resourceManager.preloadImages();
 
         // 初始化选择界面（需要在资源管理器之后，传入广告管理器和设置管理器）
-        this.selectionScreen = new SelectionScreen(canvas, ctx, this.resourceManager, this.adManager, this.settingsManager, this.emojiManager, this.butterflyRenderer, this.mouseRenderer, this.fishRenderer, this.yarnRenderer, this.multilineRenderer, this.birdRenderer, this.ladybugRenderer, this.staticLineRenderer, this.staminaManager);
+        this.selectionScreen = new SelectionScreen(canvas, ctx, this.resourceManager, this.adManager, this.settingsManager, this.emojiManager, this.butterflyRenderer, this.mouseRenderer, this.fishRenderer, this.yarnRenderer, this.multilineRenderer, this.birdRenderer, this.ladybugRenderer, this.staticLineRenderer, this.staminaManager, this.mosquitoRenderer, this.jellyfishRenderer, this.bouncyballRenderer, this.bubblefishRenderer, this.coinManager);
 
         // 防止点击穿透
         this.skipNextTouchEnd = false;
@@ -509,6 +522,7 @@ export class Game {
                 this.effectsRenderer.renderFireworkEffect(this.stateManager.fireworkEffect);
                 this.effectsRenderer.renderUnlockNotification(this.stateManager.unlockNotification);
                 // 渲染 HUD
+                this.hudRenderer.coinBalance = this.coinManager.getBalance();
                 this.hudRenderer.renderHUD({
                     score: this.stateManager.score,
                     timeLeft: this.stateManager.timeLeft,
@@ -531,7 +545,8 @@ export class Game {
                     gameTimer: this.stateManager.gameTimer,
                     highScore: this._lastGameResult && this._lastGameResult.highScore || 0,
                     isNewRecord: this._lastGameResult && this._lastGameResult.isNewRecord || false,
-                    hitCount: this._lastGameResult && this._lastGameResult.hitCount || 0  // 新增：命中目标数
+                    hitCount: this._lastGameResult && this._lastGameResult.hitCount || 0,
+                    coinsEarned: this._lastGameResult && this._lastGameResult.coinsEarned || 0
                 });
                 break;
 
@@ -751,6 +766,8 @@ renderCheckinDialog() {
 
     if (consecutiveDays >= CHECKIN_CONFIG.CYCLE_DAYS) {
         ctx.fillText('🎉 已完成7天签到！', dialogX + dialogWidth / 2, dialogY + 58);
+    } else if (!this.checkinData.firstCheckinDone) {
+        ctx.fillText('开始签到，连续7天领取丰厚奖励', dialogX + dialogWidth / 2, dialogY + 58);
     } else if (missedDays.length > 0) {
         ctx.fillText(`连续签到 ${consecutiveDays}/7 天 · ${missedDays.length}天未签到`, dialogX + dialogWidth / 2, dialogY + 58);
     } else {
@@ -870,7 +887,15 @@ renderCheckinDialog() {
         ctx.font = 'bold 18px Arial';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(hasMissed ? '重新开始签到' : '立即签到', checkinButtonX + checkinButtonWidth / 2, checkinButtonY + checkinButtonHeight / 2);
+        let buttonText;
+        if (!this.checkinData.firstCheckinDone) {
+            buttonText = '开始签到';
+        } else if (hasMissed) {
+            buttonText = '重新开始签到';
+        } else {
+            buttonText = '立即签到';
+        }
+        ctx.fillText(buttonText, checkinButtonX + checkinButtonWidth / 2, checkinButtonY + checkinButtonHeight / 2);
 
         this.checkinDialogButtons.checkin = {
             x: checkinButtonX,
@@ -937,6 +962,19 @@ drawCheckinDayCircle(ctx, centerX, centerY, dayNumber, status, radius, labelYOff
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText('✓', centerX, centerY);
+            break;
+
+        case 'blank':
+            ctx.fillStyle = colors.blank_bg;
+            ctx.fill();
+            ctx.strokeStyle = colors.blank_border;
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+            ctx.fillStyle = colors.blank_text;
+            ctx.font = 'bold 16px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(dayNumber.toString(), centerX, centerY);
             break;
 
         case 'missed':
@@ -1346,6 +1384,59 @@ drawCheckinDayCircle(ctx, centerX, centerY, dayNumber, status, radius, labelYOff
 
             const distance = pos.distanceTo(target.position);
             if (distance < target.radius + 25) {
+                // 气泡鱼：多击机制
+                if (target.maxHp > 1) {
+                    const result = target.takeDamage();
+
+                    if (result.destroyed) {
+                        const capturePoints = target.config.bubblefishConfig?.capturePoints || target.points;
+                        this.stateManager.addScore(capturePoints);
+                        this.audioManager.playCatch(capturePoints);
+                        this.stateManager.setCatchEffect(target.position.x, target.position.y, capturePoints, 'bubblefish');
+                        const colors = target.config.bubblefishConfig?.explosionColors || ['#87CEEB'];
+                        this.stateManager.setFireworkEffect(target.position.x, target.position.y, colors);
+                    } else {
+                        const popPoints = target.config.bubblefishConfig?.bubblePopPoints || 5;
+                        this.stateManager.addScore(popPoints);
+                        this.audioManager.playCatch(popPoints);
+                        this.stateManager.setCatchEffect(target.position.x, target.position.y, popPoints, 'bubblefish');
+                    }
+
+                    if (tt && this.settingsManager.isVibrationEnabled()) {
+                        tt.vibrateShort();
+                    }
+                    return;
+                }
+
+                // 弹力球：combo 机制
+                if (target.config.id === 'bouncyball') {
+                    const comboCount = target.incrementCombo();
+                    const multiplier = target.getComboMultiplier();
+                    const totalPoints = target.points * multiplier;
+
+                    target.isActive = false;
+                    this.stateManager.addScore(totalPoints);
+
+                    target.isClicked = true;
+                    target.clickTime = Date.now();
+                    target.clickIntensity = 1.0;
+
+                    this.audioManager.playCatch(totalPoints);
+
+                    if (tt && this.settingsManager.isVibrationEnabled()) {
+                        tt.vibrateShort();
+                    }
+
+                    const effectLabel = comboCount >= 2 ? `x${multiplier}` : '';
+                    this.stateManager.setCatchEffect(target.position.x, target.position.y, totalPoints, 'bouncyball', effectLabel);
+
+                    if (comboCount >= 2) {
+                        const colors = target.config.bouncyballConfig?.explosionColors || ['#FF4444'];
+                        this.stateManager.setFireworkEffect(target.position.x, target.position.y, colors);
+                    }
+                    return;
+                }
+
                 target.isActive = false;
                 this.stateManager.addScore(target.points);
 
@@ -1383,6 +1474,12 @@ drawCheckinDayCircle(ctx, centerX, centerY, dayNumber, status, radius, labelYOff
 
                 } else if (target.config.id === 'butterfly') {
                     const colors = target.config.renderConfig && target.config.renderConfig.explosionColors || ['#FFF176', '#FFD54F', '#FFD54F'];
+                    this.stateManager.setFireworkEffect(target.position.x, target.position.y, colors);
+                } else if (target.config.id === 'mosquito') {
+                    const colors = target.config.renderConfig && target.config.renderConfig.explosionColors || ['#FFF176', '#FFE066', '#FFD54F', '#FFF9C4', '#FFFFFF'];
+                    this.stateManager.setFireworkEffect(target.position.x, target.position.y, colors);
+                } else if (target.config.id === 'jellyfish') {
+                    const colors = target.config.jellyfishConfig?.explosionColors || ['#B478FF', '#DDB4FF', '#E8D0FF'];
                     this.stateManager.setFireworkEffect(target.position.x, target.position.y, colors);
                 }
 
@@ -1827,6 +1924,11 @@ drawCheckinDayCircle(ctx, centerX, centerY, dayNumber, status, radius, labelYOff
                 : this.settingsManager.getTargetHighScore(targetId)
         };
 
+        // 结算金币
+        const coinsEarned = this.coinManager.calculateSettlementCoins(finalScore);
+        this.coinManager.addCoins(coinsEarned, 'settlement');
+        this._lastGameResult.coinsEarned = coinsEarned;
+
         // 提交分数到排行榜：仅计时模式且刷新最高分时提交
         if (this.rankManager && !wasEndlessMode && isNewRecord) {
             this.rankManager.submitScore(finalScore, false);
@@ -1876,19 +1978,28 @@ drawCheckinDayCircle(ctx, centerX, centerY, dayNumber, status, radius, labelYOff
     /**
      * 再玩一次
      */
-    restartGame() {
+    async restartGame() {
         console.log('[Game] 再玩一次');
 
-        // 检查是否应该显示快捷方式弹窗
-        if (this.shortcutManager && this.shortcutManager.shouldShowPrompt()) {
-            console.log('[Game] 显示快捷方式提示弹窗');
-            // 显示快捷方式弹窗
-            this.showShortcutDialog = true;
-            this.shortcutDialogButtons = null;
-            return;
+        // 检查当前目标是否需要广告解锁
+        const lastResult = this._lastGameResult;
+        if (lastResult && lastResult.targetId) {
+            const targetConfig = TARGET_TYPES.find(t => t.id === lastResult.targetId);
+
+            // 仅对需要广告解锁且当前未解锁的目标触发广告
+            if (targetConfig && targetConfig.unlock.adRequired &&
+                !this.adManager.isTargetUnlocked(lastResult.targetId)) {
+                console.log('[Game] 再玩一次 - 目标未解锁，需要观看广告:', lastResult.targetId);
+                const unlocked = await this.adManager.requestUnlock(lastResult.targetId);
+                if (!unlocked) {
+                    console.log('[Game] 再玩一次 - 广告观看失败或取消，不重新开始');
+                    return;
+                }
+                console.log('[Game] 再玩一次 - 广告观看成功，目标已解锁');
+            }
         }
 
-        // 执行重新游戏的实际逻辑
+        // 执行重新游戏的实际逻辑（快捷方式弹窗不阻塞重启）
         this.doRestartGame();
     }
 
@@ -2026,6 +2137,16 @@ handleCheckin() {
     // 播放按钮点击音效
     this.audioManager.playButtonClick();
 
+    // 如果从未签过到且已过 weekStartDate，重置为今天
+    if (!this.checkinData.firstCheckinDone) {
+        const todayDate = this.dateToYYYYMMDD(new Date());
+        if (todayDate !== this.checkinData.weekStartDate) {
+            this.checkinData.weekStartDate = todayDate;
+            this.saveCheckinData();
+            console.log('[Game] 首签未完成，重置 weekStartDate 为今天');
+        }
+    }
+
     // 显示签到弹窗
     this.showCheckinDialog = true;
     this.checkinDialogButtons = null;
@@ -2044,8 +2165,11 @@ initCheckinData() {
             this.checkinData = JSON.parse(savedData);
             console.log('[Game] 签到数据已加载:', this.checkinData);
 
-            if (!this.checkinData.version || this.checkinData.version < CHECKIN_CONFIG.DATA_VERSION) {
+            if (!this.checkinData.version || this.checkinData.version < 2) {
                 this.migrateCheckinDataV1ToV2(this.checkinData);
+            }
+            if (this.checkinData.version < CHECKIN_CONFIG.DATA_VERSION) {
+                this.migrateCheckinDataV2ToV3(this.checkinData);
             }
         } catch (e) {
             console.warn('[Game] 签到数据解析失败:', e);
@@ -2100,6 +2224,46 @@ migrateCheckinDataV1ToV2(oldData) {
 }
 
     /**
+     * 迁移 v2 签到数据到 v3 格式（新增 firstCheckinDone 字段）
+     */
+migrateCheckinDataV2ToV3(oldData) {
+    const todayDate = this.dateToYYYYMMDD(new Date());
+    const hasCheckedDays = oldData.checkedDays && oldData.checkedDays.length > 0;
+
+    if (hasCheckedDays) {
+        this.checkinData = {
+            ...oldData,
+            version: CHECKIN_CONFIG.DATA_VERSION,
+            firstCheckinDone: true
+        };
+    } else {
+        const daysSinceWeekStart = this.dateDiffDays(oldData.weekStartDate, todayDate);
+        if (daysSinceWeekStart >= 0 && daysSinceWeekStart < CHECKIN_CONFIG.CYCLE_DAYS) {
+            this.checkinData = {
+                ...oldData,
+                version: CHECKIN_CONFIG.DATA_VERSION,
+                firstCheckinDone: false
+            };
+        } else {
+            const preservedTotal = oldData.totalCheckinDays || 0;
+            this.checkinData = {
+                version: CHECKIN_CONFIG.DATA_VERSION,
+                weekStartDate: todayDate,
+                checkedDays: [],
+                makeupDays: [],
+                lastCheckinTime: 0,
+                lastCheckinDate: 0,
+                totalCheckinDays: preservedTotal,
+                consecutiveDays: 0,
+                firstCheckinDone: false
+            };
+        }
+    }
+    this.saveCheckinData();
+    console.log('[Game] 签到数据已迁移到 v3');
+}
+
+    /**
      * 初始化新的签到周期
      */
 initNewCheckinWeek() {
@@ -2114,7 +2278,8 @@ initNewCheckinWeek() {
         lastCheckinTime: 0,
         lastCheckinDate: 0,
         totalCheckinDays: preservedTotal,
-        consecutiveDays: 0
+        consecutiveDays: 0,
+        firstCheckinDone: false
     };
     this.saveCheckinData();
     console.log('[Game] 初始化签到数据');
@@ -2161,6 +2326,9 @@ getDayStatus(dayNumber) {
         return isMakeup ? 'makeup' : 'checked';
     }
     if (dayDate < todayDate) {
+        if (!this.checkinData.firstCheckinDone) {
+            return 'blank';
+        }
         return 'missed';
     }
     if (dayDate === todayDate) {
@@ -2198,6 +2366,7 @@ _doCheckin(date, dayNumber, type) {
     }
 
     this.checkinData.checkedDays.push({ date, day: dayNumber, type });
+    this.checkinData.firstCheckinDone = true;
     this.checkinData.lastCheckinTime = Date.now();
     this.checkinData.lastCheckinDate = date;
     this.checkinData.totalCheckinDays++;
@@ -2226,7 +2395,8 @@ _resetCycleForNewStart(todayDate) {
         lastCheckinTime: 0,
         lastCheckinDate: 0,
         totalCheckinDays: preservedTotal,
-        consecutiveDays: 0
+        consecutiveDays: 0,
+        firstCheckinDone: false
     };
     this.saveCheckinData();
     console.log('[Game] 签到周期已重置，今天为 Day 1');
@@ -2246,6 +2416,13 @@ performCheckin() {
     }
 
     const daysSinceWeekStart = this.dateDiffDays(this.checkinData.weekStartDate, todayDate);
+
+    // 首次签到：以今天为 Day 1 开始新周期
+    if (!this.checkinData.firstCheckinDone) {
+        console.log('[Game] 首次签到，今天为 Day 1');
+        this._resetCycleForNewStart(todayDate);
+        return this._doCheckin(todayDate, 1, 'normal');
+    }
 
     // 周期内（0~6天偏移）
     if (daysSinceWeekStart >= 0 && daysSinceWeekStart < CHECKIN_CONFIG.CYCLE_DAYS) {

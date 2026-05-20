@@ -23,6 +23,9 @@ export class GameOverScreen {
         this.bannerHeight = 100;  // Banner高度（100px，避免遮挡按钮）
         this.bannerBottom = 0;  // 动态计算
 
+        // 按钮Y位置（render时动态计算，供handleButtonClick使用）
+        this._mainButtonY = 0;
+
     }
 
     /**
@@ -53,7 +56,7 @@ export class GameOverScreen {
      * @param {boolean} params.isNewRecord - 是否破纪录
      * @param {number} params.hitCount - 命中目标数
      */
-    render({ score, isEndlessMode, gameTimer, highScore = 0, isNewRecord = false, hitCount = 0 }) {
+    render({ score, isEndlessMode, gameTimer, highScore = 0, isNewRecord = false, hitCount = 0, coinsEarned = 0 }) {
         const ctx = this.ctx;
         const { width: logicalWidth, height: logicalHeight } = this.getLogicalSize();
 
@@ -93,13 +96,22 @@ export class GameOverScreen {
         ctx.font = '22px Arial';
         ctx.fillStyle = '#FFFFFF';
         ctx.fillText(`命中目标：${hitCount}`, logicalWidth / 2, yOffset);
-        yOffset += 50;
+        yOffset += 40;
+
+        // === 金币获得 ===
+        if (coinsEarned > 0) {
+            ctx.font = '20px Arial';
+            ctx.fillStyle = '#FFA500';
+            ctx.fillText(`+${coinsEarned} 金币`, logicalWidth / 2, yOffset);
+            yOffset += 40;
+        }
 
         // === 按钮区 ===
         const centerX = logicalWidth / 2;
 
         // 再玩一次和返回首页按钮
         const mainButtonY = yOffset + 20;
+        this._mainButtonY = mainButtonY;
 
         // 再玩一次按钮（左）
         this.drawButton(ctx, centerX - this.buttonWidth - this.buttonGap/2, mainButtonY,
@@ -168,14 +180,9 @@ export class GameOverScreen {
      * @returns {string|null} 'restart'|'home'|null
      */
     handleButtonClick(x, y) {
-        const { width: logicalWidth, height: logicalHeight } = this.getLogicalSize();
-
-        // 计算按钮位置（需要与render保持一致）
-        let yOffset = logicalHeight / 2 - 120 + 70 + 40 + 50 + 50 + 20;
+        const { width: logicalWidth } = this.getLogicalSize();
         const centerX = logicalWidth / 2;
-
-        // 计算主按钮位置
-        const mainButtonY = yOffset + 20 + 40 + 15;
+        const mainButtonY = this._mainButtonY;
 
         // 再玩一次按钮（左）
         const restartLeft = centerX - this.buttonWidth - this.buttonGap/2;

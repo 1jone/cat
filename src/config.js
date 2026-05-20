@@ -509,6 +509,278 @@ export const TARGET_TYPES = [
             canBeRewarded: false
         }
     },
+    // 14. 蚊子
+{
+    id: 'mosquito',
+    name: '荧光蚊子',
+    renderType: 'canvas',
+    renderer: 'mosquito',
+
+    // 提高速度，更像乱飞的小虫
+    speed: 220,
+
+    // 稍微放大，更容易被猫注意
+    radius: 24,
+
+    points: 20,
+
+    // 改成更灵活的运动
+    movement: 'erratic',
+
+    movementConfig: {
+        amplitude: 120,
+        frequency: 3.5,
+        jitter: 0.8,
+        zigzagChance: 0.3
+    },
+
+    renderConfig: {
+
+        // ===== 身体颜色 =====
+        // 不再用灰色
+        // 改成更吸引猫的暖黄色+荧光
+        bodyColor: '#FFD93D',
+        bodyHighlight: '#FFF3A3',
+
+        // ===== 发光颜色 =====
+        glowColor: 'rgba(255, 235, 120, 0.75)',
+        glowOuterColor: 'rgba(255, 220, 80, 0.25)',
+
+        // ===== 翅膀 =====
+        wingColor: 'rgba(255,255,255,0.55)',
+        wingVeinColor: 'rgba(255,255,255,0.18)',
+
+        // ===== 腿 =====
+        legColor: '#7A5A00',
+
+        // ===== 嘴巴 =====
+        proboscisColor: '#B8860B',
+
+        // ===== 眼睛 =====
+        // 红眼会有点恐怖
+        // 改成更可爱的亮蓝色
+        eyeColor: '#7DF9FF',
+
+        // ===== 翅膀振动 =====
+        wingFlapSpeed: 42,
+
+        // ===== 新增效果 =====
+
+        // 外发光
+        glowRadius: 1.8,
+
+        // 尾部拖尾
+        trailEnabled: true,
+        trailLength: 6,
+
+        // 呼吸闪烁
+        pulseSpeed: 4,
+
+        // 点击爆炸粒子
+        explosionColors: [
+            '#FFF176',
+            '#FFE066',
+            '#FFD54F',
+            '#FFF9C4',
+            '#FFFFFF'
+        ],
+
+        // 偶尔闪蓝绿色
+        randomGlowColors: [
+            '#FFD93D',
+            '#B6FF00',
+            '#7DF9FF'
+        ]
+    },
+
+    background: {
+        image: null,
+
+        // 不要草地
+        showGrass: false,
+
+        // 新增背景风格
+        type: 'night',
+
+        // 深蓝夜晚
+        primaryColor: '#071B34',
+        secondaryColor: '#0B2C52',
+
+        // 漂浮粒子
+        floatingParticles: true,
+
+        // 光晕
+        ambientGlow: true
+    },
+
+    // ===== 解锁 =====
+    unlock: {
+        type: 'ad',
+        adRequired: true,
+        unlockDuration: 24 * 60 * 60 * 1000
+    },
+
+    // ===== 广告触发 =====
+    adTrigger: {
+        enabled: true,
+        probability: 1.0,
+        cooldown: 0,
+        maxPerSession: 10
+    },
+
+    // ===== 奖励 =====
+    sidebarReward: {
+        canBeRewarded: true
+    }
+},
+// 15. 水母
+{
+    id: 'jellyfish',
+    name: '水母',
+    renderType: 'canvas',
+    renderer: 'jellyfish',
+    speed: 50,
+    radius: 35,
+    points: 20,
+    movement: 'hover',
+    movementConfig: {
+        hoverAmplitude: 25,
+        driftSpeed: 12
+    },
+    background: {
+        image: null,
+        showGrass: false,
+        type: 'ocean',
+        primaryColor: '#0B3D6B',
+        secondaryColor: '#0A5C8A'
+    },
+    unlock: {
+        type: 'ad',
+        adRequired: true,
+        unlockDuration: 24 * 60 * 60 * 1000
+    },
+    adTrigger: {
+        enabled: true,
+        probability: 1.0,
+        cooldown: 0,
+        maxPerSession: 10
+    },
+    sidebarReward: {
+        canBeRewarded: true
+    },
+    jellyfishConfig: {
+        breathSpeed: 1.5,
+        breathAmplitude: 0.4,
+        inflatedRadius: 48,
+        deflatedRadius: 18,
+        inflatedPoints: 10,
+        deflatedPoints: 35,
+        bodyColor: 'rgba(120, 220, 255, 0.75)',
+        bodyHighlight: 'rgba(220, 255, 255, 0.5)',
+        tentacleColor: 'rgba(180, 240, 255, 0.45)',
+        bodyHighlight: 'rgba(220, 180, 255, 0.4)',
+        tentacleColor: 'rgba(160, 100, 240, 0.5)',
+        tentacleCount: 6,
+        tentacleLength: 1.2,
+        glowColor: 'rgba(180, 120, 255, 0.3)',
+        innerGlow: 'rgba(255, 200, 255, 0.5)',
+        explosionColors: [
+            '#B478FF', '#DDB4FF', '#E8D0FF', '#F0E0FF', '#FFFFFF'
+        ]
+    }
+},
+// 16. 弹力球
+{
+    id: 'bouncyball',
+    name: '弹力球',
+    renderType: 'canvas',
+    renderer: 'bouncyball',
+    speed: 280,
+    radius: 22,
+    points: 15,
+    movement: 'bounce',
+    background: {
+        image: null,
+        showGrass: true
+    },
+    unlock: {
+        type: 'ad',
+        adRequired: true,
+        unlockDuration: 24 * 60 * 60 * 1000
+    },
+    adTrigger: {
+        enabled: true,
+        probability: 1.0,
+        cooldown: 0,
+        maxPerSession: 10
+    },
+    sidebarReward: {
+        canBeRewarded: true
+    },
+    bouncyballConfig: {
+        basePoints: 15,
+        comboWindow: 1.0,
+        comboMultipliers: [1, 2, 3, 5],
+        wallAnglePerturbation: 0.4,
+        ballColor: '#FF4444',
+        ballHighlight: '#FF8888',
+        ballGlow: 'rgba(255, 68, 68, 0.4)',
+        trailLength: 5,
+        explosionColors: ['#FF4444', '#FF6666', '#FF8888', '#FFAAAA', '#FFFFFF']
+    }
+},
+// 17. 气泡鱼
+{
+    id: 'bubblefish',
+    name: '气泡鱼',
+    renderType: 'canvas',
+    renderer: 'bubblefish',
+    speed: 100,
+    radius: 35,
+    points: 20,
+    movement: 'wave',
+    movementConfig: {
+        amplitude: 50,
+        frequency: 1.5
+    },
+    background: {
+        image: null,
+        showGrass: false,
+        type: 'ocean',
+        primaryColor: '#0B3D6B',
+        secondaryColor: '#0A5C8A'
+    },
+    unlock: {
+        type: 'ad',
+        adRequired: true,
+        unlockDuration: 24 * 60 * 60 * 1000
+    },
+    adTrigger: {
+        enabled: true,
+        probability: 1.0,
+        cooldown: 0,
+        maxPerSession: 10
+    },
+    sidebarReward: {
+        canBeRewarded: true
+    },
+    bubblefishConfig: {
+        maxHp: 3,
+        bubblePopPoints: 5,
+        capturePoints: 20,
+        bubbleShrinkFactor: 0.7,
+        fishColor: '#FF8C42',
+        fishHighlight: '#FFB366',
+        bubbleColor: 'rgba(135, 206, 250, 0.4)',
+        bubbleStroke: 'rgba(135, 206, 250, 0.7)',
+        bubbleHighlight: 'rgba(255, 255, 255, 0.6)',
+        bubbleWobbleSpeed: 3,
+        bubbleWobbleAmplitude: 2,
+        explosionColors: [
+            '#87CEEB', '#ADD8E6', '#B0E0E6', '#E0F7FA', '#FFFFFF'
+        ]
+    }
+}
 ];
 export const CONFIG = {
     GAME_DURATION: 60,  // 游戏时长60秒（1分钟）
@@ -784,6 +1056,15 @@ export const AD_CONFIG = {
     // 游戏推荐面板配置
     gridGamePanel: {
         enabled: true
+    },
+
+    // Banner广告配置
+    banner: {
+        maxRetryCount: 3,            // 最大重试次数
+        retryDelay: 3000,            // 重试基础延迟（毫秒）
+        retryBackoffMultiplier: 2,   // 指数退避倍数
+        maxRetryDelay: 15000,        // 最大重试延迟（毫秒）
+        adIntervals: 30              // 广告自动刷新间隔（秒）
     }
 };
 
@@ -1081,7 +1362,7 @@ export const POPIN_CONFIG = {
 export const CHECKIN_CONFIG = {
     CYCLE_DAYS: 7,
     MAKEUP_AD_PLACEMENT: 'checkin_makeup',
-    DATA_VERSION: 2,
+    DATA_VERSION: 3,
     COLORS: {
         checked: '#FFD700',
         makeup: '#26A69A',
@@ -1094,6 +1375,9 @@ export const CHECKIN_CONFIG = {
         reward_checked: '#B8860B',
         reward_normal: '#666666',
         makeup_button: '#26A69A',
+        blank_bg: '#F5F5F5',
+        blank_border: '#E0E0E0',
+        blank_text: '#BDBDBD',
     }
 };
 
@@ -1120,4 +1404,18 @@ export const RANK_CONFIG = {
     NORMAL: 'default',
     ENDLESS: 'default'
   }
+};
+
+export const COIN_CONFIG = {
+  SETTLEMENT_RATIO: 0.1,        // 结算金币 = 分数 × 10%
+  CHECKIN_BASE_REWARD: 100,     // 签到基础奖励
+  CHECKIN_CONSECUTIVE_BONUS: 20,// 连续签到每日递增
+  CHECKIN_MAX_CONSECUTIVE: 7,   // 连续签到最大天数（封顶）
+  GROUP_JOIN_REWARD: 100,       // 加群一次性奖励
+  STAMINA_PRICE_1: 150,         // 购买1点体力价格
+  STAMINA_PRICE_2: 299,         // 购买2点体力价格
+  STAMINA_AD_COUNT: 3,          // 观看广告次数获得无限体力
+  STAMINA_AD_DURATION: 24 * 60 * 60 * 1000,  // 无限体力持续24小时
+  PERMANENT_UNLOCK_PRICE: 500,  // 永久解锁目标价格
+  GROUP_MULTIPLIER: 2           // 加群签到翻倍倍率
 };

@@ -27,6 +27,10 @@ export class AdManager {
         this.gridGamePanel = null;
         this.isBannerVisible = false;
         this.isGridPanelVisible = false;
+        this.isBannerLoaded = false;
+        this.bannerRetryCount = 0;
+        this.bannerRetryTimer = null;
+        this.bannerPendingShow = false;
 
         // 新增：插屏广告频控追踪
         this.gameStartTime = Date.now();  // 游戏启动时间
@@ -93,6 +97,10 @@ export class AdManager {
         // 免费目标始终解锁
         if (target.unlock.type === 'free') return true;
 
+        // 检查金币永久解锁
+        const permanentUnlocks = this.settings.get('coin.permanentUnlocks') || {};
+        if (permanentUnlocks[targetId]) return true;
+
         // 检查是否有有效的解锁记录
         const unlockTime = this.unlockData[targetId];
         if (!unlockTime) return false;
@@ -121,6 +129,10 @@ export class AdManager {
     getUnlockRemainingTime(targetId) {
         const target = TARGET_TYPES.find(t => t.id === targetId);
         if (!target || target.unlock.type === 'free') return -1;
+
+        // 金币永久解锁
+        const permanentUnlocks = this.settings.get('coin.permanentUnlocks') || {};
+        if (permanentUnlocks[targetId]) return -1;
 
         const unlockTime = this.unlockData[targetId];
         if (!unlockTime) return 0;
@@ -616,39 +628,84 @@ export class AdManager {
         }
 
         try {
-            // 获取系统信息动态计算Banner位置
             const systemInfo = tt.getSystemInfoSync();
-            const screenWidth = systemInfo.windowWidth || systemInfo.screenWidth;
-            const screenHeight = systemInfo.windowHeight || systemInfo.screenHeight;
-            const bannerHeight = 100; // Banner高度（100px，避免遮挡按钮）
+            const screenWidth = systemInfo.screenWidth;
+            const screenHeight = systemInfo.screenHeight;
 
-            // 动态计算Banner样式（固定在屏幕底部）
             const bannerStyle = {
                 left: 0,
-                top: screenHeight - bannerHeight,  // 屏幕底部
-                width: screenWidth,                 // 全屏宽度
-                height: bannerHeight
+                top: screenHeight - 60,
+                width: screenWidth
             };
 
             console.log('[AdManager] Banner样式配置:', bannerStyle);
 
             this.bannerAd = tt.createBannerAd({
                 adUnitId: AD_CONFIG.adUnitIds.banner,
-                style: bannerStyle
+                style: bannerStyle,
+                adIntervals: AD_CONFIG.banner.adIntervals
             });
 
-            // 监听广告事件
             this.bannerAd.onLoad(() => {
-                console.log('[AdManager] ✅ Banner广告加载成功');
+                console.log('[AdManager] Banner广告加载成功');
+                this.isBannerLoaded = true;
+                this.bannerRetryCount = 0;
+
+                if (this.bannerPendingShow) {
+                    console.log('[AdManager] Banner广告待执行show，自动触发');
+                    this.bannerPendingShow = false;
+                    this._doShowBanner();
+                }
+            });
+
+            this.bannerAd.onResize((size) => {
+                console.log('[AdManager] Banner广告尺寸变化:', size);
+                try {
+                    this.bannerAd.style.top = screenHeight - size.height;
+                    this.bannerAd.style.left = (screenWidth - size.width) / 2;
+                } catch (e) {
+                    console.warn('[AdManager] Banner广告样式更新失败:', e);
+                }
             });
 
             this.bannerAd.onError((err) => {
-                console.error('[AdManager] ❌ Banner广告错误:', err);
+                console.error('[AdManager] Banner广告错误:', err);
+                this.isBannerLoaded = false;
+                this.bannerPendingShow = false;
+
+                if (this.bannerRetryCount >= AD_CONFIG.banner.maxRetryCount) {
+                    console.warn('[AdManager] Banner广告已达最大重试次数，停止重试');
+                    return;
+                }
+
+                this.bannerRetryCount++;
+                const baseDelay = AD_CONFIG.banner.retryDelay;
+                const multiplier = AD_CONFIG.banner.retryBackoffMultiplier;
+                const maxDelay = AD_CONFIG.banner.maxRetryDelay;
+                const delay = Math.min(
+                    baseDelay * Math.pow(multiplier, this.bannerRetryCount - 1),
+                    maxDelay
+                );
+
+                const isFillError = err.errCode === 1004;
+                const finalDelay = isFillError ? Math.min(delay * 2, maxDelay) : delay;
+
+                console.log(`[AdManager] Banner广告将在${finalDelay}ms后重试 (第${this.bannerRetryCount}/${AD_CONFIG.banner.maxRetryCount}次)`);
+                this._scheduleBannerRebuild(finalDelay);
             });
 
             console.log('[AdManager] Banner广告初始化成功');
         } catch (err) {
             console.error('[AdManager] Banner广告初始化失败:', err);
+            this.isBannerLoaded = false;
+
+            if (this.bannerRetryCount < AD_CONFIG.banner.maxRetryCount) {
+                this.bannerRetryCount++;
+                const delay = AD_CONFIG.banner.retryDelay * Math.pow(
+                    AD_CONFIG.banner.retryBackoffMultiplier, this.bannerRetryCount - 1
+                );
+                this._scheduleBannerRebuild(delay);
+            }
         }
     }
 
@@ -656,18 +713,47 @@ export class AdManager {
      * 显示Banner广告
      */
     showBannerAd() {
-        console.log('[AdManager] 🎯 请求显示Banner广告');
+        console.log('[AdManager] 请求显示Banner广告');
 
-        if (typeof tt === 'undefined' || !this.bannerAd) {
-            console.log('[AdManager] Banner广告不可用，跳过显示');
+        if (typeof tt === 'undefined') {
             return;
         }
 
+        if (!this.bannerAd) {
+            console.log('[AdManager] Banner广告实例不存在，尝试重新初始化');
+            this.initBannerAd();
+            if (!this.bannerAd) {
+                return;
+            }
+        }
+
+        if (this.isBannerVisible) {
+            return;
+        }
+
+        if (!this.isBannerLoaded) {
+            console.log('[AdManager] Banner广告尚未加载完成，标记待执行');
+            this.bannerPendingShow = true;
+            return;
+        }
+
+        this._doShowBanner();
+    }
+
+    /**
+     * 执行Banner广告显示
+     */
+    _doShowBanner() {
+        if (!this.bannerAd || !this.isBannerLoaded) return;
+
         this.bannerAd.show().then(() => {
             this.isBannerVisible = true;
-            console.log('[AdManager] ✅ Banner广告显示成功');
+            console.log('[AdManager] Banner广告显示成功');
         }).catch((err) => {
-            console.error('[AdManager] ❌ Banner广告显示失败:', err);
+            console.error('[AdManager] Banner广告显示失败:', err);
+            this.isBannerVisible = false;
+            this.isBannerLoaded = false;
+            this._scheduleBannerRebuild(AD_CONFIG.banner.retryDelay);
         });
     }
 
@@ -675,18 +761,51 @@ export class AdManager {
      * 隐藏Banner广告
      */
     hideBannerAd() {
-        console.log('[AdManager] 🎯 请求隐藏Banner广告');
+        console.log('[AdManager] 请求隐藏Banner广告');
 
-        if (!this.bannerAd || !this.isBannerVisible) {
+        if (!this.bannerAd) {
             return;
         }
 
+        this.bannerPendingShow = false;
+
         this.bannerAd.hide().then(() => {
             this.isBannerVisible = false;
-            console.log('[AdManager] ✅ Banner广告隐藏成功');
+            console.log('[AdManager] Banner广告隐藏成功');
         }).catch((err) => {
-            console.error('[AdManager] ❌ Banner广告隐藏失败:', err);
+            this.isBannerVisible = false;
+            console.error('[AdManager] Banner广告隐藏失败:', err);
         });
+    }
+
+    /**
+     * 延迟重建Banner广告实例
+     */
+    _scheduleBannerRebuild(delay) {
+        if (this.bannerRetryTimer) {
+            clearTimeout(this.bannerRetryTimer);
+            this.bannerRetryTimer = null;
+        }
+
+        this.bannerRetryTimer = setTimeout(() => {
+            console.log('[AdManager] 开始重建Banner广告实例');
+            this.bannerRetryTimer = null;
+
+            if (this.bannerAd) {
+                try {
+                    this.bannerAd.destroy();
+                } catch (e) {
+                    console.warn('[AdManager] 销毁旧Banner实例失败:', e);
+                }
+                this.bannerAd = null;
+            }
+
+            this.isBannerLoaded = false;
+            this.isBannerVisible = false;
+            this.bannerPendingShow = false;
+
+            this.initBannerAd();
+        }, delay);
     }
 
     /**
@@ -805,10 +924,24 @@ export class AdManager {
      * 销毁广告资源（游戏退出时调用）
      */
     destroyAds() {
-        console.log('[AdManager] 🎯 销毁广告资源');
+        console.log('[AdManager] 销毁广告资源');
+
+        if (this.bannerRetryTimer) {
+            clearTimeout(this.bannerRetryTimer);
+            this.bannerRetryTimer = null;
+        }
 
         if (this.bannerAd) {
-            this.bannerAd.destroy();
+            try {
+                this.bannerAd.hide();
+            } catch (e) {
+                // hide失败不影响后续destroy
+            }
+            try {
+                this.bannerAd.destroy();
+            } catch (e) {
+                console.warn('[AdManager] Banner广告destroy失败:', e);
+            }
             this.bannerAd = null;
         }
 
@@ -818,6 +951,9 @@ export class AdManager {
         }
 
         this.isBannerVisible = false;
+        this.isBannerLoaded = false;
+        this.bannerPendingShow = false;
+        this.bannerRetryCount = 0;
         this.isGridPanelVisible = false;
     }
 }

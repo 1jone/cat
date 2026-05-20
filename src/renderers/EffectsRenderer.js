@@ -70,6 +70,13 @@ export class EffectsRenderer {
             ctx.fillStyle = '#CCCCCC';  // 浅灰色分数
             ctx.textAlign = 'center';
             ctx.fillText(`+${effect.points}`, effect.x, effect.y - offsetY - pawSize);
+
+            // 额外标签（如 combo x2, x3 等）
+            if (effect.label) {
+                ctx.font = `bold ${16 * scale}px Arial`;
+                ctx.fillStyle = '#FFD700';
+                ctx.fillText(effect.label, effect.x, effect.y - offsetY - pawSize - 20);
+            }
         } else {
             // butterfly 或 particle - 只显示分数，不显示爪印
             ctx.globalAlpha = alpha;

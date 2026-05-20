@@ -99,7 +99,7 @@ export class ChatGroupManager {
                 },
                 fail: (err) => {
                     console.error('[ChatGroupManager] ❌ 加入官方群失败:', err);
-                }
+                }   
             });
             return true;
         } catch (e) {

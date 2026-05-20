@@ -44,6 +44,12 @@ export class BackgroundRenderer {
                 this.renderDarkGradientBackground(logicalWidth, logicalHeight);
             } else if (targetId === 'ladybug') {
                 this.renderFireflyBackground(logicalWidth, logicalHeight, time);
+            } else if (targetId === 'mosquito') {
+                this.renderMosquitoBackground(logicalWidth, logicalHeight, time);
+            } else if (targetId === 'jellyfish') {
+                this.renderDeepSeaBackground(logicalWidth, logicalHeight, time);
+            } else if (targetId === 'bubblefish') {
+                this.renderBubblefishBackground(logicalWidth, logicalHeight, time);
             } else {
                 this.renderSparkleBackground(logicalWidth, logicalHeight);
             }
@@ -204,7 +210,7 @@ export class BackgroundRenderer {
      * @returns {boolean}
      */
     hasSpecialBackground(targetId) {
-        const specialBackgroundTargets = ['sparkle', 'butterfly', 'fish', 'yarn', 'ladybug','laser'];
+        const specialBackgroundTargets = ['sparkle', 'butterfly', 'fish', 'yarn', 'ladybug','laser', 'mosquito', 'jellyfish', 'bubblefish'];
         return specialBackgroundTargets.includes(targetId);
     }
 
@@ -653,6 +659,445 @@ export class BackgroundRenderer {
             ctx.arc(baseX - bubbleSize * 0.3, y - bubbleSize * 0.3, bubbleSize * 0.2, 0, Math.PI * 2);
             ctx.fillStyle = `rgba(255, 255, 255, ${alpha * 1.5})`;
             ctx.fill();
+        }
+    }
+
+    /**
+     * 渲染蚊子专属背景（深蓝黑 + 霓虹线条 + 扫描光）
+     * @param {number} width - 画布宽度
+     * @param {number} height - 画布高度
+     * @param {number} time - 当前时间（秒）
+     */
+    renderMosquitoBackground(width, height, time) {
+        const ctx = this.ctx;
+
+        // === 1. 深蓝黑径向渐变底色 ===
+        const gradient = ctx.createRadialGradient(
+            width / 2, height / 2, 0,
+            width / 2, height / 2, Math.max(width, height) * 0.8
+        );
+        gradient.addColorStop(0, '#0A1628');
+        gradient.addColorStop(0.6, '#060E1A');
+        gradient.addColorStop(1, '#020408');
+
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, width, height);
+
+        // === 2. 霓虹线条 ===
+        this.renderNeonLines(ctx, width, height, time);
+
+        // === 3. 扫描光 ===
+        this.renderScanLight(ctx, width, height, time);
+    }
+
+    /**
+     * 渲染霓虹线条
+     * @param {CanvasRenderingContext2D} ctx
+     * @param {number} width
+     * @param {number} height
+     * @param {number} time
+     */
+    renderNeonLines(ctx, width, height, time) {
+        ctx.save();
+
+        const lineCount = 6;
+        const neonColors = [
+            { r: 0, g: 200, b: 255 },    // 青色
+            { r: 150, g: 0, b: 255 },     // 紫色
+            { r: 0, g: 255, b: 150 },     // 青绿
+            { r: 255, g: 50, b: 100 },    // 品红
+            { r: 100, g: 150, b: 255 },   // 蓝紫
+            { r: 0, g: 255, b: 255 },     // 亮青
+        ];
+
+        for (let i = 0; i < lineCount; i++) {
+            const color = neonColors[i % neonColors.length];
+            const baseY = height * (i + 1) / (lineCount + 1);
+            const waveAmplitude = 20 + i * 8;
+            const waveFreq = 0.008 + i * 0.002;
+            const speed = 0.5 + i * 0.15;
+
+            const alpha = 0.08 + Math.sin(time * 0.8 + i * 1.2) * 0.04;
+
+            ctx.strokeStyle = `rgba(${color.r}, ${color.g}, ${color.b}, ${alpha})`;
+            ctx.lineWidth = 1;
+            ctx.shadowColor = `rgba(${color.r}, ${color.g}, ${color.b}, ${alpha * 2})`;
+            ctx.shadowBlur = 8;
+
+            ctx.beginPath();
+            for (let x = 0; x <= width; x += 4) {
+                const y = baseY + Math.sin(x * waveFreq + time * speed) * waveAmplitude
+                              + Math.sin(x * waveFreq * 2.3 + time * speed * 0.7) * waveAmplitude * 0.3;
+                if (x === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            }
+            ctx.stroke();
+        }
+
+        ctx.restore();
+    }
+
+    /**
+     * 渲染微弱扫描光
+     * @param {CanvasRenderingContext2D} ctx
+     * @param {number} width
+     * @param {number} height
+     * @param {number} time
+     */
+    renderScanLight(ctx, width, height, time) {
+        ctx.save();
+
+        const scanPeriod = 6;
+        const scanProgress = (time % scanPeriod) / scanPeriod;
+        const scanY = scanProgress * (height + 100) - 50;
+        const scanHeight = 60;
+
+        const scanGradient = ctx.createLinearGradient(0, scanY - scanHeight / 2, 0, scanY + scanHeight / 2);
+        scanGradient.addColorStop(0, 'rgba(0, 200, 255, 0)');
+        scanGradient.addColorStop(0.5, 'rgba(0, 200, 255, 0.04)');
+        scanGradient.addColorStop(1, 'rgba(0, 200, 255, 0)');
+
+        ctx.fillStyle = scanGradient;
+        ctx.fillRect(0, scanY - scanHeight / 2, width, scanHeight);
+
+        ctx.restore();
+    }
+
+    /**
+     * 渲染深海背景（水母专用 - 深海渐变 + 光线 + 海草/珊瑚剪影 + 海洋雪粒子）
+     * @param {number} width - 画布宽度
+     * @param {number} height - 画布高度
+     * @param {number} time - 当前时间（秒）
+     */
+    renderDeepSeaBackground(width, height, time) {
+        const ctx = this.ctx;
+
+        // === 1. 深海渐变（5色标） ===
+        const gradient = ctx.createLinearGradient(0, 0, 0, height);
+        gradient.addColorStop(0,    '#020B18');
+        gradient.addColorStop(0.15, '#061428');
+        gradient.addColorStop(0.5,  '#0A1E3D');
+        gradient.addColorStop(0.8,  '#081A2A');
+        gradient.addColorStop(1,    '#04101A');
+
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, width, height);
+
+        // === 2. 微弱光线 ===
+        this.renderDeepSeaLightRays(ctx, width, height, time);
+
+        // === 3. 底部植被剪影（海草 + 珊瑚） ===
+        this.renderDeepSeaVegetation(ctx, width, height, time);
+
+        // === 4. 海洋雪粒子 ===
+        this.renderMarineSnow(width, height, time);
+    }
+
+    /**
+     * 渲染深海微弱光线（从上方投射的淡蓝光柱）
+     * @param {CanvasRenderingContext2D} ctx
+     * @param {number} width
+     * @param {number} height
+     * @param {number} time
+     */
+    renderDeepSeaLightRays(ctx, width, height, time) {
+        ctx.save();
+        ctx.globalAlpha = 0.03;
+
+        const rayCount = 3;
+        for (let i = 0; i < rayCount; i++) {
+            const baseX = width * (0.2 + i * 0.3);
+            const sway = Math.sin(time * 0.15 + i * 2.1) * 30;
+            const rayWidth = 40 + i * 15;
+
+            const rayGrad = ctx.createLinearGradient(0, 0, 0, height * 0.7);
+            rayGrad.addColorStop(0, 'rgba(100, 180, 255, 1)');
+            rayGrad.addColorStop(1, 'rgba(100, 180, 255, 0)');
+
+            ctx.fillStyle = rayGrad;
+            ctx.beginPath();
+            ctx.moveTo(baseX + sway - rayWidth / 2, 0);
+            ctx.lineTo(baseX + sway + rayWidth / 2, 0);
+            ctx.lineTo(baseX + sway + rayWidth * 1.5, height * 0.7);
+            ctx.lineTo(baseX + sway - rayWidth * 0.5, height * 0.7);
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        ctx.restore();
+    }
+
+    /**
+     * 渲染深海底部植被剪影（海草 + 珊瑚）
+     * @param {CanvasRenderingContext2D} ctx
+     * @param {number} width
+     * @param {number} height
+     * @param {number} time
+     */
+    renderDeepSeaVegetation(ctx, width, height, time) {
+        // === 海草（贝塞尔曲线，随时间摆动） ===
+        const seaweedSeeds = [73, 189, 312, 456, 534, 678, 723, 891, 956, 1034, 1156, 1287];
+        const seaweedCount = Math.min(seaweedSeeds.length, Math.floor(width / 50));
+
+        ctx.strokeStyle = 'rgba(5, 30, 25, 0.6)';
+        ctx.lineCap = 'round';
+
+        for (let i = 0; i < seaweedCount; i++) {
+            const baseX = (seaweedSeeds[i] % (width - 40)) + 20;
+            const stalkHeight = 50 + (seaweedSeeds[i] % 80);
+
+            const sway = Math.sin(time * 0.4 + i * 0.7) * 8;
+            const sway2 = Math.sin(time * 0.6 + i * 1.3) * 5;
+
+            ctx.lineWidth = 3 + (seaweedSeeds[i] % 4);
+            ctx.beginPath();
+            ctx.moveTo(baseX, height);
+            ctx.bezierCurveTo(
+                baseX + sway2 * 0.3, height - stalkHeight * 0.4,
+                baseX + sway, height - stalkHeight * 0.8,
+                baseX + sway * 1.2, height - stalkHeight
+            );
+            ctx.stroke();
+        }
+
+        // === 珊瑚（分支结构，静态） ===
+        const coralSeeds = [234, 567, 890, 1123, 1345, 1567];
+        const coralCount = Math.min(coralSeeds.length, Math.floor(width / 100));
+
+        ctx.strokeStyle = 'rgba(15, 25, 40, 0.7)';
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        for (let i = 0; i < coralCount; i++) {
+            const baseX = (coralSeeds[i] % (width - 60)) + 30;
+            const coralHeight = 25 + (coralSeeds[i] % 35);
+            const branches = 2 + (coralSeeds[i] % 2);
+
+            ctx.lineWidth = 4 + (coralSeeds[i] % 3);
+
+            ctx.beginPath();
+            ctx.moveTo(baseX, height);
+            ctx.lineTo(baseX, height - coralHeight);
+            ctx.stroke();
+
+            for (let b = 0; b < branches; b++) {
+                const branchY = height - coralHeight * (0.4 + b * 0.25);
+                const direction = (b % 2 === 0) ? 1 : -1;
+                const branchLen = 10 + (coralSeeds[(i + b) % coralSeeds.length] % 15);
+                const angle = direction * (0.3 + b * 0.2);
+
+                ctx.beginPath();
+                ctx.moveTo(baseX, branchY);
+                ctx.lineTo(
+                    baseX + Math.sin(angle) * branchLen,
+                    branchY - Math.cos(angle) * branchLen * 0.6
+                );
+                ctx.stroke();
+            }
+        }
+    }
+
+    /**
+     * 渲染海洋雪粒子（深海漂浮微粒，缓慢下落）
+     * @param {number} width - 画布宽度
+     * @param {number} height - 画布高度
+     * @param {number} time - 当前时间（秒）
+     */
+    renderMarineSnow(width, height, time) {
+        const ctx = this.ctx;
+        const particleCount = 15;
+        const seed = [87, 213, 349, 478, 592, 631, 745, 823, 934, 1042,
+                      1167, 1253, 1389, 1423, 1567];
+
+        for (let i = 0; i < particleCount; i++) {
+            const baseX = seed[i] % width;
+            const baseY = seed[(i + 3) % seed.length] % height;
+
+            const fallOffset = (time * 8 + i * 40) % height;
+            const y = (baseY + fallOffset) % height;
+
+            const drift = Math.sin(time * 0.3 + i * 1.7) * 6;
+            const x = (baseX + drift + width) % width;
+
+            const size = 1 + (i % 2);
+            const alpha = 0.12 + Math.sin(time * 0.8 + i * 2.3) * 0.06;
+
+            ctx.beginPath();
+            ctx.arc(x, y, size, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(180, 220, 255, ${alpha})`;
+            ctx.fill();
+        }
+    }
+
+    /**
+     * 渲染气泡鱼背景（浅海明亮 - 渐变 + 少量气泡 + 海草剪影 + 阳光波纹）
+     * @param {number} width - 画布宽度
+     * @param {number} height - 画布高度
+     * @param {number} time - 当前时间（秒）
+     */
+    renderBubblefishBackground(width, height, time) {
+        const ctx = this.ctx;
+
+        // === 1. 浅海明亮渐变（从上到下变深） ===
+        const gradient = ctx.createLinearGradient(0, 0, 0, height);
+        gradient.addColorStop(0,    '#AEEBFF');   // 浅天蓝（阳光水面）
+        gradient.addColorStop(0.3,  '#74D3F4');   // 主色明亮蓝
+        gradient.addColorStop(0.7,  '#4AA8D4');   // 中层蓝
+        gradient.addColorStop(1,    '#2D7EA3');   // 底部深蓝
+
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, width, height);
+
+        // === 2. 阳光波纹（水面折射光斑） ===
+        this.renderSunlightRipples(ctx, width, height, time);
+
+        // === 3. 少量漂浮气泡 ===
+        this.renderBubblefishBubbles(width, height, time);
+
+        // === 4. 底部海草剪影 ===
+        this.renderBubblefishSeaweed(ctx, width, height, time);
+    }
+
+    /**
+     * 渲染阳光波纹（水面折射产生的光斑效果）
+     * @param {CanvasRenderingContext2D} ctx
+     * @param {number} width
+     * @param {number} height
+     * @param {number} time
+     */
+    renderSunlightRipples(ctx, width, height, time) {
+        ctx.save();
+
+        // 顶部光柱（从水面向下延伸）
+        const rayCount = 4;
+        for (let i = 0; i < rayCount; i++) {
+            const baseX = width * (0.15 + i * 0.22);
+            const sway = Math.sin(time * 0.3 + i * 1.8) * 25;
+            const rayWidth = 30 + i * 10;
+
+            const rayGrad = ctx.createLinearGradient(0, 0, 0, height * 0.6);
+            rayGrad.addColorStop(0, 'rgba(216, 248, 255, 0.15)');
+            rayGrad.addColorStop(0.5, 'rgba(174, 235, 255, 0.06)');
+            rayGrad.addColorStop(1, 'rgba(174, 235, 255, 0)');
+
+            ctx.fillStyle = rayGrad;
+            ctx.beginPath();
+            ctx.moveTo(baseX + sway - rayWidth / 2, 0);
+            ctx.lineTo(baseX + sway + rayWidth / 2, 0);
+            ctx.lineTo(baseX + sway + rayWidth * 2, height * 0.6);
+            ctx.lineTo(baseX + sway - rayWidth, height * 0.6);
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        // 水面波纹线（正弦波，模拟焦散效果）
+        const waveCount = 3;
+        for (let w = 0; w < waveCount; w++) {
+            const baseY = 30 + w * 25;
+            const amplitude = 6 + w * 3;
+            const frequency = 0.015 + w * 0.003;
+            const phase = time * (0.8 + w * 0.2);
+
+            ctx.beginPath();
+            ctx.moveTo(0, baseY);
+            for (let x = 0; x <= width; x += 6) {
+                const waveY = baseY + Math.sin(x * frequency + phase) * amplitude
+                                    + Math.sin(x * frequency * 2.1 + phase * 0.6) * amplitude * 0.3;
+                ctx.lineTo(x, waveY);
+            }
+
+            ctx.strokeStyle = `rgba(255, 255, 255, ${0.12 - w * 0.03})`;
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+        }
+
+        ctx.restore();
+    }
+
+    /**
+     * 渲染气泡鱼场景的少量气泡
+     * @param {number} width
+     * @param {number} height
+     * @param {number} time
+     */
+    renderBubblefishBubbles(width, height, time) {
+        const ctx = this.ctx;
+        const bubbleCount = 8;
+        const seed = [156, 289, 423, 567, 634, 789, 856, 923];
+
+        for (let i = 0; i < bubbleCount; i++) {
+            const baseX = (seed[i] * 3) % width;
+            const baseY = (seed[(i + 2) % seed.length] * 5) % height;
+            const bubbleSize = 4 + (seed[i] % 8);
+
+            const riseOffset = (time * 15 + i * 60) % height;
+            const y = (baseY - riseOffset + height) % height;
+
+            const drift = Math.sin(time * 0.5 + i * 1.1) * 4;
+            const x = (baseX + drift + width) % width;
+
+            const alpha = 0.15 + Math.sin(time * 1.2 + i * 0.9) * 0.08;
+
+            // 气泡主体
+            ctx.beginPath();
+            ctx.arc(x, y, bubbleSize, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(216, 248, 255, ${alpha})`;
+            ctx.fill();
+
+            // 气泡边缘
+            ctx.beginPath();
+            ctx.arc(x, y, bubbleSize, 0, Math.PI * 2);
+            ctx.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.8})`;
+            ctx.lineWidth = 0.5;
+            ctx.stroke();
+
+            // 气泡高光
+            ctx.beginPath();
+            ctx.arc(x - bubbleSize * 0.3, y - bubbleSize * 0.3, bubbleSize * 0.25, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(255, 255, 255, ${alpha * 1.5})`;
+            ctx.fill();
+        }
+    }
+
+    /**
+     * 渲染气泡鱼场景的底部海草（浅海风格，较明亮）
+     * @param {CanvasRenderingContext2D} ctx
+     * @param {number} width
+     * @param {number} height
+     * @param {number} time
+     */
+    renderBubblefishSeaweed(ctx, width, height, time) {
+        const seaweedSeeds = [95, 234, 378, 512, 645, 778, 912, 1045, 1178];
+        const seaweedCount = Math.min(seaweedSeeds.length, Math.floor(width / 45));
+
+        for (let i = 0; i < seaweedCount; i++) {
+            const baseX = (seaweedSeeds[i] % (width - 30)) + 15;
+            const stalkHeight = 40 + (seaweedSeeds[i] % 60);
+
+            const sway = Math.sin(time * 0.5 + i * 0.8) * 10;
+            const sway2 = Math.sin(time * 0.7 + i * 1.4) * 6;
+
+            ctx.lineWidth = 2 + (seaweedSeeds[i] % 3);
+            ctx.lineCap = 'round';
+
+            // 海草渐变（从底部深色到顶部浅色）
+            const bladeGrad = ctx.createLinearGradient(0, height, 0, height - stalkHeight);
+            bladeGrad.addColorStop(0, 'rgba(20, 80, 60, 0.5)');
+            bladeGrad.addColorStop(0.6, 'rgba(30, 110, 80, 0.35)');
+            bladeGrad.addColorStop(1, 'rgba(50, 140, 100, 0.2)');
+
+            ctx.strokeStyle = bladeGrad;
+            ctx.beginPath();
+            ctx.moveTo(baseX, height);
+            ctx.bezierCurveTo(
+                baseX + sway2 * 0.3, height - stalkHeight * 0.4,
+                baseX + sway, height - stalkHeight * 0.75,
+                baseX + sway * 1.2, height - stalkHeight
+            );
+            ctx.stroke();
         }
     }
 }

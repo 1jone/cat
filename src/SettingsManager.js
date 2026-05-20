@@ -63,6 +63,17 @@ export class SettingsManager {
                 hasSeenPrompt: false,      // 是否已看过快捷方式提示
                 lastPromptTime: 0,         // 上次提示时间戳
                 addShortcutReward: 1       // 添加快捷方式的体力奖励
+            },
+            // 金币相关数据
+            coin: {
+                balance: 0,                    // 当前金币余额
+                totalEarned: 0,                // 累计获得金币
+                totalSpent: 0,                 // 累计消费金币
+                lastCheckinDate: null,         // 上次签到日期 'YYYY-MM-DD'
+                consecutiveCheckins: 0,        // 连续签到天数
+                groupJoinRewardClaimed: false, // 是否已领取加群奖励
+                permanentUnlocks: {},          // 金币永久解锁的目标 { targetId: true }
+                unlimitedStaminaAdProgress: 0  // 无限体力广告已观看次数
             }
         };
 

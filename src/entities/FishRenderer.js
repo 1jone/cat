@@ -40,8 +40,10 @@ export class FishRenderer {
 
         // 1. 高光闪烁 (呼吸效果)
         const shimmer = 0.3 + Math.sin(time * 3) * 0.15;
-        ctx.shadowColor = `rgba(255, 255, 255, ${shimmer})`;
-        ctx.shadowBlur = 15;
+        if (!state.isPreview) {
+            ctx.shadowColor = `rgba(255, 255, 255, ${shimmer})`;
+            ctx.shadowBlur = 15;
+        }
 
         // 2. 尾巴（抖动）
         this.renderTail(ctx, time, isStartled);

@@ -9,7 +9,7 @@ import { YarnRenderer } from './YarnRenderer';
 import { MultiLineRenderer } from './MultiLineRenderer';
 
 export class ImageTarget extends Entity {
-    constructor(position, config, mouseRenderer = null, butterflyRenderer = null, fishRenderer = null, yarnRenderer = null, multilineRenderer = null, birdRenderer = null, ladybugRenderer = null) {
+    constructor(position, config, mouseRenderer = null, butterflyRenderer = null, fishRenderer = null, yarnRenderer = null, multilineRenderer = null, birdRenderer = null, ladybugRenderer = null, mosquitoRenderer = null, bubblefishRenderer = null, bouncyballRenderer = null, jellyfishRenderer = null) {
         super(position, config.radius);
 
         // 基础属性
@@ -31,6 +31,9 @@ export class ImageTarget extends Entity {
         this.multilineRenderer = multilineRenderer;
         this.birdRenderer = birdRenderer;
         this.ladybugRenderer = ladybugRenderer;
+        this.bubblefishRenderer = bubblefishRenderer;
+        this.bouncyballRenderer = bouncyballRenderer;
+        this.jellyfishRenderer = jellyfishRenderer;
 
         // 存储 canvas 尺寸供渲染使用
         this.canvasWidth = 0;
@@ -86,6 +89,17 @@ export class ImageTarget extends Entity {
         this.frameInterval = 100;
         this.lastFrameTime = 0;
 
+        // HP 系统（多击目标使用，如气泡鱼）
+        this.hp = config.bubblefishConfig ? config.bubblefishConfig.maxHp : 1;
+        this.maxHp = this.hp;
+
+        // Combo 系统（弹力球使用）
+        this.comboCount = 0;
+        this.comboTimer = 0;
+
+        // 动态属性系统（水母使用，每帧更新 radius 和 points）
+        this.dynamicRadius = null;
+
         // 获取运动参数（合并默认配置和自定义配置）
         const movementType = config.movement || 'bounce';
         const defaultParams = CONFIG.MOVEMENT_PARAMS[movementType] || {};
@@ -112,6 +126,14 @@ export class ImageTarget extends Entity {
                 this.renderer = birdRenderer;
             } else if (config.id === 'ladybug' && ladybugRenderer) {
                 this.renderer = ladybugRenderer;
+            } else if (config.id === 'mosquito' && mosquitoRenderer) {
+                this.renderer = mosquitoRenderer;
+            } else if (config.id === 'bubblefish' && bubblefishRenderer) {
+                this.renderer = bubblefishRenderer;
+            } else if (config.id === 'bouncyball' && bouncyballRenderer) {
+                this.renderer = bouncyballRenderer;
+            } else if (config.id === 'jellyfish' && jellyfishRenderer) {
+                this.renderer = jellyfishRenderer;
             } else {
                 // 默认使用 RabbitRenderer（兼容其他Canvas渲染目标）
                 this.renderer = new RabbitRenderer(config);
@@ -166,6 +188,12 @@ export class ImageTarget extends Entity {
     initMovement(position) {
         const movement = this.config.movement;
         const params = this.movementParams;
+
+        // 弹跳角度扰动（弹力球使用）
+        this.wallAnglePerturbation = 0;
+        if (movement === 'bounce' && this.config.bouncyballConfig) {
+            this.wallAnglePerturbation = this.config.bouncyballConfig.wallAnglePerturbation || 0;
+        }
 
         switch (movement) {
             case 'circular':
@@ -245,6 +273,12 @@ export class ImageTarget extends Entity {
 
     update(dt, canvasWidth, canvasHeight) {
         this.time += dt * 2;
+
+        // 更新动态属性（水母呼吸动画改变 radius 和 points）
+        this.updateDynamicProperties(dt);
+
+        // 更新 Combo 计时器（弹力球使用）
+        this.updateCombo(dt);
 
         // 存储 canvas 尺寸供渲染使用
         this.canvasWidth = canvasWidth;
@@ -342,6 +376,68 @@ export class ImageTarget extends Entity {
         }
     }
 
+    // ==================== 新增机制方法 ====================
+
+    takeDamage() {
+        this.hp -= 1;
+        this.isClicked = true;
+        this.clickTime = Date.now();
+        this.clickIntensity = 1.0;
+
+        if (this.hp <= 0) {
+            this.isActive = false;
+            return { destroyed: true, remainingHp: 0 };
+        }
+        return { destroyed: false, remainingHp: this.hp };
+    }
+
+    updateCombo(dt) {
+        if (this.comboCount > 0) {
+            this.comboTimer -= dt;
+            if (this.comboTimer <= 0) {
+                this.comboCount = 0;
+                this.comboTimer = 0;
+            }
+        }
+    }
+
+    incrementCombo() {
+        this.comboCount++;
+        this.comboTimer = this.config.bouncyballConfig?.comboWindow || 1.0;
+        return this.comboCount;
+    }
+
+    getComboMultiplier() {
+        if (!this.config.bouncyballConfig) return 1;
+        const multipliers = this.config.bouncyballConfig.comboMultipliers;
+        const index = Math.min(this.comboCount - 1, multipliers.length - 1);
+        return multipliers[Math.max(0, index)];
+    }
+
+    updateDynamicProperties(dt) {
+        if (!this.config.jellyfishConfig) return;
+
+        const config = this.config.jellyfishConfig;
+        const breathPhase = (Math.sin(this.time * config.breathSpeed) + 1) / 2;
+
+        this.dynamicRadius = config.inflatedRadius +
+            (config.deflatedRadius - config.inflatedRadius) * breathPhase;
+
+        this.radius = this.dynamicRadius;
+        this.points = Math.round(
+            config.inflatedPoints + (config.deflatedPoints - config.inflatedPoints) * breathPhase
+        );
+    }
+
+    perturbBounceAngle() {
+        if (this.wallAnglePerturbation <= 0) return;
+        const speed = Math.sqrt(this.velocity.x * this.velocity.x + this.velocity.y * this.velocity.y);
+        const currentAngle = Math.atan2(this.velocity.y, this.velocity.x);
+        const newAngle = currentAngle + (Math.random() - 0.5) * 2 * this.wallAnglePerturbation;
+        this.velocity.x = Math.cos(newAngle) * speed;
+        this.velocity.y = Math.sin(newAngle) * speed;
+    }
+
     // ==================== 原有运动模式 ====================
 
     updateBounce(dt, canvasWidth, canvasHeight) {
@@ -351,17 +447,21 @@ export class ImageTarget extends Entity {
         if (this.position.x - this.radius < 0) {
             this.position.x = this.radius;
             this.velocity.x *= -1;
+            this.perturbBounceAngle();
         } else if (this.position.x + this.radius > canvasWidth) {
             this.position.x = canvasWidth - this.radius;
             this.velocity.x *= -1;
+            this.perturbBounceAngle();
         }
 
         if (this.position.y - this.radius < 0) {
             this.position.y = this.radius;
             this.velocity.y *= -1;
+            this.perturbBounceAngle();
         } else if (this.position.y + this.radius > canvasHeight - 80) {
             this.position.y = canvasHeight - 80 - this.radius;
             this.velocity.y *= -1;
+            this.perturbBounceAngle();
         }
     }
 
@@ -1427,6 +1527,29 @@ export class ImageTarget extends Entity {
             ctx.restore();  // 先restore以避免影响multiline renderer内部的变换
             this.multilineRenderer.render(ctx, this.canvasWidth, this.canvasHeight, this.time);
             ctx.save();   // 重新save以匹配后面的restore
+        } else if (this.renderType === 'canvas' && this.config.id === 'jellyfish' && this.jellyfishRenderer) {
+            // Canvas渲染模式（水母）
+            ctx.restore();
+            this.jellyfishRenderer.render(
+                ctx, this.position, this.radius, this.currentRotation,
+                this.time, finalScale, this.checkIsMoving(), this.getCurrentSpeed()
+            );
+            ctx.save();
+        } else if (this.renderType === 'canvas' && this.config.id === 'bubblefish' && this.bubblefishRenderer) {
+            // Canvas渲染模式（气泡鱼）
+            ctx.restore();
+            const bubbleState = {
+                isStartled: this.isStartled,
+                isClicked: this.isClicked,
+                clickIntensity: this.clickIntensity,
+                hp: this.hp,
+                maxHp: this.maxHp
+            };
+            this.bubblefishRenderer.render(
+                ctx, this.position, this.radius, this.currentRotation,
+                this.time, finalScale, this.checkIsMoving(), this.getCurrentSpeed(), bubbleState
+            );
+            ctx.save();
         } else if (this.renderType === 'canvas' && this.renderer) {
             // Canvas渲染模式（兔子、毛线球等）
             ctx.restore();  // 先restore以避免影响renderer内部的变换

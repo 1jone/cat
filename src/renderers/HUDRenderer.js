@@ -11,6 +11,7 @@ export class HUDRenderer {
         this.ctx = ctx;
         this.emojiManager = emojiManager;
         this.dpr = 1;  // 设备像素比
+        this.coinBalance = 0;  // 金币余额（由外部设置）
 
         // 按钮位置
         this.muteButton = null;
@@ -90,6 +91,11 @@ export class HUDRenderer {
         this.emojiManager.draw(ctx, 'star', 36, 72, 20);
         ctx.strokeText(` ${score}`, 48, 78);
         ctx.fillText(` ${score}`, 48, 78);
+
+        // 金币余额显示（分数右侧）
+        ctx.fillStyle = '#FFA500';
+        ctx.font = 'bold 16px Arial';
+        ctx.fillText(`💰 ${this.coinBalance}`, 48, 98);
 
         // 渲染按钮
         this.renderMuteButton(false);
