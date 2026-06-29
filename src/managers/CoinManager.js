@@ -132,6 +132,21 @@ export class CoinManager {
         return { success: true, reward: COIN_CONFIG.GROUP_JOIN_REWARD, newBalance: result.newBalance };
     }
 
+    /**
+     * 恢复加群状态（本地存储丢失但用户已在群中时调用）
+     * 仅恢复状态标志，不重复发放奖励
+     */
+    restoreGroupJoinState() {
+        const claimed = this.settings.get('coin.groupJoinRewardClaimed') || false;
+        if (claimed) {
+            console.log('[CoinManager] 加群状态已存在，无需恢复');
+            return false;
+        }
+        this.settings.set('coin.groupJoinRewardClaimed', true);
+        console.log('[CoinManager] ✅ 已恢复加群状态（签到翻倍生效）');
+        return true;
+    }
+
     // ==================== 金币永久解锁 ====================
 
     isPermanentlyUnlocked(targetId) {

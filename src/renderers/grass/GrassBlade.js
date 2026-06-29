@@ -36,6 +36,11 @@ export class GrassBlade {
         // 初始化静态位置
         this.tipY = -this.height;
         this.controlY = -this.height * 0.6;
+
+        // 预计算颜色（避免每帧创建渐变和解析字符串）
+        this.fillColor = this.color;
+        this.tipColor = this._lightenColor(this.color, 20);
+        this.midColor = this._lightenColor(this.color, 10);
     }
 
     /**
@@ -91,7 +96,6 @@ export class GrassBlade {
         ctx.beginPath();
         ctx.moveTo(this.x, this.baseY);
 
-        // 三次贝塞尔曲线创建自然的草叶形状
         ctx.bezierCurveTo(
             this.x + this.controlX - this.width * 0.5,
             this.baseY + this.controlY,
@@ -101,7 +105,6 @@ export class GrassBlade {
             this.baseY + this.tipY
         );
 
-        // 返回到底部
         ctx.bezierCurveTo(
             this.x + this.controlX + this.width * 0.3,
             this.baseY + this.controlY,
@@ -113,19 +116,11 @@ export class GrassBlade {
 
         ctx.closePath();
 
-        // 填充渐变色（增加深度感）
-        const gradient = ctx.createLinearGradient(
-            this.x - this.width, this.baseY,
-            this.x + this.width, this.baseY + this.tipY
-        );
-        gradient.addColorStop(0, this.color);
-        gradient.addColorStop(0.6, this._lightenColor(this.color, 20));
-        gradient.addColorStop(1, this._lightenColor(this.color, 10));
-
-        ctx.fillStyle = gradient;
+        // 使用预计算颜色填充（避免每帧创建渐变对象）
+        ctx.fillStyle = this.fillColor;
         ctx.fill();
 
-        // 添加高光
+        // 添加高光（仅前景层）
         if (this.layerFactor > 0.8) {
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
             ctx.lineWidth = 1;

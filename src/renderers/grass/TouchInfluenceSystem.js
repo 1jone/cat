@@ -19,6 +19,9 @@ export class TouchInfluenceSystem {
 
         // 活跃的影响点列表
         this.influences = [];
+
+        // 复用向量对象，避免每次 getInfluence 调用都创建新对象
+        this._influenceVec = new Vector2(0, 0);
     }
 
     /**
@@ -90,17 +93,13 @@ export class TouchInfluenceSystem {
             const distance = Math.sqrt(dx * dx + dy * dy);
 
             if (distance < inf.radius && bladePosition.y >= grassY - 20) {
-                // 计算影响因子（距离越近影响越大）
                 const factor = (1 - distance / inf.radius) * inf.strength;
-
-                // 计算推开方向（从触摸点向外）
                 const pushAngle = Math.atan2(dy, dx);
 
-                // 返回影响向量
-                return new Vector2(
-                    Math.cos(pushAngle) * factor * 20,
-                    Math.sin(pushAngle) * factor * 20 * 0.3 // Y轴影响较小
-                );
+                // 复用预分配的向量对象
+                this._influenceVec.x = Math.cos(pushAngle) * factor * 20;
+                this._influenceVec.y = Math.sin(pushAngle) * factor * 20 * 0.3;
+                return this._influenceVec;
             }
         }
         return null;

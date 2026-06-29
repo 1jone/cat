@@ -8,6 +8,7 @@ import { GrassDecoration, DecorationFactory } from './GrassDecoration';
 import { WindSystem } from './WindSystem';
 import { TouchInfluenceSystem } from './TouchInfluenceSystem';
 import { Vector2 } from '../../utils/Vector2';
+import { getQualityConfig } from '../../utils/QualityManager';
 
 export class GrassRenderer {
     /**
@@ -173,19 +174,86 @@ export class GrassRenderer {
      * @param {number} offsetY - Y 偏移
      */
     _drawLayer(layer, offsetX, offsetY) {
-        const skipRatio = this._getSkipRatio();
+        if (layer.length === 0) return;
 
-        this.ctx.save();
-        this.ctx.translate(offsetX, offsetY);
+        const skipRatio = this._getSkipRatio();
+        const ctx = this.ctx;
+
+        ctx.save();
+        ctx.translate(offsetX, offsetY);
+
+        // 按颜色分组批量绘制，减少 save/restore 和 fillStyle 切换次数
+        const colorGroups = new Map();
 
         for (let i = 0; i < layer.length; i++) {
-            // LOD 跳过渲染
             if (skipRatio > 0 && Math.random() < skipRatio) continue;
 
-            layer[i].draw(this.ctx);
+            const blade = layer[i];
+            const fillColor = blade.fillColor;
+            if (!colorGroups.has(fillColor)) {
+                colorGroups.set(fillColor, []);
+            }
+            colorGroups.get(fillColor).push(blade);
         }
 
-        this.ctx.restore();
+        // 批量绘制同色草叶
+        for (const [fillColor, blades] of colorGroups) {
+            ctx.fillStyle = fillColor;
+
+            for (let i = 0; i < blades.length; i++) {
+                const blade = blades[i];
+                ctx.globalAlpha = blade.opacity;
+
+                ctx.beginPath();
+                ctx.moveTo(blade.x, blade.baseY);
+
+                ctx.bezierCurveTo(
+                    blade.x + blade.controlX - blade.width * 0.5,
+                    blade.baseY + blade.controlY,
+                    blade.x + blade.controlX + blade.width * 0.5,
+                    blade.baseY + blade.controlY,
+                    blade.x + blade.tipX,
+                    blade.baseY + blade.tipY
+                );
+
+                ctx.bezierCurveTo(
+                    blade.x + blade.controlX + blade.width * 0.3,
+                    blade.baseY + blade.controlY,
+                    blade.x + blade.width,
+                    blade.baseY - blade.height * 0.3,
+                    blade.x + blade.width,
+                    blade.baseY
+                );
+
+                ctx.closePath();
+                ctx.fill();
+            }
+        }
+
+        // 绘制前景层高光
+        if (layer === this.layers.foreground) {
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+            ctx.lineWidth = 1;
+            for (let i = 0; i < layer.length; i++) {
+                if (skipRatio > 0 && Math.random() < skipRatio) continue;
+
+                const blade = layer[i];
+                if (blade.layerFactor <= 0.8) continue;
+
+                ctx.globalAlpha = blade.opacity;
+                ctx.beginPath();
+                ctx.moveTo(blade.x + blade.width * 0.3, blade.baseY);
+                ctx.quadraticCurveTo(
+                    blade.x + blade.controlX,
+                    blade.baseY + blade.controlY * 0.7,
+                    blade.x + blade.tipX * 0.8,
+                    blade.baseY + blade.tipY * 0.7
+                );
+                ctx.stroke();
+            }
+        }
+
+        ctx.restore();
     }
 
     /**
@@ -257,8 +325,11 @@ export class GrassRenderer {
      * @param {number} layerFactor - 层级因子
      */
     _generateLayer(layer, width, height, config, layerFactor) {
+        const quality = getQualityConfig();
         const density = config.density || 8;
-        const bladeCount = Math.floor(width / density);
+        // 密度值越小草叶越多，乘数越大越稀疏
+        const effectiveDensity = Math.max(3, Math.floor(density / quality.maxGrassDensity));
+        const bladeCount = Math.floor(width / effectiveDensity);
 
         for (let i = 0; i < bladeCount; i++) {
             const x = (i * density) + Math.random() * (density * 0.6);
@@ -330,13 +401,26 @@ export class GrassRenderer {
      * @param {number} dt - 时间增量
      */
     _updateLOD(dt) {
+        // 记录帧间隔历史用于 FPS 估算
+        if (!this._dtHistory) this._dtHistory = [];
+        this._dtHistory.push(dt);
+        if (this._dtHistory.length > 60) this._dtHistory.shift();
+
         this.lastFPSUpdate += dt;
 
-        // 每 0.5 秒更新一次 LOD
-        if (this.lastFPSUpdate >= 0.5) {
-            // 简化的 FPS 计算（在实际应用中应该从游戏循环获取）
-            // 这里使用默认的高质量设置
-            this.lodLevel = 'high';
+        // 每 1 秒更新一次 LOD 等级
+        if (this.lastFPSUpdate >= 1.0 && this._dtHistory.length >= 10) {
+            const avgDt = this._dtHistory.reduce((a, b) => a + b, 0) / this._dtHistory.length;
+            const fps = 1 / avgDt;
+
+            if (fps < 24) {
+                this.lodLevel = 'low';
+            } else if (fps < 40) {
+                this.lodLevel = 'medium';
+            } else {
+                this.lodLevel = 'high';
+            }
+
             this.lastFPSUpdate = 0;
         }
     }

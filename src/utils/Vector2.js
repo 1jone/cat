@@ -48,6 +48,11 @@ export class Vector2 {
         this.x = x;
         this.y = y;
     }
+    copyFrom(v) {
+        this.x = v.x;
+        this.y = v.y;
+        return this;
+    }
     static random(minX, maxX, minY, maxY) {
         return new Vector2(minX + Math.random() * (maxX - minX), minY + Math.random() * (maxY - minY));
     }

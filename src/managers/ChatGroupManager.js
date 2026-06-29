@@ -10,7 +10,7 @@ export class ChatGroupManager {
         // 群聊数据
         this.groupData = {
             officialGroup: {
-                id: '4F9U1aXLC8g0ay7zMNpoEKD51WeGOv6AM5F2rg+kK1ERavH81nDifmIujgn96zUF4et6ZbFrLr/Vbf4GfcPnJw==',
+                id: '@4F9U1aXLC8g0ay7zMNpoEKD51WeGOv6AM5F2rg+kK1ERavH81nDifmIujgn96zUF4et6ZbFrLr/Vbf4GfcPnJw==',
                 name: '猫咪追追追官方群',
                 memberCount: 0,
                 avatar: ''
@@ -38,11 +38,17 @@ export class ChatGroupManager {
         // 加载本地存储的群聊数据
         this.loadGroupData();
 
-        // 检查并初始化抖音群聊能力
-        if (tt.joinGroup && tt.getGroupInfo && tt.shareAppMessage) {
+        // 检查并初始化抖音群聊能力（仅检查核心加群和分享API）
+        const missingApis = [];
+        if (!tt.joinGroup) missingApis.push('tt.joinGroup');
+        if (!tt.shareAppMessage) missingApis.push('tt.shareAppMessage');
+
+        if (missingApis.length === 0) {
             console.log('[ChatGroupManager] 抖音群聊能力可用');
+            this.isAvailable = true;
         } else {
-            console.warn('[ChatGroupManager] 抖音群聊能力不可用');
+            console.warn(`[ChatGroupManager] 抖音群聊能力不可用，缺失API: ${missingApis.join(', ')}`);
+            this.isAvailable = false;
         }
     }
 
@@ -73,11 +79,12 @@ export class ChatGroupManager {
         }
     }
 
-    /** 
+    /**
      * 打开官方群聊（必须在用户手势回调中同步调用）
+     * @param {Function} onSuccess - 加群成功后的回调（用户实际加入了群）
      * @returns {boolean} 是否成功调用API
      */
-    openOfficialGroup() {
+    openOfficialGroup(onSuccess) {
         console.log('[ChatGroupManager] 打开官方群聊');
 
         if (typeof tt === 'undefined') {
@@ -91,19 +98,56 @@ export class ChatGroupManager {
         }
 
         try {
-            // 🔥 关键：直接同步调用，不使用 Promise！
             tt.joinGroup({
                 groupid: this.groupData.officialGroup.id,
                 success: () => {
                     console.log('[ChatGroupManager] ✅ 成功加入官方群');
+                    if (typeof onSuccess === 'function') {
+                        onSuccess();
+                    }
                 },
                 fail: (err) => {
                     console.error('[ChatGroupManager] ❌ 加入官方群失败:', err);
-                }   
+                }
             });
             return true;
         } catch (e) {
             console.error('[ChatGroupManager] 打开官方群异常:', e);
+            return false;
+        }
+    }
+
+    /**
+     * 通过平台API检查用户是否已在官方群中
+     * 用于本地存储被清理后恢复加群状态
+     * @returns {Promise<boolean>} 用户是否已在群中
+     */
+    async checkGroupMembership() {
+        if (typeof tt === 'undefined' || !tt.checkGroupInfo) {
+            console.warn('[ChatGroupManager] tt.checkGroupInfo 不可用，跳过群成员检查');
+            return false;
+        }
+
+        try {
+            const result = await new Promise((resolve) => {
+                tt.checkGroupInfo({
+                    groupid: this.groupData.officialGroup.id,
+                    success: (res) => resolve(res),
+                    fail: (err) => {
+                        console.error('[ChatGroupManager] ❌ 检查群成员失败:', err);
+                        resolve(null);
+                    }
+                });
+            });
+
+            if (result) {
+                const isMember = result.hasJoined || false;
+                console.log(`[ChatGroupManager] 群成员检查结果: hasJoined=${isMember}`);
+                return isMember;
+            }
+            return false;
+        } catch (e) {
+            console.error('[ChatGroupManager] 检查群成员异常:', e);
             return false;
         }
     }

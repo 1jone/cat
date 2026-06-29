@@ -51,11 +51,9 @@ export class WindSystem {
         // 计算最终风向
         const finalAngle = this.baseAngle + angleVariance;
 
-        // 更新风向量
-        this.currentWindVector = new Vector2(
-            Math.cos(finalAngle) * this.currentIntensity,
-            Math.sin(finalAngle) * this.currentIntensity
-        );
+        // 更新风向量（复用已有对象，避免每帧分配）
+        this.currentWindVector.x = Math.cos(finalAngle) * this.currentIntensity;
+        this.currentWindVector.y = Math.sin(finalAngle) * this.currentIntensity;
 
         return this.currentWindVector;
     }

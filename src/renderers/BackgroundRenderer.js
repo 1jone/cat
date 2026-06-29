@@ -819,7 +819,7 @@ export class BackgroundRenderer {
     renderDeepSeaBackground(width, height, time) {
         const ctx = this.ctx;
 
-        // 缓存静态渐变底色
+        // 缓存静态渐变底色 + 珊瑚（珊瑚不依赖 time，是纯静态的）
         const cache = this._getStaticBgCache('deepSea', width, height);
         if (cache.isNew) {
             const gradient = cache.ctx.createLinearGradient(0, 0, 0, height);
@@ -830,14 +830,17 @@ export class BackgroundRenderer {
             gradient.addColorStop(1,    '#04101A');
             cache.ctx.fillStyle = gradient;
             cache.ctx.fillRect(0, 0, width, height);
+
+            // 珊瑚（纯静态，缓存后不再每帧绘制）
+            this._renderCoralStatic(cache.ctx, width, height);
         }
         ctx.drawImage(cache.canvas, 0, 0);
 
         // === 2. 微弱光线 ===
         this.renderDeepSeaLightRays(ctx, width, height, time);
 
-        // === 3. 底部植被剪影（海草 + 珊瑚） ===
-        this.renderDeepSeaVegetation(ctx, width, height, time);
+        // === 3. 底部海草（仅海草需要动画，珊瑚已缓存） ===
+        this.renderDeepSeaSeaweed(ctx, width, height, time);
 
         // === 4. 海洋雪粒子 ===
         this.renderMarineSnow(width, height, time);
@@ -851,10 +854,11 @@ export class BackgroundRenderer {
      * @param {number} time
      */
     renderDeepSeaLightRays(ctx, width, height, time) {
+        const quality = getQualityConfig();
         ctx.save();
         ctx.globalAlpha = 0.03;
 
-        const rayCount = 3;
+        const rayCount = Math.max(1, Math.floor(3 * quality.lightRayCount));
         for (let i = 0; i < rayCount; i++) {
             const baseX = width * (0.2 + i * 0.3);
             const sway = Math.sin(time * 0.15 + i * 2.1) * 30;
@@ -884,11 +888,14 @@ export class BackgroundRenderer {
      * @param {number} height
      * @param {number} time
      */
-    renderDeepSeaVegetation(ctx, width, height, time) {
+    /**
+     * 渲染深海海草（需要 time 参数的动态部分，每帧调用）
+     */
+    renderDeepSeaSeaweed(ctx, width, height, time) {
         const quality = getQualityConfig();
         const seaweedSeeds = [73, 189, 312, 456, 534, 678, 723, 891, 956, 1034, 1156, 1287];
         const maxCount = Math.min(seaweedSeeds.length, Math.floor(width / 50));
-        const seaweedCount = Math.max(3, Math.floor(maxCount * quality.particleCount));
+        const seaweedCount = Math.max(2, Math.floor(maxCount * quality.seaweedCount));
 
         ctx.strokeStyle = 'rgba(5, 30, 25, 0.6)';
         ctx.lineCap = 'round';
@@ -910,10 +917,16 @@ export class BackgroundRenderer {
             );
             ctx.stroke();
         }
+    }
 
-        // === 珊瑚（分支结构，静态） ===
+    /**
+     * 渲染静态珊瑚（不依赖 time，缓存到静态背景中只绘制一次）
+     */
+    _renderCoralStatic(ctx, width, height) {
+        const quality = getQualityConfig();
         const coralSeeds = [234, 567, 890, 1123, 1345, 1567];
-        const coralCount = Math.min(coralSeeds.length, Math.floor(width / 100));
+        const coralCount = Math.max(1, Math.min(coralSeeds.length,
+            Math.floor(Math.min(coralSeeds.length, width / 100) * quality.coralCount)));
 
         ctx.strokeStyle = 'rgba(15, 25, 40, 0.7)';
         ctx.lineCap = 'round';
@@ -1126,7 +1139,10 @@ export class BackgroundRenderer {
         const quality = getQualityConfig();
         const seaweedSeeds = [95, 234, 378, 512, 645, 778, 912, 1045, 1178];
         const maxCount = Math.min(seaweedSeeds.length, Math.floor(width / 45));
-        const seaweedCount = Math.max(2, Math.floor(maxCount * quality.particleCount));
+        const seaweedCount = Math.max(2, Math.floor(maxCount * quality.seaweedCount));
+
+        // low/medium 层使用纯色替代渐变，减少每帧渐变创建
+        const useGradientColor = quality.particleCount > 0.5;
 
         for (let i = 0; i < seaweedCount; i++) {
             const baseX = (seaweedSeeds[i] % (width - 30)) + 15;
@@ -1138,13 +1154,16 @@ export class BackgroundRenderer {
             ctx.lineWidth = 2 + (seaweedSeeds[i] % 3);
             ctx.lineCap = 'round';
 
-            // 海草渐变（从底部深色到顶部浅色）
-            const bladeGrad = ctx.createLinearGradient(0, height, 0, height - stalkHeight);
-            bladeGrad.addColorStop(0, 'rgba(20, 80, 60, 0.5)');
-            bladeGrad.addColorStop(0.6, 'rgba(30, 110, 80, 0.35)');
-            bladeGrad.addColorStop(1, 'rgba(50, 140, 100, 0.2)');
+            if (useGradientColor) {
+                const bladeGrad = ctx.createLinearGradient(0, height, 0, height - stalkHeight);
+                bladeGrad.addColorStop(0, 'rgba(20, 80, 60, 0.5)');
+                bladeGrad.addColorStop(0.6, 'rgba(30, 110, 80, 0.35)');
+                bladeGrad.addColorStop(1, 'rgba(50, 140, 100, 0.2)');
+                ctx.strokeStyle = bladeGrad;
+            } else {
+                ctx.strokeStyle = 'rgba(30, 100, 70, 0.35)';
+            }
 
-            ctx.strokeStyle = bladeGrad;
             ctx.beginPath();
             ctx.moveTo(baseX, height);
             ctx.bezierCurveTo(

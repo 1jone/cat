@@ -75,6 +75,15 @@ export class SettingsManager {
                 permanentUnlocks: {},          // 金币永久解锁的目标 { targetId: true }
                 unlimitedStaminaAdProgress: 0, // 无限体力广告已观看次数
                 spendingHistory: []           // 金币消费记录 [{ timestamp, amount, reason, balance }]
+            },
+            // 订阅消息相关数据
+            subscribeMessage: {
+                templateStatuses: {},       // { tmplId: 'accept'|'reject'|'fail'|'repeat'|'limit' }
+                lastPromptTime: 0,          // 上次弹窗时间戳
+                lastPromptScene: null,       // 上次弹窗场景
+                dailyPromptCount: 0,         // 当日弹窗次数
+                dailyPromptDate: null,       // 当日弹窗日期 'YYYY-MM-DD'
+                totalPrompts: 0,             // 累计弹窗次数
             }
         };
 

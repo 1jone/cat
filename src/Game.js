@@ -47,6 +47,7 @@ import { ShortcutManager } from './managers/ShortcutManager';
 import { ChatGroupManager } from './managers/ChatGroupManager';
 import { RankManager } from './managers/RankManager';
 import { CoinManager } from './managers/CoinManager';
+import { SubscribeMessageManager } from './managers/SubscribeMessageManager';
 
 export class Game {
     constructor(canvas) {
@@ -105,7 +106,11 @@ export class Game {
             // 首帧时执行延迟初始化（在渲染前同步完成）
             if (!this._deferredInitialized) {
                 this._deferredInitialized = true;
-                this.initDeferred();
+                try {
+                    this.initDeferred();
+                } catch (e) {
+                    console.error('[Game] initDeferred 失败:', e);
+                }
             }
             // 性能测试、切后台或调试暂停后可能出现超大 dt，限制单帧追赶量。
             const deltaTime = Math.min((currentTime - this.lastTime) / 1000, 0.1);
@@ -188,6 +193,12 @@ export class Game {
         // 金币管理器
         this.coinManager = new CoinManager(this.settingsManager);
 
+        // 本地存储丢失时，通过平台API恢复加群状态
+        this._restoreGroupJoinStateIfNeeded();
+
+        // 订阅消息管理器
+        this.subscribeMessageManager = new SubscribeMessageManager(this.settingsManager);
+
         // 排行榜管理器（异步登录）
         if (FEATURE_FLAGS.friendRank) {
             this.rankManager = new RankManager(this.settingsManager);
@@ -223,7 +234,7 @@ export class Game {
         this.resourceManager.preloadImages();
 
         // 选择界面（需要资源管理器、广告管理器、渲染器等）
-        this.selectionScreen = new SelectionScreen(canvas, ctx, this.resourceManager, this.adManager, this.settingsManager, this.emojiManager, this.butterflyRenderer, this.mouseRenderer, this.fishRenderer, this.yarnRenderer, this.multilineRenderer, this.birdRenderer, this.ladybugRenderer, this.staticLineRenderer, this.staminaManager, this.mosquitoRenderer, this.jellyfishRenderer, this.bouncyballRenderer, this.bubblefishRenderer, this.coinManager);
+        this.selectionScreen = new SelectionScreen(canvas, ctx, this.resourceManager, this.adManager, this.settingsManager, this.emojiManager, this.butterflyRenderer, this.mouseRenderer, this.fishRenderer, this.yarnRenderer, this.multilineRenderer, this.birdRenderer, this.ladybugRenderer, this.staticLineRenderer, this.staminaManager, this.mosquitoRenderer, this.jellyfishRenderer, this.bouncyballRenderer, this.bubblefishRenderer, this.coinManager, this.chatGroupManager);
 
         // 延迟初始化后更新 DPR 相关组件
         this._applyDeferredResize();
@@ -257,82 +268,76 @@ export class Game {
 
     /**
      * 🔥 注册抖音原生触摸事件处理器
-     * 用于 tt.joinGroup 等必须在用户手势同步回调中调用的 API
-     * 完全绕过 canvas 和 tmg-core 框架
+     * tt.joinGroup() 必须在用户手势同步调用链中直接调用。
+     * 策略：注册时设置一个最轻量的回调，只做坐标命中 + 直接调用。
+     * 按钮 region 通过闭包变量引用，进入 SELECT 时写入。
      */
     registerNativeTouchHandler() {
         if (typeof tt === 'undefined' || !tt.onTouchStart) {
-            console.log('[Game] 非抖音环境或 tt.onTouchStart 不可用');
             return;
         }
 
-        console.log('[Game] 🔥 注册 tt.onTouchStart 全局监听器');
+        // 闭包缓存按钮区域，避免在回调中访问 this 的方法
+        const regions = { group: null, checkin: null, rank: null, active: false };
+
+        // 暴露给 render 用于更新区域
+        this._nativeRegions = regions;
 
         tt.onTouchStart((res) => {
+            if (!regions.active) return;
+
             const touch = res.touches[0];
             if (!touch) return;
 
-            const touchX = touch.clientX;
-            const touchY = touch.clientY;
+            const x = touch.clientX;
+            const y = touch.clientY;
 
-            console.log('[tt.onTouchStart] 触发:', { touchX, touchY });
-
-            // 🔥 关键：只在 SELECT 状态下响应（功能按钮在选择页面）
-            const currentState = this.stateManager.getState();
-            if (currentState !== GameState.SELECT || !this.selectionScreen) {
-                return;
-            }
-
-            // 获取按钮区域（从 SelectionScreen）
-            const groupButtonArea = this.selectionScreen.getGroupButtonArea();
-            const checkinButtonArea = this.selectionScreen.getCheckinButtonArea();
-            const rankButtonArea = this.selectionScreen.getRankButtonArea();
-
-            // 🔥 关键：使用屏幕坐标（不除以 DPR）
-            // Canvas 满屏，所以 clientX/Y 直接对应绘制坐标
-
-            // 检测加群按钮点击
-            if (groupButtonArea &&
-                touchX >= groupButtonArea.left && touchX <= groupButtonArea.right &&
-                touchY >= groupButtonArea.top && touchY <= groupButtonArea.bottom) {
-
-                console.log('[tt.onTouchStart] 🔥 检测到加群按钮点击');
-
-                // ✅ 在第一帧直接调用，不做任何逻辑判断
+            if (regions.group &&
+                x >= regions.group.left && x <= regions.group.right &&
+                y >= regions.group.top && y <= regions.group.bottom) {
                 tt.joinGroup({
-                    groupid: '4F9U1aXLC8g0ay7zMNpoEKD51WeGOv6AM5F2rg+kK1ERavH81nDifmIujgn96zUF4et6ZbFrLr/Vbf4GfcPnJw==',
-                    success: () => {
-                        console.log('[tt.onTouchStart] ✅ 成功加入官方群');
-                    },
-                    fail: (err) => {
-                        console.error('[tt.onTouchStart] ❌ 加入官方群失败:', err);
-                    }
+                    groupid: '@4F9U1aXLC8g0ay7zMNpoEKD51WeGOv6AM5F2rg+kK1ERavH81nDifmIujgn96zUF4et6ZbFrLr/Vbf4GfcPnJw=='
                 });
                 return;
             }
 
-            // 检测签到按钮点击
-            if (checkinButtonArea &&
-                touchX >= checkinButtonArea.left && touchX <= checkinButtonArea.right &&
-                touchY >= checkinButtonArea.top && touchY <= checkinButtonArea.bottom) {
-
-                console.log('[tt.onTouchStart] 🔥 检测到签到按钮点击');
+            if (regions.checkin &&
+                x >= regions.checkin.left && x <= regions.checkin.right &&
+                y >= regions.checkin.top && y <= regions.checkin.bottom) {
                 this.handleCheckin();
                 return;
             }
 
-            // 检测排行榜按钮点击
-            if (rankButtonArea &&
-                touchX >= rankButtonArea.left && touchX <= rankButtonArea.right &&
-                touchY >= rankButtonArea.top && touchY <= rankButtonArea.bottom) {
-
-                console.log('[tt.onTouchStart] 检测到排行榜按钮点击');
+            if (regions.rank &&
+                x >= regions.rank.left && x <= regions.rank.right &&
+                y >= regions.rank.top && y <= regions.rank.bottom) {
                 if (this.rankManager) {
                     this.rankManager.openRankList(false);
                 }
                 return;
             }
         });
+    }
+
+    /**
+     * 更新原生按钮区域缓存
+     * 在进入 SELECT 状态时调用，避免 tt.onTouchStart 回调内调用 SelectionScreen 方法
+     */
+    _updateNativeButtonAreas() {
+        if (!this.selectionScreen || !this._nativeRegions) return;
+        this._nativeRegions.group = this.selectionScreen.getGroupButtonArea();
+        this._nativeRegions.checkin = this.selectionScreen.getCheckinButtonArea();
+        this._nativeRegions.rank = this.selectionScreen.getRankButtonArea();
+        this._nativeRegions.active = true;
+    }
+
+    /**
+     * 离开 SELECT 状态时禁用原生按钮检测
+     */
+    _deactivateNativeButtonAreas() {
+        if (this._nativeRegions) {
+            this._nativeRegions.active = false;
+        }
     }
 
     /**
@@ -450,7 +455,17 @@ export class Game {
             target.checkStartle(touchPos);
             target.update(dt, this.logicalWidth, this.logicalHeight);
         }
-        this.targets = this.targets.filter(t => t.isActive);
+        // 原地紧凑数组（替代 filter，避免每帧创建新数组）
+        let writeIdx = 0;
+        for (let i = 0; i < this.targets.length; i++) {
+            if (this.targets[i].isActive) {
+                if (writeIdx !== i) {
+                    this.targets[writeIdx] = this.targets[i];
+                }
+                writeIdx++;
+            }
+        }
+        this.targets.length = writeIdx;
 
         // 生成新目标
         const newTarget = this.spawnManager.update(dt, {
@@ -473,6 +488,11 @@ export class Game {
     render() {
         const currentTime = performance.now();
         const state = this.stateManager.getState();
+
+        // 同步原生按钮区域的激活状态（避免 tt.onTouchStart 回调中检查 state）
+        if (this._nativeRegions) {
+            this._nativeRegions.active = (state === GameState.SELECT);
+        }
 
         // === 背景渲染逻辑改进 ===
         let backgroundImage = null;
@@ -507,7 +527,7 @@ export class Game {
 
                 // 渲染侧边栏入口按钮（在"点击开始"下方，增加间距）
                 if (this.sidebarRewardUI) {
-                    const buttonY = this.logicalHeight / 2 + 130 + offsetY;
+                    const buttonY = this.logicalHeight / 2 + 195 + offsetY;
                     this.sidebarRewardUI.renderEntryButton(this.logicalWidth / 2, buttonY);
                     // 如果有弹窗，渲染弹窗
                     this.sidebarRewardUI.render();
@@ -517,7 +537,7 @@ export class Game {
                 const isSidebarPopupOpen = this.sidebarRewardUI && (this.sidebarRewardUI.showingGuide || this.sidebarRewardUI.showingReward);
                 if (!isSidebarPopupOpen) {
                 const ctx = this.ctx;
-                const healthAdviceY = this.logicalHeight / 2 + 180 + offsetY;
+                const healthAdviceY = this.logicalHeight / 2 + 245 + offsetY;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
 
@@ -545,8 +565,10 @@ export class Game {
 
             case GameState.SELECT:
                 if (this.selectionScreen) this.selectionScreen.render();
+                this._updateNativeButtonAreas();
                 this.hudRenderer.renderMuteButton(this.audioManager && this.audioManager.isMuted);
                 this.hudRenderer.renderSettingsButton();
+                break;
                 break;
 
             case GameState.PLAYING:
@@ -1260,7 +1282,7 @@ drawCheckinDayCircle(ctx, centerX, centerY, dayNumber, status, radius, labelYOff
         }
 
         if (state === GameState.SELECT) {
-            this.selectionScreen.handleTouchStart(pos);
+            if (this.selectionScreen) this.selectionScreen.handleTouchStart(pos);
             return;
         }
 
@@ -1279,7 +1301,10 @@ drawCheckinDayCircle(ctx, centerX, centerY, dayNumber, status, radius, labelYOff
                 this.restartGame();
                 return;
             } else if (buttonAction === 'home') {
-                // 返回首页：清理广告并返回选择界面
+                // 返回首页：触发订阅消息 → 清理广告并返回选择界面
+                if (this.subscribeMessageManager) {
+                    this.subscribeMessageManager.requestSubscribe('game_over');
+                }
                 this.returnToHome();
                 return;
             }
@@ -1287,6 +1312,10 @@ drawCheckinDayCircle(ctx, centerX, centerY, dayNumber, status, radius, labelYOff
             // 注意：加群按钮由 tt.onTouchStart 原生事件处理，不在这里处理
 
             // 点击其他区域: 完整清理后返回选择界面
+            // 触发订阅消息（游戏结束场景）
+            if (this.subscribeMessageManager) {
+                this.subscribeMessageManager.requestSubscribe('game_over');
+            }
             // 注意：这里也尝试展示插屏广告（不阻塞返回流程）
             this.showGameOverHomeAd();  // fire-and-forget，不等待
 
@@ -1318,7 +1347,7 @@ drawCheckinDayCircle(ctx, centerX, centerY, dayNumber, status, radius, labelYOff
         }
 
         if (state === GameState.SELECT) {
-            this.selectionScreen.handleTouchMove(pos);
+            if (this.selectionScreen) this.selectionScreen.handleTouchMove(pos);
         }
     }
 
@@ -1377,7 +1406,7 @@ drawCheckinDayCircle(ctx, centerX, centerY, dayNumber, status, radius, labelYOff
                 return;
             }
 
-            const selectionResult = this.selectionScreen.handleTouchEnd(pos);
+            const selectionResult = this.selectionScreen ? this.selectionScreen.handleTouchEnd(pos) : null;
             if (selectionResult) {
                 const { config, mode, isTrial } = selectionResult;
                 // 保存试玩模式标记
@@ -1663,6 +1692,12 @@ drawCheckinDayCircle(ctx, centerX, centerY, dayNumber, status, radius, labelYOff
 
             if (result.success) {
                 console.log('[CheckinDialog] ✅ 签到成功:', result);
+
+                // 签到成功后触发订阅消息
+                if (this.subscribeMessageManager) {
+                    this.subscribeMessageManager.requestSubscribe('checkin_reward');
+                }
+
                 this.audioManager.playButtonClick();
                 this.showCheckinDialog = false;
                 this.checkinDialogButtons = null;
@@ -2125,6 +2160,26 @@ drawCheckinDayCircle(ctx, centerX, centerY, dayNumber, status, radius, labelYOff
         // 5. 音效和音乐
         this.audioManager.playButtonClick();
         this.audioManager.playBGM('menu', { volume: AUDIO_CONFIG.BGM_VOLUME.select });
+    }
+
+    /**
+     * 通过平台API检查并恢复加群状态
+     * 本地存储被清理后，若用户实际已在群中，自动恢复状态（不影响奖励）
+     */
+    async _restoreGroupJoinStateIfNeeded() {
+        if (!this.chatGroupManager || !this.coinManager) return;
+
+        const state = this.coinManager.getGroupJoinRewardState();
+        if (!state.canClaim) return;
+
+        try {
+            const isMember = await this.chatGroupManager.checkGroupMembership();
+            if (isMember) {
+                this.coinManager.restoreGroupJoinState();
+            }
+        } catch (e) {
+            console.warn('[Game] 检查群成员状态失败，不影响正常使用:', e);
+        }
     }
 
     /**

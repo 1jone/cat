@@ -289,8 +289,12 @@ export class ImageTarget extends Entity {
             this.multilineRenderer.update(dt, canvasWidth, canvasHeight);
         }
 
-        // 保存当前位置用于计算移动方向
-        this.previousPosition = this.position.clone();
+        // 保存当前位置用于计算移动方向（复用对象避免每帧分配）
+        if (!this.previousPosition) {
+            this.previousPosition = this.position.clone();
+        } else {
+            this.previousPosition.copyFrom(this.position);
+        }
 
         // 更新窜出状态（优先级：受惊 > 窜出 > 正常运动）
         this.updatePopInState(dt);

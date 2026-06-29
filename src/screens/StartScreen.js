@@ -1,3 +1,5 @@
+import { drawRoundRect } from '../utils/CanvasUtils';
+
 /**
  * StartScreen - 开始界面
  * 负责渲染游戏开始界面
@@ -68,23 +70,80 @@ export class StartScreen {
         // 说明文字 - 增加间距，颜色更柔和
         ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
         ctx.font = '22px Arial';
-        ctx.fillText('点击屏幕上移动的目标得分！', logicalWidth / 2, logicalHeight / 2 - 15 + offsetY);
+        // ctx.fillText('点击屏幕上移动的目标得分！', logicalWidth / 2, logicalHeight / 2 - 15 + offsetY);
 
-        // 开始提示 - 调整位置和样式
-        const startY = logicalHeight / 2 + 50 + offsetY;
+        // 游戏说明卡片
+        this.renderGameGuide(ctx, logicalWidth, logicalHeight, offsetY);
 
-        // 手指图标
-        this.emojiManager.draw(ctx, 'finger', logicalWidth / 2 - 75, startY - 5, 30);
+        // 开始按钮
+        this.renderStartButton(ctx, logicalWidth, logicalHeight, offsetY);
+    }
 
-        // 金色渐变效果的开始按钮文字
+    /**
+     * 渲染开始按钮文字
+     */
+    renderStartButton(ctx, logicalWidth, logicalHeight, offsetY) {
+        const startY = logicalHeight / 2 + 130 + offsetY;
+
         ctx.shadowColor = 'rgba(255, 215, 0, 0.6)';
         ctx.shadowBlur = 12;
         ctx.font = 'bold 34px Arial';
         ctx.fillStyle = '#FFD700';
-        ctx.fillText(' 点击开始', logicalWidth / 2 + 10, startY);
+        ctx.textAlign = 'center';
+        ctx.fillText('开始游戏', logicalWidth / 2, startY);
 
-        // 重置阴影
         ctx.shadowColor = 'transparent';
         ctx.shadowBlur = 0;
+    }
+
+    /**
+     * 渲染游戏说明卡片
+     */
+    renderGameGuide(ctx, logicalWidth, logicalHeight, offsetY) {
+        const scale = logicalWidth / 370;
+
+        const cardWidth = 300 * scale;
+        const cardHeight = 90 * scale;
+        const cardX = (logicalWidth - cardWidth) / 2;
+        const cardY = logicalHeight / 2 -20 + offsetY;
+        const radius = 14 * scale;
+
+        // 卡片背景
+        ctx.shadowColor = 'rgba(255, 255, 255, 0.08)';
+        ctx.shadowBlur = 12 * scale;
+        drawRoundRect(ctx, cardX, cardY, cardWidth, cardHeight, radius);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+        ctx.fill();
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+
+        // 卡片边框
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // 3 行图文说明
+        const guides = [
+{ emoji: 'paw', text: '小猫出动！伸出爪爪抓住乱跑的小东西！' },
+{ emoji: 'finger', text: '用爪垫轻轻点一下，会动的目标就被抓到啦~' },
+{ emoji: 'star', text: '抓到不同猎物会得不同小鱼干分数，看看猫猫能拿多高！' },
+        ];
+
+        const fontSize = Math.round(10 * scale);
+        const emojiSize = Math.round(20 * scale);
+        const lineHeight = 24 * scale;
+        const startX = cardX + 16 * scale;
+        const startY = cardY + 14 * scale + fontSize / 2;
+
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+        ctx.font = `${fontSize}px Arial`;
+
+        guides.forEach((guide, i) => {
+            const y = startY + i * lineHeight;
+            this.emojiManager.draw(ctx, guide.emoji, startX + emojiSize / 2, y, emojiSize);
+            ctx.fillText(guide.text, startX + emojiSize + 8 * scale, y);
+        });
     }
 }

@@ -23,13 +23,14 @@ export class SelectionScreen {
                 birdRenderer = null, ladybugRenderer = null, staticLineRenderer = null,
                 staminaManager = null, mosquitoRenderer = null,
                 jellyfishRenderer = null, bouncyballRenderer = null, bubblefishRenderer = null,
-                coinManager = null) {
+                coinManager = null, chatGroupManager = null) {
         this.canvas = canvas;
         this.ctx = ctx;
         this.resourceManager = resourceManager;
         this.adManager = adManager;  // 广告管理器
         this.settingsManager = settingsManager;  // 设置管理器（用于获取最高分）
         this.emojiManager = emojiManager;  // Emoji 管理器
+        this.chatGroupManager = chatGroupManager;  // 群聊管理器
         this.butterflyRenderer = butterflyRenderer || new ButterflyRenderer();  // 蝴蝶渲染器
         this.mouseRenderer = mouseRenderer || new MouseRenderer();  // 老鼠渲染器
         this.fishRenderer = fishRenderer || new FishRenderer();  // 小鱼渲染器
@@ -362,9 +363,13 @@ export class SelectionScreen {
     }
 
     /**
-     * 检测点是否在矩形区域内
+     * 检测点是否在矩形区域内（兼容 {x,width,y,height} 和 {left,right,top,bottom} 两种格式）
      */
     isInRect(pos, rect) {
+        if (rect.left !== undefined) {
+            return pos.x >= rect.left && pos.x <= rect.right &&
+                   pos.y >= rect.top && pos.y <= rect.bottom;
+        }
         return pos.x >= rect.x && pos.x <= rect.x + rect.width &&
                pos.y >= rect.y && pos.y <= rect.y + rect.height;
     }
@@ -708,17 +713,26 @@ export class SelectionScreen {
      */
     handleGroupJoin() {
         if (!this.coinManager) return;
+
         const state = this.coinManager.getGroupJoinRewardState();
         if (!state.canClaim) {
             console.log('[SelectionScreen] 加群奖励已领取');
+            // 奖励已领取但用户可能想再次打开群聊
+            if (this.chatGroupManager) {
+                this.chatGroupManager.openOfficialGroup();
+            }
             return;
         }
-        // 打开加群（由外部 Game.js 中的 chatGroupManager 处理）
-        // 加群成功后通过 claimGroupJoinReward 领取
-        // 这里先标记为已领取（实际应在加群成功回调中）
-        const result = this.coinManager.claimGroupJoinReward();
-        if (result.success) {
-            console.log(`[SelectionScreen] 加群奖励: +${result.reward} 金币`);
+
+        // 在用户手势回调中同步调用 tt.joinGroup，成功后才发放奖励
+        if (this.chatGroupManager) {
+            console.log('[SelectionScreen] 调用加群API');
+            this.chatGroupManager.openOfficialGroup(() => {
+                const result = this.coinManager.claimGroupJoinReward();
+                if (result.success) {
+                    console.log(`[SelectionScreen] 加群奖励: +${result.reward} 金币`);
+                }
+            });
         }
     }
 

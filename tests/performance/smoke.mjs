@@ -13,6 +13,13 @@ const testDir = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(testDir, '../..');
 const results = [];
 
+// 每帧 Canvas 操作计数器（用于检测渐变/save 过度创建）
+const _perfCounters = { gradientCount: 0, saveCount: 0 };
+function resetPerfCounters() {
+    _perfCounters.gradientCount = 0;
+    _perfCounters.saveCount = 0;
+}
+
 function test(name, fn) {
     results.push({ name, fn });
 }
@@ -31,6 +38,7 @@ function walk(directory, predicate = () => true) {
 }
 
 function createGradient() {
+    _perfCounters.gradientCount++;
     return { addColorStop() {} };
 }
 
@@ -47,6 +55,10 @@ function createContext() {
     return new Proxy(target, {
         get(object, property) {
             if (property in object) return object[property];
+            if (property === 'save') {
+                _perfCounters.saveCount++;
+                return () => {};
+            }
             return () => {};
         },
         set(object, property, value) {
@@ -305,6 +317,51 @@ test('every special background renders without throwing', () => {
     for (const targetId of targetIds) {
         renderer.render(null, true, targetId, 1);
     }
+});
+
+test('background rendering stays within per-frame gradient budget', () => {
+    const canvas = createCanvas();
+    const renderer = new BackgroundRenderer(canvas, canvas.getContext('2d'));
+    renderer.resize(2);
+
+    // 重度背景：深海背景（5个目标共用）是最昂贵的
+    const heavyTargets = ['jellyfish', 'bubblefish', 'fish'];
+
+    for (const targetId of heavyTargets) {
+        resetPerfCounters();
+        renderer.render(null, true, targetId, 1);
+
+        assert.ok(
+            _perfCounters.gradientCount < 20,
+            `${targetId}: ${_perfCounters.gradientCount} gradients per frame (budget: 20)`
+        );
+
+        assert.ok(
+            _perfCounters.saveCount < 50,
+            `${targetId}: ${_perfCounters.saveCount} save() calls per frame (budget: 50)`
+        );
+    }
+});
+
+test('grass renderer stays within per-frame gradient budget', async () => {
+    const canvas = createCanvas();
+    const ctx = canvas.getContext('2d');
+    const GrassRenderer = (await importRuntime('renderers/grass/GrassRenderer.js')).GrassRenderer;
+    const renderer = new GrassRenderer(canvas, ctx, 2);
+    renderer.resize(375);
+    renderer.render(0, 732, 375, 80);
+
+    // 草叶本身不再创建渐变（Phase 1 优化后），仅背景渐变保留（1-2个）
+    assert.ok(
+        _perfCounters.gradientCount <= 2,
+        `grass: ${_perfCounters.gradientCount} gradients per frame (budget: 2, only background gradient expected)`
+    );
+
+    // save/restore 应远少于优化前的每片草叶一次（~150次），现在主要是层级批量 + 装饰
+    assert.ok(
+        _perfCounters.saveCount < 80,
+        `grass: ${_perfCounters.saveCount} save() calls per frame (budget: 80)`
+    );
 });
 
 let failed = 0;

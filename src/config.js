@@ -1335,6 +1335,9 @@ export const PERFORMANCE_TIERS = {
         enableShadowBlur: true,
         waterWaveStep: 10,
         neonLineWidth: 1,
+        seaweedCount: 1.0,
+        coralCount: 1.0,
+        lightRayCount: 1.0,
     },
     medium: {
         maxGrassDensity: 0.6,
@@ -1342,6 +1345,9 @@ export const PERFORMANCE_TIERS = {
         enableShadowBlur: false,
         waterWaveStep: 20,
         neonLineWidth: 1,
+        seaweedCount: 0.5,
+        coralCount: 0.5,
+        lightRayCount: 0.7,
     },
     low: {
         maxGrassDensity: 0.3,
@@ -1349,6 +1355,9 @@ export const PERFORMANCE_TIERS = {
         enableShadowBlur: false,
         waterWaveStep: 40,
         neonLineWidth: 2,
+        seaweedCount: 0.3,
+        coralCount: 0.3,
+        lightRayCount: 0.3,
     }
 };
 
@@ -1461,4 +1470,39 @@ export const COIN_CONFIG = {
   STAMINA_AD_DURATION: 24 * 60 * 60 * 1000,  // 无限体力持续24小时
   PERMANENT_UNLOCK_PRICE: 500,  // 永久解锁目标价格
   GROUP_MULTIPLIER: 2           // 加群签到翻倍倍率
+};
+
+// ============ 订阅消息配置 ============
+export const SUBSCRIBE_MESSAGE_CONFIG = {
+  enabled: true,
+
+  tmplIds: [
+    'MSG21557757137187649395201894779199',  // 体力恢复提醒
+    'MSG21557757137177651549100420188466',  // 新增关卡提醒
+    'MSG21557757137157650056736467994930',  // 版本更新提醒
+  ],
+
+  templateLabels: {
+    'MSG21557757137187649395201894779199': 'stamina_recovery',
+    'MSG21557757137177651549100420188466': 'new_level',
+    'MSG21557757137157650056736467994930': 'version_update',
+  },
+
+  triggers: {
+    game_over: { enabled: true, probability: 0.6 },
+    checkin_reward: { enabled: true, probability: 0.8 },
+  },
+
+  cooldown: {
+    minIntervalMs: 4 * 60 * 60 * 1000,  // 两次弹窗最小间隔 4 小时
+    maxPerSession: 2,                     // 单次会话最多弹出次数
+    maxPerDay: 4,                         // 单日最多弹出次数
+  },
+
+  errorHandling: {
+    mainSwitchOff: { guideToSetting: true },
+    allDenied: { guideToSetting: true },
+  },
+
+  minSDKVersion: '1.73.0',
 };
