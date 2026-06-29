@@ -130,7 +130,7 @@ export class StaminaManager {
      * @returns {boolean} 是否成功消耗
      */
     consumeStamina(amount = 1) {
-        const playCount = this.settingsManager.settings.stats?.totalPlayCount || 0;
+        const playCount = (this.settingsManager.settings.stats && this.settingsManager.settings.stats.totalPlayCount) || 0;
         console.log(`[StaminaManager] 消耗体力 - 当前体力: ${this.data.current}, 游戏次数: ${playCount}`);
 
         if (!this.hasEnoughStamina(amount)) {

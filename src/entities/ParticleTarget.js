@@ -41,6 +41,39 @@ export class ParticleTarget extends ImageTarget {
 
         // 额外的时间变量用于粒子动画
         this.particleTime = Math.random() * Math.PI * 2;
+
+        // 预渲染离屏 Canvas 缓存
+        this._particleSpriteCache = null;
+    }
+
+    /**
+     * 获取预渲染的粒子精灵
+     */
+    _getParticleSprite() {
+        if (this._particleSpriteCache) return this._particleSpriteCache;
+
+        const size = Math.ceil(this.particleConfig.particleRadius * 2 * 1.4);
+        const offscreen = tt.createCanvas();
+        offscreen.width = size * 2;
+        offscreen.height = size * 2;
+        const octx = offscreen.getContext('2d');
+
+        const cx = size;
+        const cy = size;
+        const r = size;
+
+        const gradient = octx.createRadialGradient(cx, cy, 0, cx, cy, r);
+        gradient.addColorStop(0, '#FFFFFF');
+        gradient.addColorStop(0.5, this.particleConfig.coreColor);
+        gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+
+        octx.fillStyle = gradient;
+        octx.beginPath();
+        octx.arc(cx, cy, r, 0, Math.PI * 2);
+        octx.fill();
+
+        this._particleSpriteCache = { canvas: offscreen, size };
+        return this._particleSpriteCache;
     }
 
     /**
@@ -110,7 +143,7 @@ export class ParticleTarget extends ImageTarget {
         // 2. 绘制中层光晕
         this.drawGlow(ctx, x, y, glowRadius * 0.6 * pulse, glowColor, twinkle * 0.8);
 
-        // 3. 绘制环绕粒子
+        // 3. 绘制环绕粒子（使用预渲染精灵）
         this.drawParticles(ctx, x, y, orbitRadius * pulse, orbitSpeed, particleRadius);
 
         // 4. 绘制核心光点
@@ -187,41 +220,30 @@ export class ParticleTarget extends ImageTarget {
     }
 
     /**
-     * 绘制环绕粒子
+     * 绘制环绕粒子（使用预渲染精灵）
      */
     drawParticles(ctx, centerX, centerY, orbitRadius, orbitSpeed, particleRadius) {
-        const { particleCount } = this.particleConfig;
+        const sprite = this._getParticleSprite();
+        const spriteSize = sprite.size;
 
-        this.particles.forEach((particle, index) => {
-            // 计算当前角度（考虑轨道速度和相位）
+        this.particles.forEach((particle) => {
             const currentAngle = particle.angle + this.particleTime * orbitSpeed + particle.phase;
-
-            // 计算轨道半径（带偏移）
             const radius = orbitRadius * (1 + particle.radiusOffset);
 
-            // 计算位置
             const px = centerX + Math.cos(currentAngle) * radius;
             const py = centerY + Math.sin(currentAngle) * radius;
 
-            // 计算粒子大小（带脉动）
             const sizePulse = 0.8 + 0.4 * Math.sin(this.particleTime * 4 + particle.phase);
             const size = particleRadius * particle.size * sizePulse;
 
-            // 计算粒子透明度（距离核心越远越暗）
             const distanceAlpha = 0.5 + 0.5 * Math.cos(currentAngle - this.particleTime * orbitSpeed);
 
-            // 绘制粒子
             ctx.globalAlpha = distanceAlpha * 0.8;
-
-            const gradient = ctx.createRadialGradient(px, py, 0, px, py, size);
-            gradient.addColorStop(0, '#FFFFFF');
-            gradient.addColorStop(0.5, this.particleConfig.coreColor);
-            gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
-
-            ctx.fillStyle = gradient;
-            ctx.beginPath();
-            ctx.arc(px, py, size, 0, Math.PI * 2);
-            ctx.fill();
+            ctx.drawImage(
+                sprite.canvas,
+                px - size, py - size,
+                size * 2, size * 2
+            );
         });
 
         ctx.globalAlpha = 1;

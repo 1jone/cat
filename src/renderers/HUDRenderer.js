@@ -88,14 +88,9 @@ export class HUDRenderer {
         ctx.fillStyle = '#FFD700';
         ctx.font = 'bold 22px Arial';
         // 使用 emoji 图片渲染星星图标
-        this.emojiManager.draw(ctx, 'star', 36, 72, 20);
-        ctx.strokeText(` ${score}`, 48, 78);
-        ctx.fillText(` ${score}`, 48, 78);
-
-        // 金币余额显示（分数右侧）
-        ctx.fillStyle = '#FFA500';
-        ctx.font = 'bold 16px Arial';
-        ctx.fillText(`💰 ${this.coinBalance}`, 48, 98);
+        this.emojiManager.draw(ctx, 'star', 36, 80, 20);
+        ctx.strokeText(` ${score}`, 48, 86);
+        ctx.fillText(` ${score}`, 48, 86);
 
         // 渲染按钮
         this.renderMuteButton(false);

@@ -6,6 +6,7 @@
 import { CONFIG, GRASS_CONFIG, FEATURE_FLAGS } from '../config';
 import { OffscreenCanvasCache } from '../utils/CanvasUtils';
 import { GrassRenderer } from './grass/GrassRenderer';
+import { getQualityConfig } from '../utils/QualityManager';
 
 export class BackgroundRenderer {
     constructor(canvas, ctx) {
@@ -19,6 +20,37 @@ export class BackgroundRenderer {
         // 保留旧的静态草地缓存作为回退
         this.grassCache = new OffscreenCanvasCache({ dpr: this.dpr });
         this.grassElements = null;
+
+        // 静态背景离屏缓存
+        this._bgCacheCanvas = null;
+        this._bgCacheWidth = 0;
+        this._bgCacheHeight = 0;
+        this._bgCacheKey = '';
+    }
+
+    /**
+     * 获取或创建静态背景离屏缓存
+     * @param {string} key - 缓存标识
+     * @param {number} width - 画布宽度
+     * @param {number} height - 画布高度
+     * @param {boolean} [dirty=true] - 是否需要重新绘制
+     * @returns {{ canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D, isNew: boolean }}
+     */
+    _getStaticBgCache(key, width, height, dirty = true) {
+        const sizeChanged = this._bgCacheWidth !== width || this._bgCacheHeight !== height;
+        const keyChanged = this._bgCacheKey !== key;
+
+        if (sizeChanged || keyChanged) {
+            this._bgCacheCanvas = tt.createCanvas();
+            this._bgCacheCanvas.width = width;
+            this._bgCacheCanvas.height = height;
+            this._bgCacheWidth = width;
+            this._bgCacheHeight = height;
+            this._bgCacheKey = key;
+            return { canvas: this._bgCacheCanvas, ctx: this._bgCacheCanvas.getContext('2d'), isNew: true };
+        }
+
+        return { canvas: this._bgCacheCanvas, ctx: null, isNew: false };
     }
 
     /**
@@ -39,14 +71,14 @@ export class BackgroundRenderer {
             if (targetId === 'fish') {
                 this.renderWaterBackground(logicalWidth, logicalHeight, time);
             } else if (targetId === 'butterfly') {
-                this.renderButterflyGrassBackground(logicalWidth, logicalHeight, time);
+                this.renderMosquitoBackground(logicalWidth, logicalHeight, time);
             } else if (targetId === 'yarn') {
                 this.renderDarkGradientBackground(logicalWidth, logicalHeight);
             } else if (targetId === 'ladybug') {
                 this.renderFireflyBackground(logicalWidth, logicalHeight, time);
             } else if (targetId === 'mosquito') {
                 this.renderMosquitoBackground(logicalWidth, logicalHeight, time);
-            } else if (targetId === 'jellyfish') {
+            } else if (targetId === 'jellyfish' || targetId === 'captain' || targetId === 'octopus' || targetId === 'bear' || targetId === 'seagull') {
                 this.renderDeepSeaBackground(logicalWidth, logicalHeight, time);
             } else if (targetId === 'bubblefish') {
                 this.renderBubblefishBackground(logicalWidth, logicalHeight, time);
@@ -210,7 +242,7 @@ export class BackgroundRenderer {
      * @returns {boolean}
      */
     hasSpecialBackground(targetId) {
-        const specialBackgroundTargets = ['sparkle', 'butterfly', 'fish', 'yarn', 'ladybug','laser', 'mosquito', 'jellyfish', 'bubblefish'];
+        const specialBackgroundTargets = ['sparkle', 'butterfly', 'fish', 'yarn', 'ladybug','laser', 'mosquito', 'jellyfish', 'bubblefish', 'captain', 'octopus', 'bear', 'seagull'];
         return specialBackgroundTargets.includes(targetId);
     }
 
@@ -221,25 +253,24 @@ export class BackgroundRenderer {
      */
     renderDarkGradientBackground(width, height) {
         const ctx = this.ctx;
-
-        // 清空画布
         ctx.clearRect(0, 0, width, height);
 
-        // === 深蓝黑径向渐变 ===
-        const gradient = ctx.createRadialGradient(
-            width / 2, height / 2, 0,
-            width / 2, height / 2, Math.max(width, height) * 0.8
-        );
+        // 使用离屏缓存（首次创建时绘制，后续直接复用）
+        const cache = this._getStaticBgCache('darkGradient', width, height);
+        if (cache.isNew) {
+            const gradient = cache.ctx.createRadialGradient(
+                width / 2, height / 2, 0,
+                width / 2, height / 2, Math.max(width, height) * 0.8
+            );
+            gradient.addColorStop(0, '#0A1628');
+            gradient.addColorStop(0.5, '#0D1F3C');
+            gradient.addColorStop(1, '#000000');
+            cache.ctx.fillStyle = gradient;
+            cache.ctx.fillRect(0, 0, width, height);
+        }
+        ctx.drawImage(cache.canvas, 0, 0);
 
-        // 渐变色标 - 从中心到边缘
-        gradient.addColorStop(0, '#0A1628');      // 中心深蓝黑
-        gradient.addColorStop(0.5, '#0D1F3C');    // 中间深蓝灰
-        gradient.addColorStop(1, '#000000');      // 边缘纯黑
-
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, width, height);
-
-        // === 微弱地面质感 ===
+        // 地面纹理带时间动画，不缓存
         this.renderGroundTexture(ctx, width, height);
     }
 
@@ -317,26 +348,25 @@ export class BackgroundRenderer {
     renderSparkleBackground(width, height) {
         const ctx = this.ctx;
 
-        // 计算中心点和最大半径
-        const centerX = width / 2;
-        const centerY = height / 2;
-        const maxRadius = Math.max(width, height) * 0.7;
+        // 使用离屏缓存
+        const cache = this._getStaticBgCache('sparkle', width, height);
+        if (cache.isNew) {
+            const centerX = width / 2;
+            const centerY = height / 2;
+            const maxRadius = Math.max(width, height) * 0.7;
 
-        // 创建径向渐变（从中心向外）
-        const gradient = ctx.createRadialGradient(
-            centerX, centerY, 0,
-            centerX, centerY, maxRadius
-        );
-
-        // 渐变色标：中心微亮 → 中间深蓝 → 边缘深黑
-        gradient.addColorStop(0, 'rgba(20, 40, 80, 0.4)');     // 中心：微亮深蓝
-        gradient.addColorStop(0.3, 'rgba(10, 25, 50, 0.7)');   // 中层：深蓝
-        gradient.addColorStop(0.6, 'rgba(5, 15, 30, 0.85)');   // 外层：更深蓝
-        gradient.addColorStop(1, 'rgba(0, 0, 0, 1)');          // 边缘：纯黑
-
-        // 填充整个画布
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, width, height);
+            const gradient = cache.ctx.createRadialGradient(
+                centerX, centerY, 0,
+                centerX, centerY, maxRadius
+            );
+            gradient.addColorStop(0, 'rgba(20, 40, 80, 0.4)');
+            gradient.addColorStop(0.3, 'rgba(10, 25, 50, 0.7)');
+            gradient.addColorStop(0.6, 'rgba(5, 15, 30, 0.85)');
+            gradient.addColorStop(1, 'rgba(0, 0, 0, 1)');
+            cache.ctx.fillStyle = gradient;
+            cache.ctx.fillRect(0, 0, width, height);
+        }
+        ctx.drawImage(cache.canvas, 0, 0);
     }
 
     /**
@@ -348,16 +378,19 @@ export class BackgroundRenderer {
     renderFireflyBackground(width, height, time) {
         const ctx = this.ctx;
 
-        // === 1. 三层垂直渐变背景 ===
-        const gradient = ctx.createLinearGradient(0, 0, 0, height);
-        gradient.addColorStop(0, '#0B1F3A');      // 深夜蓝
-        gradient.addColorStop(0.5, '#132F4C');    // 深蓝
-        gradient.addColorStop(1, '#0F3A2E');      // 暗绿色
+        // 缓存静态渐变底色（仅在首次或尺寸变化时创建）
+        const cache = this._getStaticBgCache('firefly', width, height);
+        if (cache.isNew) {
+            const gradient = cache.ctx.createLinearGradient(0, 0, 0, height);
+            gradient.addColorStop(0, '#0B1F3A');
+            gradient.addColorStop(0.5, '#132F4C');
+            gradient.addColorStop(1, '#0F3A2E');
+            cache.ctx.fillStyle = gradient;
+            cache.ctx.fillRect(0, 0, width, height);
+        }
+        ctx.drawImage(cache.canvas, 0, 0);
 
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, width, height);
-
-        // === 2. 微粒子效果 ===
+        // 微粒子效果（每帧动画）
         this.renderFireflyParticles(width, height, time);
     }
 
@@ -369,7 +402,8 @@ export class BackgroundRenderer {
      */
     renderFireflyParticles(width, height, time) {
         const ctx = this.ctx;
-        const particleCount = 12;  // 非常少
+        const quality = getQualityConfig();
+        const particleCount = Math.max(4, Math.floor(12 * quality.particleCount));
 
         // 粒子颜色配置
         const particleColors = [
@@ -505,7 +539,8 @@ export class BackgroundRenderer {
      */
     renderFloatingParticles(width, height, time) {
         const ctx = this.ctx;
-        const particleCount = 30;
+        const quality = getQualityConfig();
+        const particleCount = Math.max(8, Math.floor(30 * quality.particleCount));
         const seed = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000,
                       110, 220, 330, 440, 550, 660, 770, 880, 990, 110,
                       120, 240, 360, 480, 600, 720, 840, 960, 1080, 120];
@@ -575,19 +610,22 @@ export class BackgroundRenderer {
     renderWaterBackground(width, height, time) {
         const ctx = this.ctx;
 
-        // 1. 深蓝渐变背景
-        const gradient = ctx.createLinearGradient(0, 0, 0, height);
-        gradient.addColorStop(0, '#0A2463');   // 深蓝
-        gradient.addColorStop(0.5, '#1E3A8A'); // 中蓝
-        gradient.addColorStop(1, '#0F4C75');   // 底部蓝
+        // 缓存静态渐变底色
+        const cache = this._getStaticBgCache('water', width, height);
+        if (cache.isNew) {
+            const gradient = cache.ctx.createLinearGradient(0, 0, 0, height);
+            gradient.addColorStop(0, '#0A2463');
+            gradient.addColorStop(0.5, '#1E3A8A');
+            gradient.addColorStop(1, '#0F4C75');
+            cache.ctx.fillStyle = gradient;
+            cache.ctx.fillRect(0, 0, width, height);
+        }
+        ctx.drawImage(cache.canvas, 0, 0);
 
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, width, height);
-
-        // 2. 微弱水波效果（正弦波线条）
+        // 水波效果（每帧动画）
         this.renderWaterWaves(width, height, time);
 
-        // 3. 漂浮气泡
+        // 漂浮气泡（每帧动画）
         this.renderBubbles(width, height, time);
     }
 
@@ -599,7 +637,9 @@ export class BackgroundRenderer {
      */
     renderWaterWaves(width, height, time) {
         const ctx = this.ctx;
-        const waveCount = 5;
+        const quality = getQualityConfig();
+        const waveCount = Math.max(2, Math.floor(5 * quality.particleCount));
+        const step = quality.waterWaveStep;
 
         for (let w = 0; w < waveCount; w++) {
             const y = (height / waveCount) * w + 50;
@@ -611,7 +651,7 @@ export class BackgroundRenderer {
             ctx.beginPath();
             ctx.moveTo(0, y);
 
-            for (let x = 0; x <= width; x += 10) {
+            for (let x = 0; x <= width; x += step) {
                 const waveY = y + Math.sin(x * frequency + phase) * amplitude;
                 ctx.lineTo(x, waveY);
             }
@@ -631,9 +671,9 @@ export class BackgroundRenderer {
      */
     renderBubbles(width, height, time) {
         const ctx = this.ctx;
+        const quality = getQualityConfig();
 
-        // 使用固定的种子生成10个气泡（基于位置的伪随机）
-        const bubbleCount = 10;
+        const bubbleCount = Math.max(3, Math.floor(10 * quality.particleCount));
         const seed = [123, 456, 789, 234, 567, 890, 345, 678, 901, 234];
 
         for (let i = 0; i < bubbleCount; i++) {
@@ -671,17 +711,20 @@ export class BackgroundRenderer {
     renderMosquitoBackground(width, height, time) {
         const ctx = this.ctx;
 
-        // === 1. 深蓝黑径向渐变底色 ===
-        const gradient = ctx.createRadialGradient(
-            width / 2, height / 2, 0,
-            width / 2, height / 2, Math.max(width, height) * 0.8
-        );
-        gradient.addColorStop(0, '#0A1628');
-        gradient.addColorStop(0.6, '#060E1A');
-        gradient.addColorStop(1, '#020408');
-
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, width, height);
+        // 缓存静态径向渐变底色
+        const cache = this._getStaticBgCache('mosquito', width, height);
+        if (cache.isNew) {
+            const gradient = cache.ctx.createRadialGradient(
+                width / 2, height / 2, 0,
+                width / 2, height / 2, Math.max(width, height) * 0.8
+            );
+            gradient.addColorStop(0, '#0A1628');
+            gradient.addColorStop(0.6, '#060E1A');
+            gradient.addColorStop(1, '#020408');
+            cache.ctx.fillStyle = gradient;
+            cache.ctx.fillRect(0, 0, width, height);
+        }
+        ctx.drawImage(cache.canvas, 0, 0);
 
         // === 2. 霓虹线条 ===
         this.renderNeonLines(ctx, width, height, time);
@@ -699,6 +742,7 @@ export class BackgroundRenderer {
      */
     renderNeonLines(ctx, width, height, time) {
         ctx.save();
+        const quality = getQualityConfig();
 
         const lineCount = 6;
         const neonColors = [
@@ -720,9 +764,9 @@ export class BackgroundRenderer {
             const alpha = 0.08 + Math.sin(time * 0.8 + i * 1.2) * 0.04;
 
             ctx.strokeStyle = `rgba(${color.r}, ${color.g}, ${color.b}, ${alpha})`;
-            ctx.lineWidth = 1;
+            ctx.lineWidth = quality.neonLineWidth;
             ctx.shadowColor = `rgba(${color.r}, ${color.g}, ${color.b}, ${alpha * 2})`;
-            ctx.shadowBlur = 8;
+            ctx.shadowBlur = quality.enableShadowBlur ? 8 : 0;
 
             ctx.beginPath();
             for (let x = 0; x <= width; x += 4) {
@@ -775,16 +819,19 @@ export class BackgroundRenderer {
     renderDeepSeaBackground(width, height, time) {
         const ctx = this.ctx;
 
-        // === 1. 深海渐变（5色标） ===
-        const gradient = ctx.createLinearGradient(0, 0, 0, height);
-        gradient.addColorStop(0,    '#020B18');
-        gradient.addColorStop(0.15, '#061428');
-        gradient.addColorStop(0.5,  '#0A1E3D');
-        gradient.addColorStop(0.8,  '#081A2A');
-        gradient.addColorStop(1,    '#04101A');
-
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, width, height);
+        // 缓存静态渐变底色
+        const cache = this._getStaticBgCache('deepSea', width, height);
+        if (cache.isNew) {
+            const gradient = cache.ctx.createLinearGradient(0, 0, 0, height);
+            gradient.addColorStop(0,    '#020B18');
+            gradient.addColorStop(0.15, '#061428');
+            gradient.addColorStop(0.5,  '#0A1E3D');
+            gradient.addColorStop(0.8,  '#081A2A');
+            gradient.addColorStop(1,    '#04101A');
+            cache.ctx.fillStyle = gradient;
+            cache.ctx.fillRect(0, 0, width, height);
+        }
+        ctx.drawImage(cache.canvas, 0, 0);
 
         // === 2. 微弱光线 ===
         this.renderDeepSeaLightRays(ctx, width, height, time);
@@ -838,9 +885,10 @@ export class BackgroundRenderer {
      * @param {number} time
      */
     renderDeepSeaVegetation(ctx, width, height, time) {
-        // === 海草（贝塞尔曲线，随时间摆动） ===
+        const quality = getQualityConfig();
         const seaweedSeeds = [73, 189, 312, 456, 534, 678, 723, 891, 956, 1034, 1156, 1287];
-        const seaweedCount = Math.min(seaweedSeeds.length, Math.floor(width / 50));
+        const maxCount = Math.min(seaweedSeeds.length, Math.floor(width / 50));
+        const seaweedCount = Math.max(3, Math.floor(maxCount * quality.particleCount));
 
         ctx.strokeStyle = 'rgba(5, 30, 25, 0.6)';
         ctx.lineCap = 'round';
@@ -908,7 +956,8 @@ export class BackgroundRenderer {
      */
     renderMarineSnow(width, height, time) {
         const ctx = this.ctx;
-        const particleCount = 15;
+        const quality = getQualityConfig();
+        const particleCount = Math.max(4, Math.floor(15 * quality.particleCount));
         const seed = [87, 213, 349, 478, 592, 631, 745, 823, 934, 1042,
                       1167, 1253, 1389, 1423, 1567];
 
@@ -941,15 +990,18 @@ export class BackgroundRenderer {
     renderBubblefishBackground(width, height, time) {
         const ctx = this.ctx;
 
-        // === 1. 浅海明亮渐变（从上到下变深） ===
-        const gradient = ctx.createLinearGradient(0, 0, 0, height);
-        gradient.addColorStop(0,    '#AEEBFF');   // 浅天蓝（阳光水面）
-        gradient.addColorStop(0.3,  '#74D3F4');   // 主色明亮蓝
-        gradient.addColorStop(0.7,  '#4AA8D4');   // 中层蓝
-        gradient.addColorStop(1,    '#2D7EA3');   // 底部深蓝
-
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, width, height);
+        // 缓存静态渐变底色
+        const cache = this._getStaticBgCache('bubblefish', width, height);
+        if (cache.isNew) {
+            const gradient = cache.ctx.createLinearGradient(0, 0, 0, height);
+            gradient.addColorStop(0,    '#AEEBFF');
+            gradient.addColorStop(0.3,  '#74D3F4');
+            gradient.addColorStop(0.7,  '#4AA8D4');
+            gradient.addColorStop(1,    '#2D7EA3');
+            cache.ctx.fillStyle = gradient;
+            cache.ctx.fillRect(0, 0, width, height);
+        }
+        ctx.drawImage(cache.canvas, 0, 0);
 
         // === 2. 阳光波纹（水面折射光斑） ===
         this.renderSunlightRipples(ctx, width, height, time);
@@ -1025,7 +1077,8 @@ export class BackgroundRenderer {
      */
     renderBubblefishBubbles(width, height, time) {
         const ctx = this.ctx;
-        const bubbleCount = 8;
+        const quality = getQualityConfig();
+        const bubbleCount = Math.max(3, Math.floor(8 * quality.particleCount));
         const seed = [156, 289, 423, 567, 634, 789, 856, 923];
 
         for (let i = 0; i < bubbleCount; i++) {
@@ -1070,8 +1123,10 @@ export class BackgroundRenderer {
      * @param {number} time
      */
     renderBubblefishSeaweed(ctx, width, height, time) {
+        const quality = getQualityConfig();
         const seaweedSeeds = [95, 234, 378, 512, 645, 778, 912, 1045, 1178];
-        const seaweedCount = Math.min(seaweedSeeds.length, Math.floor(width / 45));
+        const maxCount = Math.min(seaweedSeeds.length, Math.floor(width / 45));
+        const seaweedCount = Math.max(2, Math.floor(maxCount * quality.particleCount));
 
         for (let i = 0; i < seaweedCount; i++) {
             const baseX = (seaweedSeeds[i] % (width - 30)) + 15;

@@ -73,7 +73,8 @@ export class SettingsManager {
                 consecutiveCheckins: 0,        // 连续签到天数
                 groupJoinRewardClaimed: false, // 是否已领取加群奖励
                 permanentUnlocks: {},          // 金币永久解锁的目标 { targetId: true }
-                unlimitedStaminaAdProgress: 0  // 无限体力广告已观看次数
+                unlimitedStaminaAdProgress: 0, // 无限体力广告已观看次数
+                spendingHistory: []           // 金币消费记录 [{ timestamp, amount, reason, balance }]
             }
         };
 

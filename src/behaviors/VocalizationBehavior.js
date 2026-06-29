@@ -136,7 +136,8 @@ export class VocalizationBehavior {
             octopus: ['bubble1', 'bubble2', 'squirt'],
             mouse: ['squeak1', 'squeak2', 'squeak3'],
             seagull: ['call1', 'call2'],
-            bird: ['chirp1', 'chirp2', 'chirp3']
+            bird: ['chirp1', 'chirp2', 'chirp3'],
+            mosquito: ['buzz', 'wings']
         };
 
         return supportedSounds[targetId] || {};

@@ -73,38 +73,12 @@ export class Game {
         // 预加载 emoji 精灵图
         this.emojiManager.preload();
 
-        // 初始化屏幕
+        // 初始化首帧必需的屏幕
         this.startScreen = new StartScreen(canvas, ctx, this.emojiManager);
-        this.gameOverScreen = new GameOverScreen(canvas, ctx, this.emojiManager);
 
-        // 初始化渲染器
+        // 初始化首帧必需的渲染器
         this.bgRenderer = new BackgroundRenderer(canvas, ctx);
         this.hudRenderer = new HUDRenderer(canvas, ctx, this.emojiManager);
-        this.effectsRenderer = new EffectsRenderer(canvas, ctx, this.emojiManager);
-
-        // 初始化实体渲染器
-        this.mouseRenderer = new MouseRenderer();
-        this.butterflyRenderer = new ButterflyRenderer();
-        this.fishRenderer = new FishRenderer();
-        this.yarnRenderer = new YarnRenderer(
-            TARGET_TYPES.find(t => t.id === 'yarn') || {}
-        );
-        this.multilineRenderer = new MultiLineRenderer(
-            (TARGET_TYPES.find(t => t.id === 'yarn') || {}).renderConfig || {}
-        );
-        // 创建静态线渲染器用于选择界面预览
-        this.staticLineRenderer = new StaticLineRenderer(
-            (TARGET_TYPES.find(t => t.id === 'yarn') || {}).renderConfig || {}
-        );
-        this.birdRenderer = new BirdRenderer();
-        this.ladybugRenderer = new LadybugRenderer();
-        this.mosquitoRenderer = new MosquitoRenderer();
-        this.jellyfishRenderer = new JellyfishRenderer();
-        this.bouncyballRenderer = new BouncyBallRenderer();
-        this.bubblefishRenderer = new BubbleFishRenderer();
-
-        // 全局访问（供 ImageTarget 使用）
-        // window.MouseRenderer = this.mouseRenderer;
 
         // 初始化输入管理器
         this.inputManager = new InputManager(canvas);
@@ -117,79 +91,38 @@ export class Game {
         this.audioManager = getAudioManager();
         this.audioInitialized = false;
 
-        // 初始化 SpawnManager（传入设置管理器、音频管理器和渲染器）
-        this.spawnManager = new SpawnManager(this.settingsManager, this.audioManager, this.mouseRenderer, this.butterflyRenderer, this.fishRenderer, this.yarnRenderer, this.multilineRenderer, this.birdRenderer, this.ladybugRenderer, this.mosquitoRenderer, this.bubblefishRenderer, this.bouncyballRenderer, this.jellyfishRenderer);
-
-        // 初始化广告管理器
-        this.adManager = new AdManager(this.settingsManager);
-
-        // 初始化Banner广告和游戏推荐面板
-        this.adManager.initBannerAd();
-        this.adManager.createGameRecommendation();
-
-        // 初始化体力管理器（必须在 adManager 之后初始化）
-        this.staminaManager = new StaminaManager(this.settingsManager);
-        this.staminaManager.adManager = this.adManager;
-        this.showStaminaDialog = false; // 体力不足弹窗状态
-
-        // 初始化群聊管理器
-        this.chatGroupManager = new ChatGroupManager(this.settingsManager);
-
-        // 初始化金币管理器
-        this.coinManager = new CoinManager(this.settingsManager);
-
-        // 初始化排行榜管理器
-        if (FEATURE_FLAGS.friendRank) {
-            this.rankManager = new RankManager(this.settingsManager);
-            this.rankManager.login().then(code => {
-                if (code) console.log('[Game] 排行榜预登录成功');
-            });
-        } else {
-            this.rankManager = null;
-        }
-
-        // 初始化快捷方式管理器
-        this.shortcutManager = new ShortcutManager(this.settingsManager, this.staminaManager);
-        this.showShortcutDialog = false; // 快捷方式提示弹窗状态
-        this.shortcutDialogButtons = null; // 快捷方式弹窗按钮区域
-
-        // 签到系统
-        this.showCheckinDialog = false; // 签到弹窗状态
-        this.checkinDialogButtons = null; // 签到弹窗按钮区域
-        this.isCheckinAdPlaying = false; // 补签广告播放中标记
-        this.initCheckinData(); // 初始化签到数据
-
-        // 试玩模式标记
-        this.isTrialMode = false;  // 当前游戏是否是试玩模式
-
-        // 初始化设置界面
-        this.settingsUI = new SettingsUI(canvas, ctx, this.settingsManager, this.audioManager, this.emojiManager);
-
-        // 初始化侧边栏管理器
-        this.sidebarManager = new SidebarManager(this);
-
-        // 初始化侧边栏奖励UI
-        this.sidebarRewardUI = new SidebarRewardUI(canvas, ctx, this.sidebarManager, this.emojiManager);
-
-        // 预加载资源
-        this.resourceManager.preloadImages();
-
-        // 初始化选择界面（需要在资源管理器之后，传入广告管理器和设置管理器）
-        this.selectionScreen = new SelectionScreen(canvas, ctx, this.resourceManager, this.adManager, this.settingsManager, this.emojiManager, this.butterflyRenderer, this.mouseRenderer, this.fishRenderer, this.yarnRenderer, this.multilineRenderer, this.birdRenderer, this.ladybugRenderer, this.staticLineRenderer, this.staminaManager, this.mosquitoRenderer, this.jellyfishRenderer, this.bouncyballRenderer, this.bubblefishRenderer, this.coinManager);
-
         // 防止点击穿透
         this.skipNextTouchEnd = false;
         this.stateChangeTime = 0;
 
+        // 延迟初始化标记
+        this._deferredInitialized = false;
+
         // 游戏循环
         this.lastTime = 0;
+        this.lastFrameErrorTime = 0;
         this.gameLoop = (currentTime) => {
-            const deltaTime = (currentTime - this.lastTime) / 1000;
+            // 首帧时执行延迟初始化（在渲染前同步完成）
+            if (!this._deferredInitialized) {
+                this._deferredInitialized = true;
+                this.initDeferred();
+            }
+            // 性能测试、切后台或调试暂停后可能出现超大 dt，限制单帧追赶量。
+            const deltaTime = Math.min((currentTime - this.lastTime) / 1000, 0.1);
             this.lastTime = currentTime;
-            this.update(deltaTime);
-            this.render();
-            requestAnimationFrame(this.gameLoop);
-            // requestAnimationFrame(()=>this.gameLoop)
+            try {
+                this.update(deltaTime);
+                this.render();
+            } catch (error) {
+                // 单帧异常不应永久终止 requestAnimationFrame 循环。
+                const now = Date.now();
+                if (now - this.lastFrameErrorTime > 1000) {
+                    console.error('[Game] 帧循环异常:', error);
+                    this.lastFrameErrorTime = now;
+                }
+            } finally {
+                requestAnimationFrame(this.gameLoop);
+            }
         };
 
         // 调整大小并应用设置
@@ -200,6 +133,100 @@ export class Game {
         if (typeof tt !== 'undefined' && tt.onTouchStart) {
             this.registerNativeTouchHandler();
         }
+    }
+
+    /**
+     * 延迟初始化 — 首帧必需的初始化完成后，在第一帧 gameLoop 中同步调用。
+     * 包含广告 SDK、资源预加载、实体渲染器、非首屏 UI 等重量级操作。
+     */
+    initDeferred() {
+        const canvas = this.canvas;
+        const ctx = this.ctx;
+
+        // 非首屏屏幕
+        this.gameOverScreen = new GameOverScreen(canvas, ctx, this.emojiManager);
+
+        // 特效渲染器（仅 PLAYING 状态使用）
+        this.effectsRenderer = new EffectsRenderer(canvas, ctx, this.emojiManager);
+
+        // 实体渲染器（仅 PLAYING 状态使用）
+        this.mouseRenderer = new MouseRenderer();
+        this.butterflyRenderer = new ButterflyRenderer();
+        this.fishRenderer = new FishRenderer();
+        this.yarnRenderer = new YarnRenderer(
+            TARGET_TYPES.find(t => t.id === 'yarn') || {}
+        );
+        this.multilineRenderer = new MultiLineRenderer(
+            (TARGET_TYPES.find(t => t.id === 'yarn') || {}).renderConfig || {}
+        );
+        this.staticLineRenderer = new StaticLineRenderer(
+            (TARGET_TYPES.find(t => t.id === 'yarn') || {}).renderConfig || {}
+        );
+        this.birdRenderer = new BirdRenderer();
+        this.ladybugRenderer = new LadybugRenderer();
+        this.mosquitoRenderer = new MosquitoRenderer();
+        this.jellyfishRenderer = new JellyfishRenderer();
+        this.bouncyballRenderer = new BouncyBallRenderer();
+        this.bubblefishRenderer = new BubbleFishRenderer();
+
+        // SpawnManager（仅 PLAYING 状态使用）
+        this.spawnManager = new SpawnManager(this.settingsManager, this.audioManager, this.mouseRenderer, this.butterflyRenderer, this.fishRenderer, this.yarnRenderer, this.multilineRenderer, this.birdRenderer, this.ladybugRenderer, this.mosquitoRenderer, this.bubblefishRenderer, this.bouncyballRenderer, this.jellyfishRenderer);
+
+        // 广告管理器（Banner 在 SELECT 界面才可见）
+        this.adManager = new AdManager(this.settingsManager);
+        this.adManager.initBannerAd();
+        this.adManager.createGameRecommendation();
+
+        // 体力管理器（必须在 adManager 之后）
+        this.staminaManager = new StaminaManager(this.settingsManager);
+        this.staminaManager.adManager = this.adManager;
+        this.showStaminaDialog = false;
+
+        // 群聊管理器
+        this.chatGroupManager = new ChatGroupManager(this.settingsManager);
+
+        // 金币管理器
+        this.coinManager = new CoinManager(this.settingsManager);
+
+        // 排行榜管理器（异步登录）
+        if (FEATURE_FLAGS.friendRank) {
+            this.rankManager = new RankManager(this.settingsManager);
+            this.rankManager.login().then(code => {
+                if (code) console.log('[Game] 排行榜预登录成功');
+            });
+        } else {
+            this.rankManager = null;
+        }
+
+        // 快捷方式管理器
+        this.shortcutManager = new ShortcutManager(this.settingsManager, this.staminaManager);
+        this.showShortcutDialog = false;
+        this.shortcutDialogButtons = null;
+
+        // 签到系统
+        this.showCheckinDialog = false;
+        this.checkinDialogButtons = null;
+        this.isCheckinAdPlaying = false;
+        this.initCheckinData();
+
+        // 试玩模式标记
+        this.isTrialMode = false;
+
+        // 设置界面
+        this.settingsUI = new SettingsUI(canvas, ctx, this.settingsManager, this.audioManager, this.emojiManager);
+
+        // 侧边栏管理器 + UI
+        this.sidebarManager = new SidebarManager(this);
+        this.sidebarRewardUI = new SidebarRewardUI(canvas, ctx, this.sidebarManager, this.emojiManager);
+
+        // 预加载目标资源（异步，不阻塞渲染）
+        this.resourceManager.preloadImages();
+
+        // 选择界面（需要资源管理器、广告管理器、渲染器等）
+        this.selectionScreen = new SelectionScreen(canvas, ctx, this.resourceManager, this.adManager, this.settingsManager, this.emojiManager, this.butterflyRenderer, this.mouseRenderer, this.fishRenderer, this.yarnRenderer, this.multilineRenderer, this.birdRenderer, this.ladybugRenderer, this.staticLineRenderer, this.staminaManager, this.mosquitoRenderer, this.jellyfishRenderer, this.bouncyballRenderer, this.bubblefishRenderer, this.coinManager);
+
+        // 延迟初始化后更新 DPR 相关组件
+        this._applyDeferredResize();
     }
 
     /**
@@ -252,7 +279,7 @@ export class Game {
 
             // 🔥 关键：只在 SELECT 状态下响应（功能按钮在选择页面）
             const currentState = this.stateManager.getState();
-            if (currentState !== GameState.SELECT) {
+            if (currentState !== GameState.SELECT || !this.selectionScreen) {
                 return;
             }
 
@@ -313,7 +340,8 @@ export class Game {
      */
     resize() {
         const systemInfo = tt.getSystemInfoSync();
-        const dpr = systemInfo.pixelRatio || 1;
+        // Canvas 内存和填充成本随 DPR 平方增长；小游戏场景 2x 已足够清晰。
+        const dpr = Math.min(systemInfo.pixelRatio || 1, 2);
         const width = systemInfo.windowWidth;
         const height = systemInfo.windowHeight;
 
@@ -333,21 +361,27 @@ export class Game {
         this.logicalHeight = height;
         this.dpr = dpr;
 
-        // 更新各组件（传递 dpr）
+        // 更新首帧必需组件
         this.bgRenderer.resize(dpr);
         this.hudRenderer.resize(dpr);
-        this.effectsRenderer.setDpr(dpr);
         this.startScreen.setDpr(dpr);
-        this.gameOverScreen.setDpr(dpr);
-        this.selectionScreen.setDpr(dpr);
 
-        if (this.settingsUI) {
-            this.settingsUI.updateLayout(dpr);
+        // 如果延迟初始化已完成，更新延迟组件
+        if (this._deferredInitialized) {
+            this._applyDeferredResize();
         }
+    }
 
-        if (this.sidebarRewardUI) {
-            this.sidebarRewardUI.updateLayout(dpr);
-        }
+    /**
+     * 更新延迟初始化组件的 DPR（在 resize 和 initDeferred 中调用）
+     */
+    _applyDeferredResize() {
+        const dpr = this.dpr;
+        if (this.effectsRenderer) this.effectsRenderer.setDpr(dpr);
+        if (this.gameOverScreen) this.gameOverScreen.setDpr(dpr);
+        if (this.selectionScreen) this.selectionScreen.setDpr(dpr);
+        if (this.settingsUI) this.settingsUI.updateLayout(dpr);
+        if (this.sidebarRewardUI) this.sidebarRewardUI.updateLayout(dpr);
     }
 
     /**
@@ -370,7 +404,7 @@ export class Game {
         this.bgRenderer.update(dt, currentTime);
 
         // 更新体力恢复（所有状态下都更新）
-        this.staminaManager.update(dt);
+        if (this.staminaManager) this.staminaManager.update(dt);
 
         // 设置界面状态：跳过游戏逻辑更新
         if (state === GameState.SETTINGS) {
@@ -389,7 +423,7 @@ export class Game {
 
         // 选择界面的更新逻辑
         if (state === GameState.SELECT) {
-            this.selectionScreen.update(dt);
+            if (this.selectionScreen) this.selectionScreen.update(dt);
             return;
         }
 
@@ -479,7 +513,9 @@ export class Game {
                     this.sidebarRewardUI.render();
                 }
 
-                // 渲染健康游戏忠告（在侧边栏入口按钮下方，增加间距）
+                // 渲染健康游戏忠告（弹窗打开时不渲染，避免遮住弹窗）
+                const isSidebarPopupOpen = this.sidebarRewardUI && (this.sidebarRewardUI.showingGuide || this.sidebarRewardUI.showingReward);
+                if (!isSidebarPopupOpen) {
                 const ctx = this.ctx;
                 const healthAdviceY = this.logicalHeight / 2 + 180 + offsetY;
                 ctx.textAlign = 'center';
@@ -504,10 +540,11 @@ export class Game {
                 ctx.fillText(line2, this.logicalWidth / 2, contentStartY + lineHeight);
                 ctx.fillText(line3, this.logicalWidth / 2, contentStartY + lineHeight * 2);
                 ctx.fillText(line4, this.logicalWidth / 2, contentStartY + lineHeight * 3);
+                }
                 break;
 
             case GameState.SELECT:
-                this.selectionScreen.render();
+                if (this.selectionScreen) this.selectionScreen.render();
                 this.hudRenderer.renderMuteButton(this.audioManager && this.audioManager.isMuted);
                 this.hudRenderer.renderSettingsButton();
                 break;
@@ -518,9 +555,11 @@ export class Game {
                     target.render(this.ctx);
                 }
                 // 渲染特效
-                this.effectsRenderer.renderCatchEffect(this.stateManager.catchEffect);
-                this.effectsRenderer.renderFireworkEffect(this.stateManager.fireworkEffect);
-                this.effectsRenderer.renderUnlockNotification(this.stateManager.unlockNotification);
+                if (this.effectsRenderer) {
+                    this.effectsRenderer.renderCatchEffect(this.stateManager.catchEffect);
+                    this.effectsRenderer.renderFireworkEffect(this.stateManager.fireworkEffect);
+                    this.effectsRenderer.renderUnlockNotification(this.stateManager.unlockNotification);
+                }
                 // 渲染 HUD
                 this.hudRenderer.coinBalance = this.coinManager.getBalance();
                 this.hudRenderer.renderHUD({
@@ -539,7 +578,7 @@ export class Game {
                     target.render(this.ctx);
                 }
                 // 渲染结束界面（传递额外的统计信息）
-                this.gameOverScreen.render({
+                if (this.gameOverScreen) this.gameOverScreen.render({
                     score: this.stateManager.score,
                     isEndlessMode: this._lastGameResult && this._lastGameResult.wasEndlessMode || false,
                     gameTimer: this.stateManager.gameTimer,
@@ -553,14 +592,16 @@ export class Game {
             case GameState.SETTINGS:
                 // 先渲染之前状态的背景
                 if (this.stateManager.previousState === GameState.SELECT) {
-                    this.selectionScreen.render();
+                    if (this.selectionScreen) this.selectionScreen.render();
                 } else if (this.stateManager.previousState === GameState.PLAYING) {
                     for (const target of this.targets) {
                         target.render(this.ctx);
                     }
-                    this.effectsRenderer.renderCatchEffect(this.stateManager.catchEffect);
-                    this.effectsRenderer.renderFireworkEffect(this.stateManager.fireworkEffect);
-                    this.effectsRenderer.renderUnlockNotification(this.stateManager.unlockNotification);
+                    if (this.effectsRenderer) {
+                        this.effectsRenderer.renderCatchEffect(this.stateManager.catchEffect);
+                        this.effectsRenderer.renderFireworkEffect(this.stateManager.fireworkEffect);
+                        this.effectsRenderer.renderUnlockNotification(this.stateManager.unlockNotification);
+                    }
                     this.hudRenderer.renderHUD({
                         score: this.stateManager.score,
                         timeLeft: this.stateManager.timeLeft,
@@ -813,7 +854,7 @@ renderCheckinDialog() {
     ctx.font = '12px Arial';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
-    ctx.fillText('前6天每天+1体力，第7天获24小时无限体力', dialogX + dialogWidth / 2, ROW2_CENTER_Y + CIRCLE_RADIUS + 50);
+    ctx.fillText('奇数天+1体力，偶数天+50金币，第7天无限体力', dialogX + dialogWidth / 2, ROW2_CENTER_Y + CIRCLE_RADIUS + 50);
 
     // 按钮区域
     const todayDate = this.dateToYYYYMMDD(new Date());
@@ -1020,13 +1061,17 @@ drawCheckinDayCircle(ctx, centerX, centerY, dayNumber, status, radius, labelYOff
 
     const labelY = centerY + labelYOffset;
     const isClaimed = status === 'checked' || status === 'makeup';
-    if (dayNumber < 7) {
-        ctx.fillStyle = isClaimed ? colors.reward_checked : colors.reward_normal;
-        ctx.fillText(`${dayNumber}天 ⚡+1`, centerX, labelY);
+    const rewardConfig = CHECKIN_CONFIG.DAILY_REWARDS[dayNumber - 1];
+    let label;
+    if (rewardConfig.type === 'stamina') {
+        label = `${dayNumber}天 ⚡+1`;
+    } else if (rewardConfig.type === 'coins') {
+        label = `${dayNumber}天 🪙+50`;
     } else {
-        ctx.fillStyle = isClaimed ? colors.reward_checked : colors.reward_normal;
-        ctx.fillText(`${dayNumber}天 ♾️无限`, centerX, labelY);
+        label = `${dayNumber}天 ♾️无限`;
     }
+    ctx.fillStyle = isClaimed ? colors.reward_checked : colors.reward_normal;
+    ctx.fillText(label, centerX, labelY);
 }
 
     /**
@@ -1145,14 +1190,14 @@ drawCheckinDayCircle(ctx, centerX, centerY, dayNumber, status, radius, labelYOff
 
         if (state === GameState.START) {
             this.stateManager.setState(GameState.SELECT);
-            this.selectionScreen.reset();
-            this.adManager.showBannerAd();  // 显示Banner广告
+            if (this.selectionScreen) this.selectionScreen.reset();
+            if (this.adManager) this.adManager.showBannerAd();  // 显示Banner广告
                     } else if (state === GameState.PLAYING) {
             this.tryToCatch(pos);
         } else if (state === GameState.OVER) {
             this.stateManager.setState(GameState.SELECT);
-            this.selectionScreen.reset();
-            this.adManager.showBannerAd();  // 显示Banner广告
+            if (this.selectionScreen) this.selectionScreen.reset();
+            if (this.adManager) this.adManager.showBannerAd();  // 显示Banner广告
                     }
     }
 
@@ -1205,8 +1250,8 @@ drawCheckinDayCircle(ctx, centerX, centerY, dayNumber, status, radius, labelYOff
 
             // 如果没有点击弹窗或按钮，则进入选择界面
             this.stateManager.setState(GameState.SELECT);
-            this.selectionScreen.reset();
-            this.adManager.showBannerAd();  // 显示Banner广告
+            if (this.selectionScreen) this.selectionScreen.reset();
+            if (this.adManager) this.adManager.showBannerAd();  // 显示Banner广告
             this.skipNextTouchEnd = true;
             this.stateChangeTime = Date.now();
             this.audioManager.playBGM('menu', { volume: AUDIO_CONFIG.BGM_VOLUME.select });
@@ -1389,14 +1434,14 @@ drawCheckinDayCircle(ctx, centerX, centerY, dayNumber, status, radius, labelYOff
                     const result = target.takeDamage();
 
                     if (result.destroyed) {
-                        const capturePoints = target.config.bubblefishConfig?.capturePoints || target.points;
+                        const capturePoints = (target.config.bubblefishConfig && target.config.bubblefishConfig.capturePoints) || target.points;
                         this.stateManager.addScore(capturePoints);
                         this.audioManager.playCatch(capturePoints);
                         this.stateManager.setCatchEffect(target.position.x, target.position.y, capturePoints, 'bubblefish');
-                        const colors = target.config.bubblefishConfig?.explosionColors || ['#87CEEB'];
+                        const colors = (target.config.bubblefishConfig && target.config.bubblefishConfig.explosionColors) || ['#87CEEB'];
                         this.stateManager.setFireworkEffect(target.position.x, target.position.y, colors);
                     } else {
-                        const popPoints = target.config.bubblefishConfig?.bubblePopPoints || 5;
+                        const popPoints = (target.config.bubblefishConfig && target.config.bubblefishConfig.bubblePopPoints) || 5;
                         this.stateManager.addScore(popPoints);
                         this.audioManager.playCatch(popPoints);
                         this.stateManager.setCatchEffect(target.position.x, target.position.y, popPoints, 'bubblefish');
@@ -1431,7 +1476,7 @@ drawCheckinDayCircle(ctx, centerX, centerY, dayNumber, status, radius, labelYOff
                     this.stateManager.setCatchEffect(target.position.x, target.position.y, totalPoints, 'bouncyball', effectLabel);
 
                     if (comboCount >= 2) {
-                        const colors = target.config.bouncyballConfig?.explosionColors || ['#FF4444'];
+                        const colors = (target.config.bouncyballConfig && target.config.bouncyballConfig.explosionColors) || ['#FF4444'];
                         this.stateManager.setFireworkEffect(target.position.x, target.position.y, colors);
                     }
                     return;
@@ -1479,7 +1524,7 @@ drawCheckinDayCircle(ctx, centerX, centerY, dayNumber, status, radius, labelYOff
                     const colors = target.config.renderConfig && target.config.renderConfig.explosionColors || ['#FFF176', '#FFE066', '#FFD54F', '#FFF9C4', '#FFFFFF'];
                     this.stateManager.setFireworkEffect(target.position.x, target.position.y, colors);
                 } else if (target.config.id === 'jellyfish') {
-                    const colors = target.config.jellyfishConfig?.explosionColors || ['#B478FF', '#DDB4FF', '#E8D0FF'];
+                    const colors = (target.config.jellyfishConfig && target.config.jellyfishConfig.explosionColors) || ['#B478FF', '#DDB4FF', '#E8D0FF'];
                     this.stateManager.setFireworkEffect(target.position.x, target.position.y, colors);
                 }
 
@@ -1621,6 +1666,20 @@ drawCheckinDayCircle(ctx, centerX, centerY, dayNumber, status, radius, labelYOff
                 this.audioManager.playButtonClick();
                 this.showCheckinDialog = false;
                 this.checkinDialogButtons = null;
+
+                // 在 SelectionScreen 上显示签到成功弹窗
+                if (this.selectionScreen) {
+                    const reward = result.reward;
+                    const isUnlimited = reward.type === 'unlimited';
+                    this.selectionScreen.showCheckinSuccessDialog = true;
+                    this.selectionScreen.checkinSuccessData = {
+                        coins: reward.coins || 0,
+                        stamina: isUnlimited ? 0 : (reward.type === 'stamina' ? reward.amount : 0),
+                        unlimited: isUnlimited ? reward.duration : 0,
+                        day: result.day,
+                        consecutiveDays: this.checkinData.consecutiveDays
+                    };
+                }
             } else {
                 console.log('[CheckinDialog] 签到失败:', result.message);
             }
@@ -1750,29 +1809,9 @@ drawCheckinDayCircle(ctx, centerX, centerY, dayNumber, status, radius, labelYOff
 
         // 播放游戏开始音效
         this.audioManager.playGameStart();
-        // 根据目标类型选择BGM（老鼠和蝴蝶使用专属音乐）
-        let bgmName = 'game';
-        if (targetConfig.id === 'mouse') {
-            bgmName = 'mouse';
-        } else if (targetConfig.id === 'butterfly') {
-            bgmName = 'butterfly';
-        }else if (targetConfig.id === 'sparkle') {
-            bgmName = 'sparkle';
-        
-        }else if (targetConfig.id === 'fish') {
-            bgmName = 'fish';
-        
-        }else if (targetConfig.id === 'bird') {
-            bgmName = 'bird';
-        
-        }else if (targetConfig.id === 'yarn') {
-            bgmName = 'yarn';
-        }else if (targetConfig.id === 'ladybug') {
-            bgmName = 'ladybug';
-        }else if (targetConfig.id === 'laser') {
-            bgmName = 'laser';
-        }
-        this.audioManager.playBGM(bgmName, { volume: AUDIO_CONFIG.BGM_VOLUME.game }); 
+        // 根据目标类型选择BGM
+        const bgmName = targetConfig.id || 'game';
+        this.audioManager.playBGM(bgmName, { volume: AUDIO_CONFIG.BGM_VOLUME.game });
 
         // 生成初始目标
         this.targets = this.spawnManager.spawnInitialTargets({
@@ -1836,30 +1875,9 @@ drawCheckinDayCircle(ctx, centerX, centerY, dayNumber, status, radius, labelYOff
         // 播放模式选择音效
         this.audioManager.playModeSelect();
         this.audioManager.playGameStart();
-        // 根据目标类型选择BGM（老鼠和蝴蝶使用专属音乐）
-        let bgmName = 'menu';
-        if (targetConfig.id === 'mouse') {
-            bgmName = 'mouse';
-        } else if (targetConfig.id === 'butterfly') {
-            bgmName = 'butterfly';
-        }else if (targetConfig.id === 'sparkle') {
-            bgmName = 'sparkle';
-        
-        }else if (targetConfig.id === 'fish') {
-            bgmName = 'fish';
-        
-        }else if (targetConfig.id === 'bird') {
-            bgmName = 'bird';
-        
-        }else if (targetConfig.id === 'yarn') {
-            bgmName = 'yarn';
-        }else if (targetConfig.id === 'ladybug') {
-            bgmName = 'ladybug';
-        
-        }else if (targetConfig.id === 'laser') {
-            bgmName = 'laser';
-        }
-        this.audioManager.playBGM(bgmName, { volume: AUDIO_CONFIG.BGM_VOLUME.endless }); 
+        // 根据目标类型选择BGM
+        const bgmName = targetConfig.id || 'menu';
+        this.audioManager.playBGM(bgmName, { volume: AUDIO_CONFIG.BGM_VOLUME.endless });
 
         // 生成初始目标
         this.targets = this.spawnManager.spawnInitialTargets({
@@ -2479,25 +2497,42 @@ calculateConsecutiveDays() {
 
     /**
      * 发放签到奖励
-     * 第1-6天：每天1体力
-     * 第7天：24小时无限体力
+     * 根据天数从 CHECKIN_CONFIG.DAILY_REWARDS 查表发放
+     * 奇数天+1体力，偶数天+50金币，第7天无限体力
      */
-grantCheckinReward(consecutiveDay) {
-    if (consecutiveDay < 7) {
-        // 前6天：每天1体力（不受上限限制）
-        if (this.staminaManager) {
-            this.staminaManager.data.current += 1;
-            this.staminaManager.save();
-            console.log('[Game] ✅ 签到奖励：+1体力，当前:', this.staminaManager.data.current);
-        }
-        return { type: 'stamina', amount: 1 };
-    } else {
-        // 第7天：24小时无限体力
-        if (this.staminaManager) {
-            this.staminaManager.enableUnlimitedStamina(24 * 60 * 60 * 1000); // 24小时
-            console.log('[Game] ✅ 签到奖励：24小时无限体力');
-        }
-        return { type: 'unlimited', duration: 24 };
+grantCheckinReward(dayNumber) {
+    const rewardConfig = CHECKIN_CONFIG.DAILY_REWARDS[dayNumber - 1];
+    if (!rewardConfig) {
+        console.warn('[Game] ⚠️ 签到天数超出奖励配置:', dayNumber);
+        return { type: 'stamina', amount: 0 };
+    }
+
+    switch (rewardConfig.type) {
+        case 'stamina':
+            if (this.staminaManager) {
+                this.staminaManager.data.current += rewardConfig.amount;
+                this.staminaManager.save();
+                console.log(`[Game] ✅ 签到奖励：+${rewardConfig.amount}体力，当前:`, this.staminaManager.data.current);
+            }
+            return { type: 'stamina', amount: rewardConfig.amount, coins: 0 };
+
+        case 'coins':
+            if (this.coinManager) {
+                this.coinManager.addCoins(rewardConfig.amount, 'checkin_reward');
+                console.log(`[Game] ✅ 签到奖励：+${rewardConfig.amount}金币`);
+            }
+            return { type: 'coins', amount: rewardConfig.amount, coins: rewardConfig.amount };
+
+        case 'unlimited':
+            if (this.staminaManager) {
+                this.staminaManager.enableUnlimitedStamina(24 * 60 * 60 * 1000);
+                console.log('[Game] ✅ 签到奖励：24小时无限体力');
+            }
+            return { type: 'unlimited', duration: rewardConfig.duration, coins: 0 };
+
+        default:
+            console.warn('[Game] ⚠️ 未知奖励类型:', rewardConfig.type);
+            return { type: 'stamina', amount: 0, coins: 0 };
     }
 }
 

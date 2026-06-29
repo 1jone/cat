@@ -5,6 +5,14 @@
 
 import { COIN_CONFIG } from '../config';
 
+const MAX_SPENDING_HISTORY = 100;
+
+const REASON_LABELS = {
+    'buy_stamina_1': '购买体力(+1)',
+    'buy_stamina_2': '购买体力(+2)',
+    'permanent_unlock': '永久解锁目标'
+};
+
 export class CoinManager {
     constructor(settingsManager) {
         this.settings = settingsManager;
@@ -36,6 +44,13 @@ export class CoinManager {
         const totalSpent = (this.settings.get('coin.totalSpent') || 0) + amount;
         this.settings.set('coin.balance', newBalance);
         this.settings.set('coin.totalSpent', totalSpent);
+
+        const record = { timestamp: Date.now(), amount, reason, balance: newBalance };
+        const history = this.settings.get('coin.spendingHistory') || [];
+        history.unshift(record);
+        if (history.length > MAX_SPENDING_HISTORY) history.length = MAX_SPENDING_HISTORY;
+        this.settings.set('coin.spendingHistory', history);
+
         console.log(`[CoinManager] -${amount} 金币 (${reason}), 余额: ${newBalance}`);
         return { success: true, newBalance };
     }
@@ -173,5 +188,36 @@ export class CoinManager {
             return { completed: true, progress: next, total: COIN_CONFIG.STAMINA_AD_COUNT };
         }
         return { completed: false, progress: next, total: COIN_CONFIG.STAMINA_AD_COUNT };
+    }
+
+    // ==================== 消费记录 ====================
+
+    getReasonLabel(reason) {
+        return REASON_LABELS[reason] || reason;
+    }
+
+    getSpendingHistory() {
+        return this.settings.get('coin.spendingHistory') || [];
+    }
+
+    getSpendingHistoryGrouped() {
+        const history = this.getSpendingHistory();
+        if (history.length === 0) return { today: [], yesterday: [], earlier: [] };
+
+        const today = this._dateStr(new Date());
+        const yesterday = this._dateStr(new Date(Date.now() - 86400000));
+
+        const grouped = { today: [], yesterday: [], earlier: [] };
+        for (const record of history) {
+            const date = this._dateStr(new Date(record.timestamp));
+            if (date === today) grouped.today.push(record);
+            else if (date === yesterday) grouped.yesterday.push(record);
+            else grouped.earlier.push(record);
+        }
+        return grouped;
+    }
+
+    _dateStr(date) {
+        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
     }
 }

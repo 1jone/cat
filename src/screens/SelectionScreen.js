@@ -71,6 +71,20 @@ export class SelectionScreen {
         this.buyStaminaDialogButtons = null;
         this.unlimitedStaminaAdPlaying = false;  // 是否正在播放无限体力广告
 
+        // Toast 提示
+        this.toastMessage = null;
+        this.toastTime = 0;
+
+        // 金币消费明细弹窗
+        this.showSpendingHistoryDialog = false;
+        this.spendingHistoryButtons = null;
+        this.coinDisplayClickArea = null;
+
+        // 签到成功弹窗状态
+        this.showCheckinSuccessDialog = false;
+        this.checkinSuccessData = null;
+        this.checkinSuccessDialogButtons = null;
+
         // 模式选择弹窗状态
         this.showModeDialog = false;
         this.selectedTarget = null;
@@ -181,6 +195,9 @@ export class SelectionScreen {
         this.showUnlockDialog = false;
         this.unlockDialogTarget = null;
         this.showModeDialog = false;
+        this.showCheckinSuccessDialog = false;
+        this.checkinSuccessData = null;
+        this.checkinSuccessDialogButtons = null;
         this.selectedTarget = null;
 
         // 重置插屏广告计时器
@@ -266,6 +283,11 @@ export class SelectionScreen {
             return this.handleModeDialogClick(pos);
         }
 
+        // 优先级1.1: 签到成功弹窗
+        if (this.showCheckinSuccessDialog) {
+            return this.handleCheckinSuccessDialogClick(pos);
+        }
+
         // 优先级1.5: 购买体力弹窗
         if (this.showBuyStaminaDialog) {
             return this.handleBuyStaminaDialogClick(pos);
@@ -281,6 +303,17 @@ export class SelectionScreen {
             this.isDragging = false;
             this.autoScrollTimer = 0;
             this.handleBuyStamina();
+            return null;
+        }
+
+        // 优先级2.6: 消费明细弹窗
+        if (this.showSpendingHistoryDialog) {
+            return this.handleSpendingHistoryClick(pos);
+        }
+
+        // 优先级2.7: 金币区域点击
+        if (this.coinDisplayClickArea && this.isInRect(pos, this.coinDisplayClickArea)) {
+            this.showSpendingHistoryDialog = true;
             return null;
         }
 
@@ -534,10 +567,16 @@ export class SelectionScreen {
      * @param {number} dt - 时间增量（秒）
      */
     update(dt) {
-        // 更新粒子动画时间
-        if (typeof dt === 'number' && isFinite(dt)) {
-            this.particleTime += dt;
+        // 限制dt最大值，防止后台切回时dt过大导致位置跳变
+        if (typeof dt !== 'number' || !isFinite(dt) || dt > 0.1) {
+            dt = 0.016;
         }
+
+        // 更新粒子动画时间
+        this.particleTime += dt;
+
+        // 更新 Toast 提示
+        this.updateToast(dt);
 
         // 检查是否应该展示插屏广告
         this.checkAndShowInterstitialAd(dt);
@@ -634,6 +673,37 @@ export class SelectionScreen {
     }
 
     /**
+     * 处理签到成功弹窗点击
+     */
+    handleCheckinSuccessDialogClick(pos) {
+        if (!this.checkinSuccessDialogButtons) return null;
+        const btns = this.checkinSuccessDialogButtons;
+
+        if (this.isInRect(pos, btns.confirm)) {
+            this.showCheckinSuccessDialog = false;
+            this.checkinSuccessData = null;
+            this.checkinSuccessDialogButtons = null;
+            return null;
+        }
+
+        // 点击弹窗外部关闭
+        const { width: logicalWidth, height: logicalHeight } = this.getLogicalSize();
+        const centerX = logicalWidth / 2;
+        const centerY = logicalHeight / 2;
+        const dialogWidth = 280;
+        const dialogHeight = 260;
+        if (pos.x < centerX - dialogWidth / 2 ||
+            pos.x > centerX + dialogWidth / 2 ||
+            pos.y < centerY - dialogHeight / 2 ||
+            pos.y > centerY + dialogHeight / 2) {
+            this.showCheckinSuccessDialog = false;
+            this.checkinSuccessData = null;
+            this.checkinSuccessDialogButtons = null;
+        }
+        return null;
+    }
+
+    /**
      * 处理加群奖励领取
      */
     handleGroupJoin() {
@@ -705,11 +775,58 @@ export class SelectionScreen {
         return null;
     }
 
+    // ==================== Toast 提示 ====================
+
+    showToast(message) {
+        this.toastMessage = message;
+        this.toastTime = 2.0;
+    }
+
+    updateToast(dt) {
+        if (this.toastTime > 0) {
+            this.toastTime -= dt;
+            if (this.toastTime <= 0) {
+                this.toastMessage = null;
+                this.toastTime = 0;
+            }
+        }
+    }
+
+    renderToast() {
+        if (!this.toastMessage) return;
+        const ctx = this.ctx;
+        const { width: logicalWidth } = this.getLogicalSize();
+
+        const fadeStart = 0.5;
+        const alpha = this.toastTime <= fadeStart ? this.toastTime / fadeStart : 1;
+        const offsetY = this.toastTime <= fadeStart ? (fadeStart - this.toastTime) / fadeStart * 10 : 0;
+
+        ctx.save();
+        ctx.globalAlpha = alpha;
+
+        const toastW = 220;
+        const toastH = 40;
+        const toastX = logicalWidth / 2 - toastW / 2;
+        const toastY = 50 - offsetY;
+
+        drawRoundRect(ctx, toastX, toastY, toastW, toastH, 20);
+        ctx.fillStyle = 'rgba(76, 175, 80, 0.95)';
+        ctx.fill();
+
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = 'bold 15px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(this.toastMessage, logicalWidth / 2, toastY + toastH / 2);
+
+        ctx.restore();
+    }
+
     executeBuyStamina1() {
         if (!this.coinManager || !this.staminaManager) return;
         const result = this.coinManager.buyStamina1(this.staminaManager);
         if (result.success) {
-            console.log('[SelectionScreen] 150金币购买1点体力成功');
+            this.showToast('购买成功！体力 +1');
             this.showBuyStaminaDialog = false;
         }
     }
@@ -718,7 +835,7 @@ export class SelectionScreen {
         if (!this.coinManager || !this.staminaManager) return;
         const result = this.coinManager.buyStamina2(this.staminaManager);
         if (result.success) {
-            console.log('[SelectionScreen] 299金币购买2点体力成功');
+            this.showToast('购买成功！体力 +2');
             this.showBuyStaminaDialog = false;
         }
     }
@@ -746,43 +863,88 @@ export class SelectionScreen {
     /**
      * 渲染金币余额（左上角，体力恢复时间下方）
      */
-    renderCoinDisplay() {
-        if (!this.coinManager) return;
+    renderCoinDisplay(startY) {
+        if (!this.coinManager) return startY;
         const ctx = this.ctx;
         const balance = this.coinManager.getBalance();
         const scale = this.canvas.width / this.dpr / 375;
         const x = 20;
-        const y = 90;
+        const y = startY;
+
+        const fontSize = Math.round(14 * scale);
+        const coinText = `💰 ${balance}`;
+        const textWidth = ctx.measureText(coinText).width || 80;
+
+        this.coinDisplayClickArea = { x: x - 6, y: y - fontSize * 0.65, w: textWidth + 16, h: fontSize * 1.3 };
 
         ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
         ctx.lineWidth = 3;
         ctx.lineJoin = 'round';
 
         ctx.fillStyle = '#FFA500';
-        ctx.font = `bold ${Math.round(14 * scale)}px Arial`;
+        ctx.font = `bold ${fontSize}px Arial`;
         ctx.textAlign = 'left';
         ctx.textBaseline = 'middle';
 
-        const coinText = `💰 ${balance}`;
         ctx.strokeText(coinText, x, y);
         ctx.fillText(coinText, x, y);
     }
 
     /**
-     * 渲染体力显示（左上角，简化版）
+     * 渲染体力显示（左侧）
      */
-    renderStaminaDisplay() {
-        if (!this.staminaManager) return;
+    renderStaminaDisplay(startY) {
+        if (!this.staminaManager) return startY;
 
         const x = 20;
-        const y = 55;
+        const y = startY;
 
         if (this.staminaManager.isUnlimitedStamina()) {
             this.buyStaminaButtonArea = null;
             this._renderUnlimitedStaminaDisplay(x, y);
+            return y + 28;
         } else {
-            this._renderNormalStaminaDisplay(x, y);
+            return this._renderNormalStaminaDisplay(x, y);
         }
+    }
+
+    /**
+     * 渲染恢复时间（体力未满时在第二行显示）
+     */
+    renderRestoreTime(startY) {
+        if (!this.staminaManager) return startY;
+        if (this.staminaManager.isUnlimitedStamina()) return startY;
+
+        const current = this.staminaManager.getCurrentStamina();
+        const max = this.staminaManager.getMaxStamina();
+        if (current >= max) return startY;
+
+        const nextRestoreTime = this.staminaManager.getNextRestoreTime();
+        if (nextRestoreTime <= 0) return startY;
+
+        const ctx = this.ctx;
+        const scale = this.canvas.width / this.dpr / 375;
+        const x = 20;
+        const y = startY;
+
+        const minutes = Math.floor(nextRestoreTime / 60000);
+        const seconds = Math.floor((nextRestoreTime % 60000) / 1000);
+        const timeStr = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+        ctx.lineWidth = 3;
+        ctx.lineJoin = 'round';
+
+        ctx.font = `${Math.round(11 * scale)}px Arial`;
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+
+        const restoreText = `⏰ ${timeStr} 后恢复`;
+        ctx.strokeText(restoreText, x, y);
+        ctx.fillText(restoreText, x, y);
+
+        return y + 18;
     }
 
     /**
@@ -831,23 +993,7 @@ export class SelectionScreen {
             height: btnH
         };
 
-        // 体力未满时显示恢复时间
-        if (current < max) {
-            const nextRestoreTime = this.staminaManager.getNextRestoreTime();
-            if (nextRestoreTime > 0) {
-                const minutes = Math.floor(nextRestoreTime / 60000);
-                const seconds = Math.floor((nextRestoreTime % 60000) / 1000);
-                const timeStr = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-
-                ctx.font = '12px Arial';
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-                ctx.textBaseline = 'top';
-
-                const restoreText = `⏰ ${timeStr} 后恢复`;
-                ctx.strokeText(restoreText, x, y + 14);
-                ctx.fillText(restoreText, x, y + 14);
-            }
-        }
+        return y;
     }
 
     /**
@@ -898,11 +1044,15 @@ export class SelectionScreen {
         // === 1. 渐变背景 ===
         this.renderBackground(ctx, w, h);
 
-        // === 2. 体力显示 ===
-        this.renderStaminaDisplay();
+        // === 2. 顶部信息栏（体力 → 恢复时间 → 金币，从上到下）===
+        const STAMINA_Y = 55;
+        const RESTORE_Y = 77;
+        const COIN_Y_NO_RESTORE = 77;
+        const COIN_Y_WITH_RESTORE = 97;
 
-        // === 2.5 金币余额 + 购买体力按钮 ===
-        this.renderCoinDisplay();
+        this.renderStaminaDisplay(STAMINA_Y);
+        const hasRestore = this.renderRestoreTime(RESTORE_Y) > RESTORE_Y;
+        this.renderCoinDisplay(hasRestore ? COIN_Y_WITH_RESTORE : COIN_Y_NO_RESTORE);
 
         // === 3. 标题 ===
         ctx.fillStyle = '#FFFFFF';
@@ -993,6 +1143,13 @@ export class SelectionScreen {
         if (this.showUnlockDialog && this.unlockDialogTarget) {
             this.renderUnlockDialog();
         }
+        if (this.showCheckinSuccessDialog) {
+            this.renderCheckinSuccessDialog();
+        }
+        if (this.showSpendingHistoryDialog) {
+            this.renderSpendingHistoryDialog();
+        }
+        this.renderToast();
     }
 
     /**
@@ -1391,13 +1548,16 @@ export class SelectionScreen {
         } else {
             const groupTag = checkinState.hasGroupBonus ? '🔥今日双倍  ' : '';
             const dayText = `第${checkinState.consecutiveDays}天`;
-            const rewardText = `🎁 +${checkinState.todayReward}金币`;
-            ctx.fillText(`${groupTag}${dayText} ${rewardText}`, textX, y + 33 * scale);
+            const nextDay = checkinState.consecutiveDays;
+            const dayReward = nextDay % 2 === 1
+                ? '🎁 ⚡+1体力'
+                : (nextDay === 7 ? '🎁 ♾️无限体力' : '🎁 🪙+50金币');
+            ctx.fillText(`${groupTag}${dayText} ${dayReward}`, textX, y + 33 * scale);
         }
 
         ctx.fillStyle = '#999999';
         ctx.font = `${Math.round(9 * scale)}px Arial`;
-        ctx.fillText('连续签到奖励更丰厚', textX, y + 48 * scale);
+        ctx.fillText('签到领体力/金币，第7天无限体力', textX, y + 48 * scale);
 
         const btnW = 68 * scale;
         const btnH = 30 * scale;
@@ -1442,12 +1602,12 @@ export class SelectionScreen {
         ctx.fillStyle = isClaimed ? '#F5F5F5' : '#FFF8E1';
         drawRoundRect(ctx, cardX, y, cardW, cardH, 12 * scale);
         ctx.fill();
-
+            
         ctx.font = `${Math.round(20 * scale)}px Arial`;
         ctx.textAlign = 'left';
         ctx.textBaseline = 'middle';
         ctx.fillText('🎁', cardX + 12 * scale, y + cardH / 2);
-
+        
         const textX = cardX + 42 * scale;
         ctx.fillStyle = '#333333';
         ctx.font = `bold ${Math.round(13 * scale)}px Arial`;
@@ -1456,7 +1616,7 @@ export class SelectionScreen {
 
         ctx.fillStyle = '#888888';
         ctx.font = `${Math.round(10 * scale)}px Arial`;
-        ctx.fillText('✔ 签到奖励翻倍  ✔ 每日额外奖励', textX, y + 34 * scale);
+        ctx.fillText('✔ 新功能建议、问题反馈，欢迎进群交流🐾', textX, y + 34 * scale);
 
         const btnW = 60 * scale;
         const btnH = 30 * scale;
@@ -1816,6 +1976,179 @@ export class SelectionScreen {
         };
     }
 
+    // ==================== 金币消费明细弹窗 ====================
+
+    renderSpendingHistoryDialog() {
+        const ctx = this.ctx;
+        const { width: logicalWidth, height: logicalHeight } = this.getLogicalSize();
+        const centerX = logicalWidth / 2;
+        const centerY = logicalHeight / 2;
+        const dialogWidth = 290;
+        const dialogHeight = 380;
+
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.fillRect(0, 0, logicalWidth, logicalHeight);
+
+        const gradient = ctx.createLinearGradient(
+            centerX - dialogWidth / 2, centerY - dialogHeight / 2,
+            centerX + dialogWidth / 2, centerY + dialogHeight / 2
+        );
+        gradient.addColorStop(0, 'rgba(50, 50, 70, 0.98)');
+        gradient.addColorStop(1, 'rgba(30, 30, 50, 0.98)');
+
+        drawRoundRect(ctx, centerX - dialogWidth / 2, centerY - dialogHeight / 2, dialogWidth, dialogHeight, 20);
+        ctx.fillStyle = gradient;
+        ctx.fill();
+        ctx.strokeStyle = '#FFD700';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // 标题
+        ctx.fillStyle = '#FFD700';
+        ctx.font = 'bold 20px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('💰 金币消费明细', centerX, centerY - dialogHeight / 2 + 30);
+
+        // 当前余额
+        const balance = this.coinManager ? this.coinManager.getBalance() : 0;
+        ctx.fillStyle = '#FFA500';
+        ctx.font = '14px Arial';
+        ctx.fillText(`当前余额: ${balance}`, centerX, centerY - dialogHeight / 2 + 55);
+
+        // 消费记录列表
+        const listTop = centerY - dialogHeight / 2 + 75;
+        const listBottom = centerY + dialogHeight / 2 - 55;
+        const listHeight = listBottom - listTop;
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(centerX - dialogWidth / 2 + 10, listTop, dialogWidth - 20, listHeight);
+        ctx.clip();
+
+        if (!this.coinManager) {
+            ctx.fillStyle = '#888888';
+            ctx.font = '14px Arial';
+            ctx.fillText('暂无消费记录', centerX, listTop + listHeight / 2);
+        } else {
+            const grouped = this.coinManager.getSpendingHistoryGrouped();
+            const allItems = [];
+            if (grouped.today.length > 0) {
+                allItems.push({ label: '今天', items: grouped.today });
+            }
+            if (grouped.yesterday.length > 0) {
+                allItems.push({ label: '昨天', items: grouped.yesterday });
+            }
+            if (grouped.earlier.length > 0) {
+                allItems.push({ label: '更早', items: grouped.earlier });
+            }
+
+            if (allItems.length === 0) {
+                ctx.fillStyle = '#888888';
+                ctx.font = '14px Arial';
+                ctx.fillText('暂无消费记录', centerX, listTop + listHeight / 2);
+            } else {
+                let itemY = listTop + 5;
+                const maxItems = 7;
+                let count = 0;
+
+                for (const group of allItems) {
+                    if (count >= maxItems) break;
+
+                    // 组标题
+                    ctx.fillStyle = '#AAAAAA';
+                    ctx.font = '12px Arial';
+                    ctx.textAlign = 'left';
+                    ctx.fillText(group.label, centerX - dialogWidth / 2 + 20, itemY + 8);
+                    itemY += 22;
+                    count++;
+
+                    for (const record of group.items) {
+                        if (count >= maxItems) break;
+                        const d = new Date(record.timestamp);
+                        const timeStr = `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+
+                        ctx.textAlign = 'left';
+                        ctx.fillStyle = '#FFFFFF';
+                        ctx.font = '13px Arial';
+                        ctx.fillText(this.coinManager.getReasonLabel(record.reason), centerX - dialogWidth / 2 + 20, itemY + 8);
+
+                        ctx.textAlign = 'right';
+                        ctx.fillStyle = '#FF6B6B';
+                        ctx.font = 'bold 13px Arial';
+                        ctx.fillText(`-${record.amount}`, centerX + dialogWidth / 2 - 20, itemY + 8);
+
+                        ctx.textAlign = 'right';
+                        ctx.fillStyle = '#777777';
+                        ctx.font = '10px Arial';
+                        ctx.fillText(timeStr, centerX + dialogWidth / 2 - 20, itemY + 22);
+
+                        itemY += 36;
+                        count++;
+
+                        // 分隔线
+                        ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+                        ctx.lineWidth = 1;
+                        ctx.beginPath();
+                        ctx.moveTo(centerX - dialogWidth / 2 + 20, itemY - 4);
+                        ctx.lineTo(centerX + dialogWidth / 2 - 20, itemY - 4);
+                        ctx.stroke();
+                    }
+                }
+
+                if (count >= maxItems && allItems.some(g => g.items.length > maxItems)) {
+                    ctx.textAlign = 'center';
+                    ctx.fillStyle = '#888888';
+                    ctx.font = '12px Arial';
+                    ctx.fillText('仅显示最近记录...', centerX, itemY + 10);
+                }
+            }
+        }
+
+        ctx.restore();
+
+        // 关闭按钮
+        const closeBtnW = 100;
+        const closeBtnH = 34;
+        const closeBtnY = centerY + dialogHeight / 2 - 42;
+        drawRoundRect(ctx, centerX - closeBtnW / 2, closeBtnY, closeBtnW, closeBtnH, 10);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.fillStyle = '#AAAAAA';
+        ctx.font = '14px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('关闭', centerX, closeBtnY + closeBtnH / 2);
+
+        this.spendingHistoryButtons = {
+            close: { x: centerX - closeBtnW / 2, y: closeBtnY, w: closeBtnW, h: closeBtnH }
+        };
+    }
+
+    handleSpendingHistoryClick(pos) {
+        if (!this.spendingHistoryButtons) return null;
+        const btns = this.spendingHistoryButtons;
+
+        const closeBtn = btns.close;
+        if (closeBtn && pos.x >= closeBtn.x && pos.x <= closeBtn.x + closeBtn.w &&
+            pos.y >= closeBtn.y && pos.y <= closeBtn.y + closeBtn.h) {
+            this.showSpendingHistoryDialog = false;
+            return null;
+        }
+
+        // 点击弹窗外关闭
+        const { width: logicalWidth, height: logicalHeight } = this.getLogicalSize();
+        const cx = logicalWidth / 2, cy = logicalHeight / 2;
+        const dw = 290, dh = 380;
+        if (pos.x < cx - dw / 2 || pos.x > cx + dw / 2 || pos.y < cy - dh / 2 || pos.y > cy + dh / 2) {
+            this.showSpendingHistoryDialog = false;
+        }
+
+        return null;
+    }
+
     /**
      * 渲染解锁确认弹窗
      */
@@ -1924,6 +2257,91 @@ export class SelectionScreen {
             ad: { x: adX - buttonWidth / 2, y: adY - buttonHeight / 2, w: buttonWidth, h: buttonHeight },
             coin: { x: coinX - buttonWidth / 2, y: coinY - buttonHeight / 2, w: buttonWidth, h: buttonHeight },
             cancel: { x: centerX - cancelW / 2, y: cancelY - cancelH / 2, w: cancelW, h: cancelH }
+        };
+    }
+
+    /**
+     * 渲染签到成功弹窗
+     */
+    renderCheckinSuccessDialog() {
+        if (!this.checkinSuccessData) return;
+
+        const ctx = this.ctx;
+        const { width: logicalWidth, height: logicalHeight } = this.getLogicalSize();
+        const centerX = logicalWidth / 2;
+        const centerY = logicalHeight / 2;
+        const dialogWidth = 280;
+        const dialogHeight = 260;
+        const data = this.checkinSuccessData;
+
+        // 全屏遮罩
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.fillRect(0, 0, logicalWidth, logicalHeight);
+
+        // 弹窗背景
+        const gradient = ctx.createLinearGradient(
+            centerX - dialogWidth / 2, centerY - dialogHeight / 2,
+            centerX + dialogWidth / 2, centerY + dialogHeight / 2
+        );
+        gradient.addColorStop(0, 'rgba(50, 50, 70, 0.98)');
+        gradient.addColorStop(1, 'rgba(30, 30, 50, 0.98)');
+
+        drawRoundRect(ctx, centerX - dialogWidth / 2, centerY - dialogHeight / 2, dialogWidth, dialogHeight, 20);
+        ctx.fillStyle = gradient;
+        ctx.fill();
+        ctx.strokeStyle = '#FFD700';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // 标题
+        ctx.fillStyle = '#FFD700';
+        ctx.font = 'bold 22px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('🎉 签到成功', centerX, centerY - 95);
+
+        // 奖励内容
+        if (data.unlimited > 0) {
+            ctx.fillStyle = '#FF6B6B';
+            ctx.font = 'bold 20px Arial';
+            ctx.fillText(`♾️ ${data.unlimited}小时无限体力`, centerX, centerY - 45);
+        } else {
+            // 金币
+            if (data.coins > 0) {
+                ctx.fillStyle = '#FFA500';
+                ctx.font = 'bold 18px Arial';
+                ctx.fillText(`🪙 +${data.coins} 金币`, centerX, centerY - 55);
+            }
+            // 体力
+            if (data.stamina > 0) {
+                ctx.fillStyle = '#4FC3F7';
+                ctx.font = 'bold 18px Arial';
+                ctx.fillText(`⚡ +${data.stamina} 体力`, centerX, centerY - 25);
+            }
+        }
+
+        // 连续天数
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+        ctx.font = '13px Arial';
+        ctx.fillText(`连续签到第 ${data.consecutiveDays} 天`, centerX, centerY + 15);
+
+        // "好的"按钮
+        const confirmW = 120;
+        const confirmH = 40;
+        const confirmX = centerX - confirmW / 2;
+        const confirmY = centerY + 70;
+        drawRoundRect(ctx, confirmX, confirmY, confirmW, confirmH, 20);
+        ctx.fillStyle = '#43A047';
+        ctx.fill();
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = 'bold 16px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('好的', centerX, confirmY + confirmH / 2);
+
+        // 保存按钮区域
+        this.checkinSuccessDialogButtons = {
+            confirm: { x: confirmX, y: confirmY, width: confirmW, height: confirmH }
         };
     }
 
@@ -2200,7 +2618,7 @@ export class SelectionScreen {
         if (!this.adManager) return;
 
         // 如果有弹窗显示，不触发广告
-        if (this.showUnlockDialog || this.showModeDialog) {
+        if (this.showUnlockDialog || this.showModeDialog || this.showCheckinSuccessDialog) {
             return;
         }
 

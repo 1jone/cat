@@ -7,7 +7,7 @@ export const TARGET_TYPES = [
         image: '/target/sparkle_re.png',
         speed: 60,
         radius: 25,
-        points: 8,
+        points: 3,
         movement: 'hover',
         movementConfig: {
             hoverAmplitude: 20,
@@ -41,7 +41,7 @@ export const TARGET_TYPES = [
         image: '/target/laser_re.png',
         speed: 180,
         radius: 20,  // 最小体积
-        points: 25,
+        points: 10,
         movement: 'random',
         movementConfig: {
             chaseSpeed: 120,
@@ -78,7 +78,7 @@ export const TARGET_TYPES = [
         renderer: 'mouse',        // 指定渲染器类型
         speed: 150,
         radius: 25,               // 稍微减小碰撞半径
-        points: 15,
+        points: 7,
         movement: 'dash',
         movementConfig: {
             dashSpeed: 250,
@@ -111,406 +111,7 @@ export const TARGET_TYPES = [
             tailSwingSpeed: 8,         // 尾巴摆动速度
             tailSwingAmplitude: 0.15   // 尾巴摆动幅度
         }
-    },
-    // 4. 蝴蝶
-    {
-        id: 'butterfly',
-        type: 'butterfly',
-        name: '蝴蝶',
-        image: null,              // 改为 Canvas 渲染
-        renderType: 'canvas',
-        speed: 90,
-        radius: 30,
-        points: 12,
-        movement: 'butterfly',
-        background: {
-            image: null,
-            showGrass: false
-        },
-        // 渲染配置
-        renderConfig: {
-            primaryWingColor: '#FFD700',
-            secondaryWingColor: '#FFC125',
-            wingFlapSpeed: 15,
-            wingFlapAmplitude: 0.4,
-            glow: {
-                enabled: true,
-                color: 'rgba(255, 215, 0, 0.3)',
-                blur: 15
-            }
-        },
-        // 运动参数
-        butterflyParams: {
-            directionChangeProbability: 0.08,
-            edgeHuggingProbability: 0.3,
-            edgeDistance: 60,
-            speedVariation: 0.4
-        },
-        unlock: {
-            type: 'ad',
-            adRequired: true,
-            unlockDuration: 24 * 60 * 60 * 1000  // 24小时
-        },
-        adTrigger: {
-            enabled: true,
-            probability: 1.0,
-            cooldown: 0,
-            maxPerSession: 10
-        },
-        sidebarReward: {
-            canBeRewarded: false
-        }
-    },
-    // 5. 小鸟
-    {
-        id: 'bird',
-        name: '小鸟',
-        renderType: 'canvas',              // Canvas渲染
-        // image: '/target/bird_re.png',   // 改用Canvas绘制
-        speed: 130,
-        radius: 30,
-        points: 15,
-        movement: 'zigzag',
-        movementConfig: {
-            amplitude: 80,
-            frequency: 1.2
-        },
-        renderConfig: {                    // Canvas渲染配置
-            // 颜色方案
-            bodyColor: '#9C7B5E',          // 暖棕身体
-            bellyColor: '#EAD7C5',         // 米色腹部
-            wingColor: '#6B4F3A',          // 深棕翅膀
-            beakColor: '#D79B3B',          // 柔橙嘴
-            eyeColor: '#111111',           // 黑色眼睛
-
-            // 尺寸比例（相对于radius=30）
-            bodyRadius: 0.93,              // 28/30
-            headRadius: 0.73,              // 22/30
-            wingLength: 1.17               // 35/30
-        },
-        background: {
-            image: null,
-            showGrass: true
-        },
-        unlock: {
-            type: 'ad',
-            adRequired: true,
-            unlockDuration: 24 * 60 * 60 * 1000  // 24小时
-        },
-        adTrigger: {
-            enabled: true,
-            probability: 1.0,
-            cooldown: 0,
-            maxPerSession: 10
-        },
-        sidebarReward: {
-            canBeRewarded: true
-        }
-    },
-    // 6. 萤火虫
-    {
-        id: 'ladybug',
-        name: '萤火虫',
-        renderType: 'canvas',            // Canvas渲染
-        renderer: 'ladybug',             // 指定渲染器类型
-        speed: 60,
-        radius: 22,
-        points: 20,
-        movement: 'random',
-        renderConfig: {                 // 萤火虫渲染配置
-            // 发光颜色
-            glowColor: '#B6FF00',        // 黄绿色光晕
-            coreColor: '#FFFF66',        // 淡黄色核心
-            bodyColor: '#222222',        // 深色身体
-
-            // 发光参数
-            glow: {
-                innerRadius: 1.2,        // 内发光半径
-                outerRadius: 2.0,        // 外发光半径
-                opacity: 0.8             // 发光透明度
-            },
-
-            // 闪烁参数
-            flicker: {
-                baseIntensity: 0.6,      // 基础亮度
-                sineAmplitude: 0.3,      // 正弦波幅度
-                sineFrequency: 6,        // 正弦波频率
-                randomAmount: 0.2,       // 随机扰动
-                startleMultiplier: 2.5   // 受惊倍率
-            },
-
-            // 身体尺寸
-            bodyWidth: 0.3,              // 身体宽度
-            bodyLength: 0.5,             // 身体长度
-            headRadius: 0.15,            // 头部半径
-
-            // 爆炸粒子颜色
-            explosionColors: [
-                '#B6FF00',               // 黄绿色（主发光色）
-                '#FFFF66',               // 淡黄色（核心色）
-                '#88DD00',               // 深绿色
-                '#CCFF00',               // 黄绿色
-                '#99EE44',               // 浅绿色
-                '#DDFF55'                // 淡黄绿色
-            ]
-        },
-        background: {
-            image: null,
-            showGrass: true
-        },
-        unlock: {
-            type: 'ad',
-            adRequired: true,
-            unlockDuration: 24 * 60 * 60 * 1000  // 24小时
-        },
-        adTrigger: {
-            enabled: true,
-            probability: 1.0,
-            cooldown: 0,
-            maxPerSession: 10
-        },
-        sidebarReward: {
-            canBeRewarded: true
-        }
-    },
-    // 7. 小鱼
-    {
-        id: 'fish',
-        name: '小鱼',
-        icon: '🐠',
-        image: null,              // 改为 Canvas 渲染
-        renderer: 'fish',         // 指定渲染器类型
-        speed: 120,
-        radius: 32,
-        points: 12,
-        movement: 'zigzag',       // 改为锯齿运动
-        movementConfig: {
-            amplitude: 50,        // Z字幅度
-            frequency: 1.5        // Z字频率
-        },
-        background: {
-            image: null,
-            showGrass: false      // 不显示草地，使用水体背景
-        },
-        unlock: {
-            type: 'ad',
-            adRequired: true,
-            unlockDuration: 24 * 60 * 60 * 1000  // 24小时
-        },
-        adTrigger: {
-            enabled: true,
-            probability: 1.0,
-            cooldown: 0,
-            maxPerSession: 10
-        },
-        sidebarReward: {
-            canBeRewarded: true
-        },
-        // 小鱼特有配置
-        fishConfig: {
-            shimmerSpeed: 3,      // 闪烁速度
-            scaleShimmerSpeed: 2, // 鳞片闪烁速度
-            tailFlutterSpeed: 12  // 尾巴抖动速度
-        }
-    },
-    // 8. 多彩线群
-    {
-        id: 'yarn',
-        name: '多彩线群',
-        renderType: 'multiline',      // 多线渲染类型
-        speed: 30,                   // 较慢的游走速度
-        radius: 40,                  // 点击判定半径
-        points: 15,
-        movement: 'free',            // 自由移动模式
-        renderConfig: {
-            lineCount: 5,             // 线的数量
-            segmentCount: 60,         // 每条线的段数（增加到30，线更长）
-            segmentLength: 12,        // 每段长度（增加到12）
-            baseSpeed: 30,            // 基础速度
-            wiggleAmplitude: 15,      // 扭动幅度
-            wiggleFrequency: 2,       // 扭动频率
-            colors: [                 // 配色方案
-                '#FF6B6B', // 红
-                '#4ECDC4', // 蓝
-                '#95E1D3', // 青
-                '#F38181', // 粉
-                '#AA96DA'  // 紫
-            ]
-        },
-        background: {
-            image: null,
-            showGrass: false          // 不显示草地，使用深蓝背景
-        },
-        unlock: {
-            type: 'ad',
-            adRequired: true,
-            unlockDuration: 24 * 60 * 60 * 1000  // 24小时
-        },
-        adTrigger: {
-            enabled: true,
-            probability: 1.0,
-            cooldown: 0,
-            maxPerSession: 10
-        },
-        sidebarReward: {
-            canBeRewarded: true
-        }
-    },
-    // 9. 羽毛
-    {
-        id: 'feather',
-        name: '羽毛',
-        image: '/target/feather_re.png',
-        speed: 70,
-        radius: 28,
-        points: 22,
-        movement: 'pendulum',
-        movementConfig: {
-            pendulumLength: 120,
-            maxAngle: Math.PI / 4,
-            angularFreq: 1.5
-        },
-        background: {
-            image: null,
-            showGrass: true
-        },
-        unlock: {
-            type: 'ad',
-            adRequired: true,
-            unlockDuration: 24 * 60 * 60 * 1000  // 24小时
-        },
-        adTrigger: {
-            enabled: true,
-            probability: 1.0,
-            cooldown: 0,
-            maxPerSession: 10
-        },
-        sidebarReward: {
-            canBeRewarded: true
-        }
-    },
-    // 10. 船长
-    {
-        id: 'captain',
-        name: '船长',
-        image: '/target/captain_re.png',
-        speed: 100,
-        radius: 40,
-        points: 15,
-        movement: 'bounce',
-        background: {
-            image: '/backgrounds/captain_bg.jpg',
-            showGrass: false
-        },
-        // 广告配置 - 需要广告解锁（24小时）
-        unlock: {
-            type: 'ad',
-            adRequired: true,
-            unlockDuration: 24 * 60 * 60 * 1000  // 24小时
-        },
-        adTrigger: {
-            enabled: true,
-            probability: 1.0,
-            cooldown: 0,
-            maxPerSession: 10
-        },
-        // 侧边栏奖励配置 - 免费关卡不参与奖励
-        sidebarReward: {
-            canBeRewarded: false
-        }
-    },
-    // 11. 章鱼
-    {
-        id: 'octopus',
-        name: '章鱼',
-        image: '/target/octopus_re.png',
-        speed: 70,
-        radius: 45,
-        points: 20,
-        movement: 'wave',
-        background: {
-            image: '/backgrounds/octopus_bg.jpg',
-            showGrass: false
-        },
-        // 广告配置 - 需要广告解锁（24小时）
-        unlock: {
-            type: 'ad',
-            adRequired: true,
-            unlockDuration: 24 * 60 * 60 * 1000  // 24小时
-        },
-        adTrigger: {
-            enabled: true,
-            probability: 1.0,
-            cooldown: 0,
-            maxPerSession: 10
-        },
-        // 侧边栏奖励配置 - 可作为奖励
-        sidebarReward: {
-            canBeRewarded: true
-        }
-    },
-    // 12. 小熊
-    {
-        id: 'bear',
-        name: '小熊',
-        image: '/target/bear_re.png',
-        speed: 50,
-        radius: 35,
-        points: 25,
-        movement: 'random',
-        background: {
-            image: '/backgrounds/bear_bg.jpg',
-            showGrass: false
-        },
-        // 广告配置 - 需要广告解锁（24小时）
-        unlock: {
-            type: 'ad',
-            adRequired: true,
-            unlockDuration: 24 * 60 * 60 * 1000  // 24小时
-        },
-        adTrigger: {
-            enabled: true,
-            probability: 1.0,
-            cooldown: 0,
-            maxPerSession: 10
-        },
-        // 侧边栏奖励配置 - 可作为奖励
-        sidebarReward: {
-            canBeRewarded: true
-        }
-    },
-    // 13. 海鸥
-    {
-        id: 'seagull',
-        name: '海鸥',
-        image: '/target/seagull_re.png',
-        speed: 200,
-        radius: 30,
-        points: 10,
-        movement: 'random',
-        background: {
-            image: '/backgrounds/seagull_bg.jpg',
-            showGrass: false
-        },
-        // 广告配置 - 需要广告解锁（24小时）
-        unlock: {
-            type: 'ad',
-            adRequired: true,
-            unlockDuration: 24 * 60 * 60 * 1000  // 24小时
-        },
-        adTrigger: {
-            enabled: true,
-            probability: 1.0,
-            cooldown: 0,
-            maxPerSession: 10
-        },
-        // 侧边栏奖励配置 - 免费关卡不参与奖励
-        sidebarReward: {
-            canBeRewarded: false
-        }
-    },
-    // 14. 蚊子
-{
+    },{
     id: 'mosquito',
     name: '荧光蚊子',
     renderType: 'canvas',
@@ -522,7 +123,7 @@ export const TARGET_TYPES = [
     // 稍微放大，更容易被猫注意
     radius: 24,
 
-    points: 20,
+    points: 8,
 
     // 改成更灵活的运动
     movement: 'erratic',
@@ -633,6 +234,405 @@ export const TARGET_TYPES = [
         canBeRewarded: true
     }
 },
+    // 4. 蝴蝶
+    {
+        id: 'butterfly',
+        type: 'butterfly',
+        name: '蝴蝶',
+        image: null,              // 改为 Canvas 渲染
+        renderType: 'canvas',
+        speed: 90,
+        radius: 30,
+        points: 5,
+        movement: 'butterfly',
+        background: {
+            image: null,
+            showGrass: false
+        },
+        // 渲染配置
+        renderConfig: {
+            primaryWingColor: '#FFD700',
+            secondaryWingColor: '#FFC125',
+            wingFlapSpeed: 15,
+            wingFlapAmplitude: 0.4,
+            glow: {
+                enabled: true,
+                color: 'rgba(255, 215, 0, 0.3)',
+                blur: 15
+            }
+        },
+        // 运动参数
+        butterflyParams: {
+            directionChangeProbability: 0.08,
+            edgeHuggingProbability: 0.3,
+            edgeDistance: 60,
+            speedVariation: 0.4
+        },
+        unlock: {
+            type: 'ad',
+            adRequired: true,
+            unlockDuration: 24 * 60 * 60 * 1000  // 24小时
+        },
+        adTrigger: {
+            enabled: true,
+            probability: 1.0,
+            cooldown: 0,
+            maxPerSession: 10
+        },
+        sidebarReward: {
+            canBeRewarded: false
+        }
+    },
+    // 5. 小鸟
+    {
+        id: 'bird',
+        name: '小鸟',
+        renderType: 'canvas',              // Canvas渲染
+        // image: '/target/bird_re.png',   // 改用Canvas绘制
+        speed: 130,
+        radius: 30,
+        points: 7,
+        movement: 'zigzag',
+        movementConfig: {
+            amplitude: 80,
+            frequency: 1.2
+        },
+        renderConfig: {                    // Canvas渲染配置
+            // 颜色方案
+            bodyColor: '#9C7B5E',          // 暖棕身体
+            bellyColor: '#EAD7C5',         // 米色腹部
+            wingColor: '#6B4F3A',          // 深棕翅膀
+            beakColor: '#D79B3B',          // 柔橙嘴
+            eyeColor: '#111111',           // 黑色眼睛
+
+            // 尺寸比例（相对于radius=30）
+            bodyRadius: 0.93,              // 28/30
+            headRadius: 0.73,              // 22/30
+            wingLength: 1.17               // 35/30
+        },
+        background: {
+            image: null,
+            showGrass: true
+        },
+        unlock: {
+            type: 'ad',
+            adRequired: true,
+            unlockDuration: 24 * 60 * 60 * 1000  // 24小时
+        },
+        adTrigger: {
+            enabled: true,
+            probability: 1.0,
+            cooldown: 0,
+            maxPerSession: 10
+        },
+        sidebarReward: {
+            canBeRewarded: true
+        }
+    },
+    // 6. 萤火虫
+    {
+        id: 'ladybug',
+        name: '萤火虫',
+        renderType: 'canvas',            // Canvas渲染
+        renderer: 'ladybug',             // 指定渲染器类型
+        speed: 60,
+        radius: 22,
+        points: 8,
+        movement: 'random',
+        renderConfig: {                 // 萤火虫渲染配置
+            // 发光颜色
+            glowColor: '#B6FF00',        // 黄绿色光晕
+            coreColor: '#FFFF66',        // 淡黄色核心
+            bodyColor: '#222222',        // 深色身体
+
+            // 发光参数
+            glow: {
+                innerRadius: 1.2,        // 内发光半径
+                outerRadius: 2.0,        // 外发光半径
+                opacity: 0.8             // 发光透明度
+            },
+
+            // 闪烁参数
+            flicker: {
+                baseIntensity: 0.6,      // 基础亮度
+                sineAmplitude: 0.3,      // 正弦波幅度
+                sineFrequency: 6,        // 正弦波频率
+                randomAmount: 0.2,       // 随机扰动
+                startleMultiplier: 2.5   // 受惊倍率
+            },
+
+            // 身体尺寸
+            bodyWidth: 0.3,              // 身体宽度
+            bodyLength: 0.5,             // 身体长度
+            headRadius: 0.15,            // 头部半径
+
+            // 爆炸粒子颜色
+            explosionColors: [
+                '#B6FF00',               // 黄绿色（主发光色）
+                '#FFFF66',               // 淡黄色（核心色）
+                '#88DD00',               // 深绿色
+                '#CCFF00',               // 黄绿色
+                '#99EE44',               // 浅绿色
+                '#DDFF55'                // 淡黄绿色
+            ]
+        },
+        background: {
+            image: null,
+            showGrass: true
+        },
+        unlock: {
+            type: 'ad',
+            adRequired: true,
+            unlockDuration: 24 * 60 * 60 * 1000  // 24小时
+        },
+        adTrigger: {
+            enabled: true,
+            probability: 1.0,
+            cooldown: 0,
+            maxPerSession: 10
+        },
+        sidebarReward: {
+            canBeRewarded: true
+        }
+    },
+    // 7. 小鱼
+    {
+        id: 'fish',
+        name: '小鱼',
+        icon: '🐠',
+        image: null,              // 改为 Canvas 渲染
+        renderer: 'fish',         // 指定渲染器类型
+        speed: 120,
+        radius: 32,
+        points: 5,
+        movement: 'zigzag',       // 改为锯齿运动
+        movementConfig: {
+            amplitude: 50,        // Z字幅度
+            frequency: 1.5        // Z字频率
+        },
+        background: {
+            image: null,
+            showGrass: false      // 不显示草地，使用水体背景
+        },
+        unlock: {
+            type: 'ad',
+            adRequired: true,
+            unlockDuration: 24 * 60 * 60 * 1000  // 24小时
+        },
+        adTrigger: {
+            enabled: true,
+            probability: 1.0,
+            cooldown: 0,
+            maxPerSession: 10
+        },
+        sidebarReward: {
+            canBeRewarded: true
+        },
+        // 小鱼特有配置
+        fishConfig: {
+            shimmerSpeed: 3,      // 闪烁速度
+            scaleShimmerSpeed: 2, // 鳞片闪烁速度
+            tailFlutterSpeed: 12  // 尾巴抖动速度
+        }
+    },
+    // 8. 多彩线群
+    {
+        id: 'yarn',
+        name: '多彩线群',
+        renderType: 'multiline',      // 多线渲染类型
+        speed: 30,                   // 较慢的游走速度
+        radius: 40,                  // 点击判定半径
+        points: 7,
+        movement: 'free',            // 自由移动模式
+        renderConfig: {
+            lineCount: 5,             // 线的数量
+            segmentCount: 60,         // 每条线的段数（增加到30，线更长）
+            segmentLength: 12,        // 每段长度（增加到12）
+            baseSpeed: 30,            // 基础速度
+            wiggleAmplitude: 15,      // 扭动幅度
+            wiggleFrequency: 2,       // 扭动频率
+            colors: [                 // 配色方案
+                '#FF6B6B', // 红
+                '#4ECDC4', // 蓝
+                '#95E1D3', // 青
+                '#F38181', // 粉
+                '#AA96DA'  // 紫
+            ]
+        },
+        background: {
+            image: null,
+            showGrass: false          // 不显示草地，使用深蓝背景
+        },
+        unlock: {
+            type: 'ad',
+            adRequired: true,
+            unlockDuration: 24 * 60 * 60 * 1000  // 24小时
+        },
+        adTrigger: {
+            enabled: true,
+            probability: 1.0,
+            cooldown: 0,
+            maxPerSession: 10
+        },
+        sidebarReward: {
+            canBeRewarded: true
+        }
+    },
+    // 9. 羽毛
+    {
+        id: 'feather',
+        name: '羽毛',
+        image: '/target/feather_re.png',
+        speed: 70,
+        radius: 28,
+        points: 9,
+        movement: 'pendulum',
+        movementConfig: {
+            pendulumLength: 120,
+            maxAngle: Math.PI / 4,
+            angularFreq: 1.5
+        },
+        background: {
+            image: null,
+            showGrass: true
+        },
+        unlock: {
+            type: 'ad',
+            adRequired: true,
+            unlockDuration: 24 * 60 * 60 * 1000  // 24小时
+        },
+        adTrigger: {
+            enabled: true,
+            probability: 1.0,
+            cooldown: 0,
+            maxPerSession: 10
+        },
+        sidebarReward: {
+            canBeRewarded: true
+        }
+    },
+    // 10. 船长
+    {
+        id: 'captain',
+        name: '船长',
+        image: '/target/captain_re.png',
+        speed: 100,
+        radius: 40,
+        points: 7,
+        movement: 'bounce',
+        background: {
+            image: null,
+            showGrass: false
+        },
+        // 广告配置 - 需要广告解锁（24小时）
+        unlock: {
+            type: 'ad',
+            adRequired: true,
+            unlockDuration: 24 * 60 * 60 * 1000  // 24小时
+        },
+        adTrigger: {
+            enabled: true,
+            probability: 1.0,
+            cooldown: 0,
+            maxPerSession: 10
+        },
+        // 侧边栏奖励配置 - 免费关卡不参与奖励
+        sidebarReward: {
+            canBeRewarded: false
+        }
+    },
+    // 11. 章鱼
+    {
+        id: 'octopus',
+        name: '章鱼',
+        image: '/target/octopus_re.png',
+        speed: 70,
+        radius: 45,
+        points: 8,
+        movement: 'wave',
+        background: {
+            image: null,
+            showGrass: false
+        },
+        // 广告配置 - 需要广告解锁（24小时）
+        unlock: {
+            type: 'ad',
+            adRequired: true,
+            unlockDuration: 24 * 60 * 60 * 1000  // 24小时
+        },
+        adTrigger: {
+            enabled: true,
+            probability: 1.0,
+            cooldown: 0,
+            maxPerSession: 10
+        },
+        // 侧边栏奖励配置 - 可作为奖励
+        sidebarReward: {
+            canBeRewarded: true
+        }
+    },
+    // 12. 小熊
+    {
+        id: 'bear',
+        name: '小熊',
+        image: '/target/bear_re.png',
+        speed: 50,
+        radius: 35,
+        points: 10,
+        movement: 'random',
+        background: {
+            image: null,
+            showGrass: false
+        },
+        // 广告配置 - 需要广告解锁（24小时）
+        unlock: {
+            type: 'ad',
+            adRequired: true,
+            unlockDuration: 24 * 60 * 60 * 1000  // 24小时
+        },
+        adTrigger: {
+            enabled: true,
+            probability: 1.0,
+            cooldown: 0,
+            maxPerSession: 10
+        },
+        // 侧边栏奖励配置 - 可作为奖励
+        sidebarReward: {
+            canBeRewarded: true
+        }
+    },
+    // 13. 海鸥
+    {
+        id: 'seagull',
+        name: '海鸥',
+        image: '/target/seagull_re.png',
+        speed: 200,
+        radius: 30,
+        points: 4,
+        movement: 'random',
+        background: {
+            image: null,
+            showGrass: false
+        },
+        // 广告配置 - 需要广告解锁（24小时）
+        unlock: {
+            type: 'ad',
+            adRequired: true,
+            unlockDuration: 24 * 60 * 60 * 1000  // 24小时
+        },
+        adTrigger: {
+            enabled: true,
+            probability: 1.0,
+            cooldown: 0,
+            maxPerSession: 10
+        },
+        // 侧边栏奖励配置 - 免费关卡不参与奖励
+        sidebarReward: {
+            canBeRewarded: false
+        }
+    },
+    // 14. 蚊子
+
 // 15. 水母
 {
     id: 'jellyfish',
@@ -641,7 +641,7 @@ export const TARGET_TYPES = [
     renderer: 'jellyfish',
     speed: 50,
     radius: 35,
-    points: 20,
+    points: 8,
     movement: 'hover',
     movementConfig: {
         hoverAmplitude: 25,
@@ -673,8 +673,8 @@ export const TARGET_TYPES = [
         breathAmplitude: 0.4,
         inflatedRadius: 48,
         deflatedRadius: 18,
-        inflatedPoints: 10,
-        deflatedPoints: 35,
+        inflatedPoints: 3,
+        deflatedPoints: 10,
         bodyColor: 'rgba(120, 220, 255, 0.75)',
         bodyHighlight: 'rgba(220, 255, 255, 0.5)',
         tentacleColor: 'rgba(180, 240, 255, 0.45)',
@@ -697,7 +697,7 @@ export const TARGET_TYPES = [
     renderer: 'bouncyball',
     speed: 280,
     radius: 22,
-    points: 15,
+    points: 6,
     movement: 'bounce',
     background: {
         image: null,
@@ -718,9 +718,9 @@ export const TARGET_TYPES = [
         canBeRewarded: true
     },
     bouncyballConfig: {
-        basePoints: 15,
+        basePoints: 3,
         comboWindow: 1.0,
-        comboMultipliers: [1, 2, 3, 5],
+        comboMultipliers: [1, 2],
         wallAnglePerturbation: 0.4,
         ballColor: '#FF4444',
         ballHighlight: '#FF8888',
@@ -737,7 +737,7 @@ export const TARGET_TYPES = [
     renderer: 'bubblefish',
     speed: 100,
     radius: 35,
-    points: 20,
+    points: 8,
     movement: 'wave',
     movementConfig: {
         amplitude: 50,
@@ -766,8 +766,8 @@ export const TARGET_TYPES = [
     },
     bubblefishConfig: {
         maxHp: 3,
-        bubblePopPoints: 5,
-        capturePoints: 20,
+        bubblePopPoints: 2,
+        capturePoints: 6,
         bubbleShrinkFactor: 0.7,
         fishColor: '#FF8C42',
         fishHighlight: '#FFB366',
@@ -870,7 +870,7 @@ export const STAMINA_CONFIG = {
     // 分享内容配置
     SHARE: {
         title: '我正在玩猫咪追追追，快来一起玩吧！',  // 分享标题
-        imageUrl: 'target/play.png',                                       // 分享图片URL（可选，空字符串使用默认）
+        imageUrl: 'target/captain_re.png',                                 // 分享图片URL（可选，空字符串使用默认）
         path: 'src/screens/SelectionScreen.js',                         // 分享路径（点击分享卡片进入的页面）
         query: "type=stamina"                                 // 分享参数（可选）
     }
@@ -881,7 +881,7 @@ export const ENDLESS_CONFIG = {
     ATTRIBUTE_CHANGE_INTERVAL: 5000,
     SPEED_MULTIPLIER_RANGE: [0.7, 1.5],
     RADIUS_MULTIPLIER_RANGE: [0.8, 1.3],
-    POINTS_MULTIPLIER_RANGE: [0.8, 1.5]
+    POINTS_MULTIPLIER_RANGE: [0.8, 1.0]
 };
 export const SELECTION_CONFIG = {
     CARD_WIDTH: 140,              // 卡片宽度
@@ -1129,58 +1129,63 @@ export const AUDIO_LAYER_CONFIG = {
     // 音效文件路径映射（目标音效）
     TARGET_SFX_PATHS: {
         captain: {
-            meow1: 'assets/target/captain/meow1.mp3',
-            meow2: 'assets/target/captain/meow2.mp3',
-            meow3: 'assets/target/captain/meow3.mp3',
-            purr: 'assets/target/captain/purr.mp3'
+            meow1: 'assets/sfx/water.mp3',
+            meow2: 'assets/sfx/water.mp3',
+            meow3: 'assets/sfx/water.mp3',
+            purr: 'assets/sfx/water.mp3'
         },
         bear: {
-            growl1: 'assets/target/bear/growl1.mp3',
-            growl2: 'assets/target/bear/growl2.mp3',
-            purr1: 'assets/target/bear/purr1.mp3',
-            roar: 'assets/target/bear/roar.mp3'
+            growl1: 'assets/sfx/water.mp3',
+            growl2: 'assets/sfx/water.mp3',
+            purr1: 'assets/sfx/water.mp3',
+            roar: 'assets/sfx/water.mp3'
         },
         octopus: {
-            bubble1: 'assets/target/octopus/bubble1.mp3',
-            bubble2: 'assets/target/octopus/bubble2.mp3',
-            squirt: 'assets/target/octopus/squirt.mp3'
+            bubble1: 'assets/sfx/water.mp3',
+            bubble2: 'assets/sfx/water.mp3',
+            squirt: 'assets/sfx/water.mp3'
         },
         mouse: {
-            squeak1: 'assets/target/mouse/squeak1.mp3',
-            squeak2: 'assets/target/mouse/squeak2.mp3',
-            squeak3: 'assets/target/mouse/squeak3.mp3'
+            squeak1: 'assets/sfx/mouse.mp3',
+            squeak2: 'assets/sfx/mouse.mp3',
+            squeak3: 'assets/sfx/mouse.mp3'
         },
-        // 其他目标可以使用默认音效或保持静默
         seagull: {
-            call1: 'assets/target/seagull/call1.mp3',
-            call2: 'assets/target/seagull/call2.mp3'
+            call1: 'assets/sfx/water.mp3',
+            call2: 'assets/sfx/water.mp3'
         },
         bird: {
-            chirp1: 'assets/target/bird/chirp1.mp3',
-            chirp2: 'assets/target/bird/chirp2.mp3',
-            chirp3: 'assets/target/bird/chirp3.mp3'
+            chirp1: 'assets/sfx/bird.mp3',
+            chirp2: 'assets/sfx/bird.mp3',
+            chirp3: 'assets/sfx/bird.mp3',
+            wings: 'assets/sfx/wings.mp3'
         },
         fish: {
-            splash: 'assets/target/fish/splash.mp3'
+            splash: 'assets/sfx/water.mp3'
         },
         butterfly: {
-            flutter: 'assets/target/butterfly/flutter.mp3'
+            flutter: 'assets/sfx/wings.mp3',
+            wings: 'assets/sfx/wings.mp3'
         },
         yarn: {
-            rustle: 'assets/target/yarn/rustle.mp3'
+            rustle: 'assets/sfx/freesound_community-bird-chirps-43756.mp3'
         },
         ladybug: {
-            tiny: 'assets/target/ladybug/tiny.mp3'
+            tiny: 'assets/sfx/bird.mp3',
+            wings: 'assets/sfx/wings.mp3'
         },
         feather: {
-            rustle: 'assets/target/feather/rustle.mp3'
+            rustle: 'assets/sfx/bird.mp3'
         },
         laser: {
-            zap: 'assets/target/laser/zap.mp3'
+            zap: 'assets/sfx/freesound_community-bird-chirps-43756.mp3'
         },
-        // 粒子目标
+        mosquito: {
+            buzz: 'assets/sfx/wings.mp3',
+            wings: 'assets/sfx/wings.mp3'
+        },
         sparkle: {
-            sparkle: 'assets/target/sparkle/sparkle.mp3'
+            sparkle: 'assets/sfx/bird.mp3'
         }
     }
 };
@@ -1318,6 +1323,35 @@ export const FEATURE_FLAGS = {
     friendRank: true
 };
 
+/**
+ * 性能分级配置
+ * 根据设备能力自动选择 high / medium / low 等级
+ * QualityManager 读取此配置控制渲染质量
+ */
+export const PERFORMANCE_TIERS = {
+    high: {
+        maxGrassDensity: 1.0,
+        particleCount: 1.0,
+        enableShadowBlur: true,
+        waterWaveStep: 10,
+        neonLineWidth: 1,
+    },
+    medium: {
+        maxGrassDensity: 0.6,
+        particleCount: 0.5,
+        enableShadowBlur: false,
+        waterWaveStep: 20,
+        neonLineWidth: 1,
+    },
+    low: {
+        maxGrassDensity: 0.3,
+        particleCount: 0.25,
+        enableShadowBlur: false,
+        waterWaveStep: 40,
+        neonLineWidth: 2,
+    }
+};
+
 // ============ 窜出动画配置 ============
 
 /**
@@ -1363,6 +1397,15 @@ export const CHECKIN_CONFIG = {
     CYCLE_DAYS: 7,
     MAKEUP_AD_PLACEMENT: 'checkin_makeup',
     DATA_VERSION: 3,
+    DAILY_REWARDS: [
+        { type: 'stamina', amount: 1 },      // 第1天：+1体力
+        { type: 'coins', amount: 50 },       // 第2天：+50金币
+        { type: 'stamina', amount: 1 },      // 第3天：+1体力
+        { type: 'coins', amount: 50 },       // 第4天：+50金币
+        { type: 'stamina', amount: 1 },      // 第5天：+1体力
+        { type: 'coins', amount: 50 },       // 第6天：+50金币
+        { type: 'unlimited', duration: 24 }, // 第7天：无限体力
+    ],
     COLORS: {
         checked: '#FFD700',
         makeup: '#26A69A',

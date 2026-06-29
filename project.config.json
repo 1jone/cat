@@ -9,7 +9,21 @@
         "compileHotReLoad": true,
         "nativeCompile": true,
         "mockLogin": false,
-        "autoPush": true
+        "autoPush": true,
+        "packOptions": {
+            "ignore": [
+                { "type": "folder", "value": "tools" },
+                { "type": "folder", "value": "docs" },
+                { "type": "folder", "value": "scripts" },
+                { "type": "folder", "value": "tests" },
+                { "type": "folder", "value": ".git" },
+                { "type": "folder", "value": ".byte-ide" },
+                { "type": "folder", "value": ".claude" },
+                { "type": "folder", "value": ".playwright-mcp" },
+                { "type": "file", "value": "CLAUDE.md" },
+                { "type": "file", "value": "AGENTS.md" }
+            ]
+        }
     },
     "appid": "tt0c697ad4920b501302",
     "projectname": "catGame",

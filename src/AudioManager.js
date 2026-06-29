@@ -40,6 +40,37 @@ export class AudioManager {
 
         // 目标音效缓存（避免重复创建音频实例）
         this.targetSfxCache = new Map();
+
+        // 音频对象池（复用音频实例，减少创建/销毁开销）
+        this._sfxPool = [];
+        this._sfxPoolMaxSize = 8;
+    }
+
+    /**
+     * 从对象池获取音频实例
+     */
+    _acquireAudio() {
+        for (let i = 0; i < this._sfxPool.length; i++) {
+            const audio = this._sfxPool[i];
+            if (audio._pooled) {
+                audio._pooled = false;
+                return audio;
+            }
+        }
+        return tt.createInnerAudioContext();
+    }
+
+    /**
+     * 归还音频实例到对象池
+     */
+    _releaseAudio(audio) {
+        try { audio.stop(); } catch (e) {}
+        if (this._sfxPool.length < this._sfxPoolMaxSize) {
+            audio._pooled = true;
+            this._sfxPool.push(audio);
+        } else {
+            try { audio.destroy(); } catch (e) {}
+        }
     }
 
     /**
@@ -62,15 +93,27 @@ export class AudioManager {
     getBGMPath(name) {
         const paths = {
             'menu': 'music/summer_breeze_cruise-52322afd-e3d0-4d6d-aa63-57e653a2337c.mp3',
-            'game': 'music/summer_breeze_cruise-817a5819-90e8-48ad-a24e-8c7268c6c4f4.mp3',
+            // 'game': 'music/summer_breeze_cruise-817a5819-90e8-48ad-a24e-8c7268c6c4f4.mp3',
+            // bird.mp3 组：光点、小鸟、萤火虫、羽毛
+            'sparkle': 'assets/sfx/bird.mp3',
+            'bird': 'assets/sfx/bird.mp3',
+            'ladybug': 'assets/sfx/bird.mp3',
+            'feather': 'assets/sfx/bird.mp3',
+            // freesound 组：激光点、蝴蝶、多彩线群、弹力球
+            'laser': 'assets/sfx/freesound_community-bird-chirps-43756.mp3',
+            'butterfly': 'assets/sfx/freesound_community-bird-chirps-43756.mp3',
+            'yarn': 'assets/sfx/freesound_community-bird-chirps-43756.mp3',
+            'bouncyball': 'assets/sfx/freesound_community-bird-chirps-43756.mp3',
+            // water.mp3 组：小鱼、船长、章鱼、小熊、海鸥、水母、气泡鱼
             'mouse': 'assets/sfx/mouse.mp3',
-            'butterfly':'assets/sfx/butterfly.mp3',
-            "sparkle":'assets/sfx/game.mp3',
-            "fish":'assets/sfx/ocean.mp3',
-            "bird":'assets/sfx/guitar.mp3',
-            "yarn":'assets/sfx/happy.mp3',
-            "ladybug":'assets/sfx/crickets.mp3',
-            "laser":'assets/sfx/game.mp3',
+            'fish': 'assets/sfx/water.mp3',
+            'captain': 'assets/sfx/water.mp3',
+            'octopus': 'assets/sfx/water.mp3',
+            'bear': 'assets/sfx/water.mp3',
+            'seagull': 'assets/sfx/water.mp3',
+            'jellyfish': 'assets/sfx/water.mp3',
+            'bubblefish': 'assets/sfx/water.mp3',
+            'mosquito': 'assets/sfx/wings.mp3',
         };
         return paths[name] || paths['menu'];
     }
@@ -328,21 +371,18 @@ export class AudioManager {
         if (this.isMuted) return;
 
         try {
-            // 创建音效实例
-            const sfx = tt.createInnerAudioContext();
+            const sfx = this._acquireAudio();
             sfx.src = 'music/click.mp3';
             sfx.volume = this.gameSfxVolume;
             sfx.loop = false;
 
-            // 播放完成后销毁实例
             sfx.onEnded(() => {
-                sfx.destroy();
+                this._releaseAudio(sfx);
             });
 
-            // 错误处理
             sfx.onError((err) => {
                 console.warn('播放点击音效失败:', err);
-                sfx.destroy();
+                this._releaseAudio(sfx);
             });
 
             sfx.play();
@@ -437,21 +477,19 @@ export class AudioManager {
         const soundPath = this.getTargetSFXPath(targetId, soundId);
 
         try {
-            // 创建新的音频实例
-            const audio = tt.createInnerAudioContext();
+            const audio = this._acquireAudio();
             audio.src = soundPath;
             audio.volume = this.targetSfxVolume;
 
-            // 播放完成后清理缓存
             audio.onEnded(() => {
                 this.targetSfxCache.delete(soundPath);
-                try { audio.destroy(); } catch (e) {}
+                this._releaseAudio(audio);
             });
 
             audio.onError((err) => {
                 console.warn('目标音效播放错误:', soundPath, err);
                 this.targetSfxCache.delete(soundPath);
-                try { audio.destroy(); } catch (e) {}
+                this._releaseAudio(audio);
             });
 
             audio.play();
@@ -479,6 +517,12 @@ export class AudioManager {
             } catch (e) {}
         });
         this.targetSfxCache.clear();
+
+        // 清理音频对象池
+        this._sfxPool.forEach(audio => {
+            try { audio.destroy(); } catch (e) {}
+        });
+        this._sfxPool = [];
         this.initialized = false;
     }
 }

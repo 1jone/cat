@@ -403,7 +403,7 @@ export class ImageTarget extends Entity {
 
     incrementCombo() {
         this.comboCount++;
-        this.comboTimer = this.config.bouncyballConfig?.comboWindow || 1.0;
+        this.comboTimer = (this.config.bouncyballConfig && this.config.bouncyballConfig.comboWindow) || 1.0;
         return this.comboCount;
     }
 
@@ -618,9 +618,13 @@ export class ImageTarget extends Entity {
         const angularSpeed = params.angularSpeed || 2;
         const orbitRadius = params.orbitRadius || 80;
 
+        const angle = this.time * angularSpeed + this.phase;
+        const cosAngle = Math.cos(angle);
+        const sinAngle = Math.sin(angle);
+
         // 计算新位置
-        const newX = this.orbitCenterX + orbitRadius * Math.cos(this.time * angularSpeed + this.phase);
-        const newY = this.orbitCenterY + orbitRadius * Math.sin(this.time * angularSpeed + this.phase);
+        const newX = this.orbitCenterX + orbitRadius * cosAngle;
+        const newY = this.orbitCenterY + orbitRadius * sinAngle;
 
         // 边界处理 - 如果超出边界，移动轨道中心
         const margin = orbitRadius + this.radius;
@@ -640,9 +644,9 @@ export class ImageTarget extends Entity {
         this.orbitCenterX = Math.max(minX, Math.min(maxX, this.orbitCenterX));
         this.orbitCenterY = Math.max(minY, Math.min(maxY, this.orbitCenterY));
 
-        // 更新位置
-        this.position.x = this.orbitCenterX + orbitRadius * Math.cos(this.time * angularSpeed + this.phase);
-        this.position.y = this.orbitCenterY + orbitRadius * Math.sin(this.time * angularSpeed + this.phase);
+        // 更新位置（复用已计算的三角函数值）
+        this.position.x = this.orbitCenterX + orbitRadius * cosAngle;
+        this.position.y = this.orbitCenterY + orbitRadius * sinAngle;
     }
 
     /**
@@ -671,8 +675,11 @@ export class ImageTarget extends Entity {
         }
 
         // 计算新位置
-        const newX = this.spiralCenterX + this.spiralRadius * Math.cos(this.time * angularSpeed + this.phase);
-        const newY = this.spiralCenterY + this.spiralRadius * Math.sin(this.time * angularSpeed + this.phase);
+        const angle = this.time * angularSpeed + this.phase;
+        const cosAngle = Math.cos(angle);
+        const sinAngle = Math.sin(angle);
+        const newX = this.spiralCenterX + this.spiralRadius * cosAngle;
+        const newY = this.spiralCenterY + this.spiralRadius * sinAngle;
 
         // 边界处理
         const margin = maxRadius + this.radius;
@@ -691,8 +698,8 @@ export class ImageTarget extends Entity {
         this.spiralCenterX = Math.max(minX, Math.min(maxX, this.spiralCenterX));
         this.spiralCenterY = Math.max(minY, Math.min(maxY, this.spiralCenterY));
 
-        this.position.x = this.spiralCenterX + this.spiralRadius * Math.cos(this.time * angularSpeed + this.phase);
-        this.position.y = this.spiralCenterY + this.spiralRadius * Math.sin(this.time * angularSpeed + this.phase);
+        this.position.x = this.spiralCenterX + this.spiralRadius * cosAngle;
+        this.position.y = this.spiralCenterY + this.spiralRadius * sinAngle;
     }
 
     /**

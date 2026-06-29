@@ -120,12 +120,12 @@ export class RankManager {
     async openRankList(isEndlessMode) {
         if (!this.isAvailable) {
             console.log('[RankManager] 排行榜不可用，原因:', this.unavailableReason);
-            tt.showToast?.({ title: '排行榜暂不可用', icon: 'none' });
+            if (tt.showToast) tt.showToast({ title: '排行榜暂不可用', icon: 'none' });
             return;
         }
         if (!this.isLoggedIn) await this.login();
         if (!this.isLoggedIn) {
-            tt.showToast?.({ title: '登录失败，请重试', icon: 'none' });
+            if (tt.showToast) tt.showToast({ title: '登录失败，请重试', icon: 'none' });
             return;
         }
 
@@ -149,10 +149,10 @@ export class RankManager {
                 });
             });
             console.log('[RankManager] 打开排行榜成功:', rankKey, zoneId);
-            tt.showToast?.({ title: '打开排行榜成功', icon: 'success' });
+            if (tt.showToast) tt.showToast({ title: '打开排行榜成功', icon: 'success' });
         } catch (e) {
             console.error('[RankManager] 打开排行榜失败:', e.errMsg || e);
-            tt.showToast?.({ title: '打开失败，请稍后重试', icon: 'none' });
+            if (tt.showToast) tt.showToast({ title: '打开失败，请稍后重试', icon: 'none' });
         }
     }
 }
